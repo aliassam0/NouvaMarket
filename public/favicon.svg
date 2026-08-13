@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <radialGradient id="bagShadow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    
+    <linearGradient id="frontFaceGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6ee7b7"/>
+      <stop offset="25%" stop-color="#22c55e"/>
+      <stop offset="70%" stop-color="#15803d"/>
+      <stop offset="100%" stop-color="#064e3b"/>
+    </linearGradient>
+
+    <linearGradient id="sideFaceGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#15803d"/>
+      <stop offset="100%" stop-color="#022c22"/>
+    </linearGradient>
+
+    <linearGradient id="handleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#a7f3d0"/>
+      <stop offset="40%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#065f46"/>
+    </linearGradient>
+
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ecfdf5"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#064e3b"/>
+    </linearGradient>
+    
+    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#f0fdf4"/>
+    </linearGradient>
+
+    <linearGradient id="highlightGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <ellipse cx="256" cy="468" rx="180" ry="22" fill="url(#bagShadow)"/>
+
+  <path d="M 200 170 C 200 70, 275 70, 275 170" fill="none" stroke="url(#handleGrad)" stroke-width="28" stroke-linecap="round"/>
+  <path d="M 295 170 C 295 70, 370 70, 370 170" fill="none" stroke="url(#handleGrad)" stroke-width="28" stroke-linecap="round"/>
+
+  <path d="M 120 195 L 180 145 C 195 135, 345 135, 360 145 L 420 195 C 438 210, 448 230, 428 415 C 418 440, 388 448, 358 448 L 180 448 C 145 448, 120 438, 110 410 Z" fill="url(#sideFaceGrad)"/>
+
+  <path d="M 148 170 C 165 158, 365 158, 382 170 C 402 185, 422 410, 402 435 C 392 450, 372 456, 335 456 L 185 456 C 148 456, 128 450, 118 435 C 98 410, 128 185, 148 170 Z" fill="url(#frontFaceGrad)"/>
+
+  <path d="M 148 170 C 165 158, 365 158, 382 170 C 390 178, 393 195, 390 215 C 335 185, 195 185, 140 215 C 137 195, 140 178, 148 170 Z" fill="url(#highlightGrad)"/>
+
+  <path d="M 195 175 C 195 80, 270 80, 270 175" fill="none" stroke="url(#handleGrad)" stroke-width="26" stroke-linecap="round"/>
+  <path d="M 285 175 C 285 80, 360 80, 360 175" fill="none" stroke="url(#handleGrad)" stroke-width="26" stroke-linecap="round"/>
+
+  <circle cx="195" cy="175" r="14" fill="url(#ringGrad)" stroke="#064e3b" stroke-width="3"/>
+  <circle cx="195" cy="175" r="7" fill="#022c22"/>
+  
+  <circle cx="270" cy="175" r="14" fill="url(#ringGrad)" stroke="#064e3b" stroke-width="3"/>
+  <circle cx="270" cy="175" r="7" fill="#022c22"/>
+
+  <circle cx="285" cy="175" r="14" fill="url(#ringGrad)" stroke="#064e3b" stroke-width="3"/>
+  <circle cx="285" cy="175" r="7" fill="#022c22"/>
+
+  <circle cx="360" cy="175" r="14" fill="url(#ringGrad)" stroke="#064e3b" stroke-width="3"/>
+  <circle cx="360" cy="175" r="7" fill="#022c22"/>
+
+  <g transform="translate(10, 10)">
+    <path d="M 360 205 C 230 220, 155 315, 155 415 C 240 438, 375 370, 370 210 Z" fill="url(#leafGrad)"/>
+    <path d="M 165 405 C 215 320, 312 248, 330 240 C 280 280, 210 360, 165 405 Z" fill="#15803d"/>
+  </g>
+</svg>

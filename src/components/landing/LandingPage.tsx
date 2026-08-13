@@ -207,11 +207,12 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3">
           {/* Brand Logo & Name */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 via-indigo-600 to-violet-600 p-0.5 shadow-md shadow-emerald-500/10 shrink-0">
-              <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center font-black text-emerald-400 text-sm sm:text-base tracking-tighter">
-                RM
-              </div>
-            </div>
+            <img 
+              src="/logo.svg" 
+              alt="Nouva Market Logo" 
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl object-contain drop-shadow-md shrink-0 bg-emerald-50 p-1 border border-emerald-100" 
+              referrerPolicy="no-referrer" 
+            />
             <div>
               <div className="flex items-center gap-1.5">
                 <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight leading-none">

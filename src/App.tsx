@@ -241,9 +241,7 @@ function AppContent() {
             <span>🌐 الرئيسية</span>
           </button>
           <div className="hidden sm:flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-emerald-500 flex items-center justify-center text-white font-black text-xs shadow-md shrink-0">
-              KM
-            </div>
+            <img src="/logo.svg" alt="Nouva Market Logo" className="w-8 h-8 rounded-xl object-contain drop-shadow-sm shrink-0" referrerPolicy="no-referrer" />
             <div>
               <h1 className="text-xs font-black tracking-tight text-slate-900 dark:text-white leading-none">
                 {t('app.title')}
