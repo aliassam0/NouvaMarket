@@ -115,7 +115,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
         setIsLoginModalOpen(false);
         onEnterApp(targetRole);
       } else {
-        onShowToast('بيانات الدخول غير صحيحة! يرجى إدخال البريد الإلكتروني وكلمة السر الصحيحة (Ali1234567)', 'error');
+        onShowToast('❌ بيانات الدخول غير صحيحة! البريد الإلكتروني أو كلمة السر غير مسجلة لدينا.', 'error');
       }
     } catch (err) {
       onShowToast('حدث خطأ أثناء تسجيل الدخول', 'error');
@@ -161,7 +161,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
           password: regPassword,
           role: 'warehouse',
         });
-        onShowToast('✔ تم تسجيل حسابك كمورد بنجاح! مرحباً بك في لوحة تحكم المستودع والتوريد.', 'success');
+        onShowToast('⏳ تم تقديم طلب انضمام المورد بنجاح! حسابك الآن قيد المراجعة والتدقيق من طرف الإدارة.', 'info');
         setIsRegisterModalOpen(false);
         onEnterApp('warehouse');
       } else {

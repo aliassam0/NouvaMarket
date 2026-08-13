@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DateFilterBar, DateFilterMode, matchesDateFilter } from '../common/DateFilterBar';
 import { ShipmentTrackingTool } from '../common/ShipmentTrackingTool';
 import { ShippingRatesModal } from '../common/ShippingRatesModal';
@@ -139,7 +139,10 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
 
   // Supplier Profile & Financials State
   const { user } = useAuth();
-  const isDemoSupplier = false;
+  const isDemoSupplier =
+    (user?.email && user.email.toLowerCase() === 'warehouse@nouvamarket.com') ||
+    user?.id === 'u-wh-1' ||
+    user?.id === 'sup-demo';
 
   const [supplierProfile, setSupplierProfile] = useState<SupplierProfile>(() => {
     const suppliers = getStoredSuppliers();
@@ -157,7 +160,7 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
       password: '123',
       wilaya: user?.wilaya || '16 - الجزائر',
       activityType: 'ألبسة ونسيج',
-      status: 'APPROVED',
+      status: (user?.approvalStatus as any) || 'PENDING',
       ccpOrRip: 'CCP / BaridiMob Pending',
       totalSalesDzd: 0,
       nouvaCommissionDzd: 0,
@@ -172,6 +175,24 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
     saveStoredSuppliers([newSupplier, ...suppliers]);
     return newSupplier;
   });
+
+  const mySupplierProducts = useMemo(() => {
+    return products.filter((p) => {
+      if (isDemoSupplier) {
+        if (!p.supplierId && !p.supplierName) return true;
+        return (
+          p.supplierId === supplierProfile.id ||
+          p.supplierName === supplierProfile.companyName ||
+          p.supplierName === supplierProfile.fullName
+        );
+      }
+      return (
+        p.supplierId === supplierProfile.id ||
+        (p.supplierEmail && p.supplierEmail.toLowerCase() === (supplierProfile.email || '').toLowerCase()) ||
+        (p.supplierName && (p.supplierName === supplierProfile.companyName || p.supplierName === supplierProfile.fullName))
+      );
+    });
+  }, [products, supplierProfile, isDemoSupplier]);
 
   const [settlements, setSettlements] = useState<SupplierSettlement[]>(() => {
     const allSettlements = getStoredSettlements();
@@ -466,12 +487,18 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
   // Products Save Handler
   const handleSaveProductFromWarehouse = (savedProduct: Product) => {
     let isNew = false;
+    const productWithSupplier: Product = {
+      ...savedProduct,
+      supplierId: savedProduct.supplierId || supplierProfile.id,
+      supplierName: savedProduct.supplierName || supplierProfile.companyName || supplierProfile.fullName,
+      supplierEmail: savedProduct.supplierEmail || supplierProfile.email,
+    };
     setProducts((prev) => {
-      const exists = prev.some((x) => x.id === savedProduct.id);
+      const exists = prev.some((x) => x.id === productWithSupplier.id);
       isNew = !exists || isAddingNewProduct;
       const updated = exists
-        ? prev.map((x) => (x.id === savedProduct.id ? savedProduct : x))
-        : [savedProduct, ...prev];
+        ? prev.map((x) => (x.id === productWithSupplier.id ? productWithSupplier : x))
+        : [productWithSupplier, ...prev];
       saveStoredProducts(updated);
       return updated;
     });
@@ -692,7 +719,7 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
               <Box className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             </div>
             <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-indigo-300 font-mono">{products.length}</span>
+              <span className="text-sm sm:text-base font-black text-indigo-300 font-mono">{mySupplierProducts.length}</span>
               <span className="text-[9px] text-indigo-200 font-medium">منتج</span>
             </div>
           </div>
@@ -929,7 +956,7 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
               }`}
             >
               <Box className="w-4 h-4 text-indigo-400" />
-              <span>إدارة المنتجات والمخزون ({products.length})</span>
+              <span>إدارة المنتجات والمخزون ({mySupplierProducts.length})</span>
             </button>
 
             {/* 2. Pending Orders */}
@@ -1668,23 +1695,7 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
 
       {/* ==================== TAB 5: إدارة المنتجات والمخزون ==================== */}
       {activeTab === 'products' && (() => {
-        const myProducts = products.filter((p) => {
-          if (isDemoSupplier) {
-            if (!p.supplierId && !p.supplierName) return true;
-            return (
-              p.supplierId === supplierProfile.id ||
-              p.supplierName === supplierProfile.companyName ||
-              p.supplierName === supplierProfile.fullName
-            );
-          }
-          return (
-            p.supplierId === supplierProfile.id ||
-            (p.supplierEmail && p.supplierEmail === supplierProfile.email) ||
-            p.supplierName === supplierProfile.companyName ||
-            p.supplierName === supplierProfile.fullName
-          );
-        });
-        const displayedProductsList = showOnlyMyProducts ? myProducts : products;
+        const displayedProductsList = showOnlyMyProducts ? mySupplierProducts : products;
 
         return (
           <div className="space-y-3">
@@ -1699,13 +1710,13 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
               </div>
 
               <div className="flex items-center gap-2">
-                {getLowStockProducts(products).length > 0 && (
+                {getLowStockProducts(mySupplierProducts).length > 0 && (
                   <button
                     onClick={() => setIsLowStockModalOpen(true)}
                     className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer"
                   >
                     <ShieldAlert className="w-4 h-4 text-amber-200 animate-pulse" />
-                    <span>تنبيهات انخفاض المخزون ({getLowStockProducts(products).length})</span>
+                    <span>تنبيهات انخفاض المخزون ({getLowStockProducts(mySupplierProducts).length})</span>
                   </button>
                 )}
 
@@ -1739,7 +1750,7 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                   }`}
                 >
                   <Building2 className="w-3.5 h-3.5" />
-                  <span>منتجاتي الموردة ({myProducts.length})</span>
+                  <span>منتجاتي الموردة ({mySupplierProducts.length})</span>
                 </button>
                 <button
                   onClick={() => setShowOnlyMyProducts(false)}

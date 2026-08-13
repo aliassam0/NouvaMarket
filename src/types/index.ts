@@ -102,6 +102,7 @@ export interface Product {
   images: string[];
   supplierId?: string;
   supplierName?: string;
+  supplierEmail?: string;
   supplierNetPrice?: number; // Net price requested by supplier
   nouvaFeePercent?: number;  // Marketplace fee percentage
   wholesalePrice: number;    // Price charged to reseller in DZD (supplierNetPrice + Nouva fee)

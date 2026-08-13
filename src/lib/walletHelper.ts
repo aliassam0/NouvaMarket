@@ -14,9 +14,17 @@ const WALLET_TXS_KEY = 'reseller_wallet_transactions_v1';
 
 const INITIAL_TRANSACTIONS: WalletTransaction[] = [];
 
-export function getStoredWalletBalance(fallbackBalance?: number): number {
+function getBalanceKey(userId?: string) {
+  return userId ? `reseller_wallet_balance_${userId}` : 'reseller_wallet_balance_v1';
+}
+
+function getTxsKey(userId?: string) {
+  return userId ? `reseller_wallet_transactions_${userId}` : 'reseller_wallet_transactions_v1';
+}
+
+export function getStoredWalletBalance(userId?: string, fallbackBalance?: number): number {
   try {
-    const raw = localStorage.getItem(WALLET_BALANCE_KEY);
+    const raw = localStorage.getItem(getBalanceKey(userId));
     if (raw !== null) {
       const val = parseFloat(raw);
       if (!isNaN(val)) return val;
@@ -27,17 +35,17 @@ export function getStoredWalletBalance(fallbackBalance?: number): number {
   return fallbackBalance ?? 0;
 }
 
-export function saveStoredWalletBalance(amount: number): void {
+export function saveStoredWalletBalance(amount: number, userId?: string): void {
   try {
-    localStorage.setItem(WALLET_BALANCE_KEY, amount.toString());
+    localStorage.setItem(getBalanceKey(userId), amount.toString());
   } catch (e) {
     console.error('Error saving wallet balance:', e);
   }
 }
 
-export function getStoredWalletTransactions(fallbackToDemo: boolean = false): WalletTransaction[] {
+export function getStoredWalletTransactions(userId?: string, fallbackToDemo: boolean = false): WalletTransaction[] {
   try {
-    const raw = localStorage.getItem(WALLET_TXS_KEY);
+    const raw = localStorage.getItem(getTxsKey(userId));
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
@@ -45,7 +53,7 @@ export function getStoredWalletTransactions(fallbackToDemo: boolean = false): Wa
           (t) => t && !['tx-102', 'tx-101', 'tx-100', 'tx-099'].includes(t.id)
         );
         if (filtered.length !== parsed.length) {
-          saveStoredWalletTransactions(filtered);
+          saveStoredWalletTransactions(filtered, userId);
         }
         return filtered;
       }
@@ -56,17 +64,17 @@ export function getStoredWalletTransactions(fallbackToDemo: boolean = false): Wa
   return [];
 }
 
-export function saveStoredWalletTransactions(txs: WalletTransaction[]): void {
+export function saveStoredWalletTransactions(txs: WalletTransaction[], userId?: string): void {
   try {
-    localStorage.setItem(WALLET_TXS_KEY, JSON.stringify(txs));
+    localStorage.setItem(getTxsKey(userId), JSON.stringify(txs));
   } catch (e) {
     console.error('Error saving wallet txs:', e);
   }
 }
 
-export function creditResellerCommission(orderId: string, amount: number): { success: boolean; newBalance: number } {
-  const currentBalance = getStoredWalletBalance();
-  const txs = getStoredWalletTransactions();
+export function creditResellerCommission(orderId: string, amount: number, userId?: string): { success: boolean; newBalance: number } {
+  const currentBalance = getStoredWalletBalance(userId);
+  const txs = getStoredWalletTransactions(userId);
 
   // Check if already credited for this order
   const existing = txs.find((tx) => tx.description.includes(`#${orderId}`));
@@ -88,8 +96,8 @@ export function creditResellerCommission(orderId: string, amount: number): { suc
 
   const updatedTxs = [newTx, ...txs];
 
-  saveStoredWalletBalance(newBalance);
-  saveStoredWalletTransactions(updatedTxs);
+  saveStoredWalletBalance(newBalance, userId);
+  saveStoredWalletTransactions(updatedTxs, userId);
 
   addSellerNotification({
     type: 'wallet',

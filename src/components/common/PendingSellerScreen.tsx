@@ -11,11 +11,13 @@ interface PendingSellerScreenProps {
 export function PendingSellerScreen({ onLogout, onGoToLanding }: PendingSellerScreenProps) {
   const { user } = useAuth();
 
+  const isSupplier = user?.role === 'warehouse';
+  const roleLabel = isSupplier ? 'المورد / المصنع' : 'البائع';
   const isSuspended = user?.approvalStatus === 'SUSPENDED';
   const isRejected = user?.approvalStatus === 'REJECTED';
 
-  const whatsappMessage = `مرحباً إدارة Nouva Market، قمت بتسجيل حساب بائع جديد باسم (${user?.storeName || user?.fullName}) ورقم (${user?.phone})، وأرغب في تأكيد وتفعيل الحساب.`;
-  const whatsappUrl = getWhatsAppUrl('0550000000', whatsappMessage);
+  const whatsappMessage = `مرحباً إدارة Nouva Market، قمت بتسجيل حساب ${roleLabel} جديد باسم (${user?.storeName || user?.fullName}) ورقم (${user?.phone})، وأرغب في تأكيد وتفعيل الحساب.`;
+  const whatsappUrl = getWhatsAppUrl('+213550228983', whatsappMessage);
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-4 dir-rtl text-right">
@@ -45,13 +47,15 @@ export function PendingSellerScreen({ onLogout, onGoToLanding }: PendingSellerSc
                 ? 'حسابك معلق حالياً'
                 : isRejected
                 ? 'تم رفض طلب الانضمام'
-                : 'طلب انضمامك كبائع قيد المراجعة ⏳'}
+                : `طلب انضمامك كـ ${roleLabel} قيد المراجعة ⏳`}
             </h2>
             <p className="text-xs text-slate-400 mt-2 leading-relaxed">
               {isSuspended
                 ? 'تم تعليق حسابك من قبل إدارة Nouva. يرجى التواصل مع الدعم الفني للاستفسار.'
                 : isRejected
-                ? 'نأسف، تم رفض طلب تسجيل حساب البائع الخاص بك من قبل الإدارة.'
+                ? `نأسف، تم رفض طلب تسجيل حساب ${roleLabel} الخاص بك من قبل الإدارة.`
+                : isSupplier
+                ? 'شكراً لتسجيلك كمورد في منصة Nouva Market! لقد تم استلام طلبك وهو حالياً بانتظار موافقة واعتماد الأدمن لتفعيل حسابك وإتاحة إضافة منتجاتك وبناء مخزونك.'
                 : 'شكراً لتسجيلك في منصة Nouva Market! لقد تم استلام طلبك وهو حالياً بانتظار موافقة واعتماد الأدمن لتفعيل دخولك الكامل للكتالوج وإنشاء الطلبات.'}
             </p>
           </div>
@@ -60,7 +64,7 @@ export function PendingSellerScreen({ onLogout, onGoToLanding }: PendingSellerSc
         {/* User Account Info Card */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-2.5 text-xs">
           <h3 className="font-black text-amber-400 border-b border-slate-800 pb-2 flex items-center justify-between">
-            <span>تفاصيل حساب البائع المسجل:</span>
+            <span>تفاصيل حساب {roleLabel} المسجل:</span>
             <span className="text-[10px] text-slate-500 font-mono">ID: {user?.id}</span>
           </h3>
 

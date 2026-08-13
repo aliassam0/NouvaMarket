@@ -21,7 +21,7 @@ export function WalletTab({ onShowToast }: WalletTabProps) {
   const { user } = useAuth();
   const { t, language } = useLanguage();
 
-  const [availableBalance, setAvailableBalance] = useState<number>(() => getStoredWalletBalance(0));
+  const [availableBalance, setAvailableBalance] = useState<number>(() => getStoredWalletBalance(user?.id, 0));
   const [pendingBalance, setPendingBalance] = useState<number>(0);
 
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
@@ -30,13 +30,13 @@ export function WalletTab({ onShowToast }: WalletTabProps) {
   // Profit Filter State: 'today' | 'week' | 'month' | 'all'
   const [profitFilter, setProfitFilter] = useState<'today' | 'week' | 'month' | 'all'>('all');
 
-  const [transactions, setTransactions] = useState<WalletTransaction[]>(() => getStoredWalletTransactions(false));
+  const [transactions, setTransactions] = useState<WalletTransaction[]>(() => getStoredWalletTransactions(user?.id, false));
 
-  // Sync wallet balance & transactions whenever mounted
+  // Sync wallet balance & transactions whenever mounted or user changes
   useEffect(() => {
-    setAvailableBalance(getStoredWalletBalance(0));
-    setTransactions(getStoredWalletTransactions(false));
-  }, []);
+    setAvailableBalance(getStoredWalletBalance(user?.id, 0));
+    setTransactions(getStoredWalletTransactions(user?.id, false));
+  }, [user?.id]);
 
   // Date parsing helpers for profit filtering & sorting
   const parseTxDate = (dateStr?: string): Date | null => {
@@ -167,7 +167,7 @@ export function WalletTab({ onShowToast }: WalletTabProps) {
 
     const newBal = availableBalance - withdrawAmount;
     setAvailableBalance(newBal);
-    saveStoredWalletBalance(newBal);
+    saveStoredWalletBalance(newBal, user?.id);
 
     const newTx: WalletTransaction = {
       id: 'tx-' + Date.now(),
@@ -180,7 +180,7 @@ export function WalletTab({ onShowToast }: WalletTabProps) {
 
     const updatedTxs = [newTx, ...transactions];
     setTransactions(updatedTxs);
-    saveStoredWalletTransactions(updatedTxs);
+    saveStoredWalletTransactions(updatedTxs, user?.id);
 
     addSellerNotification({
       type: 'wallet',

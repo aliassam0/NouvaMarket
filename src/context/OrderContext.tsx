@@ -742,7 +742,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
             // Automatically credit reseller wallet commission upon delivery!
             if (!o.commissionCredited) {
-              creditResellerCommission(o.id, o.totalProfit || 1000);
+              creditResellerCommission(o.id, o.totalProfit || 1000, o.resellerId);
             }
           } else if (newStatus === 'FAILED' || newStatus === 'CANCELLED') {
             statusAr = 'فشل التسليم';

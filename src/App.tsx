@@ -361,7 +361,14 @@ function AppContent() {
         )}
 
         {currentRole === 'warehouse' && (
-          <WarehouseDashboard onShowToast={showToast} />
+          user?.approvalStatus !== 'APPROVED' && !impersonatedSupplierName ? (
+            <PendingSellerScreen
+              onLogout={handleLogout}
+              onGoToLanding={() => setViewMode('landing')}
+            />
+          ) : (
+            <WarehouseDashboard onShowToast={showToast} />
+          )
         )}
 
         {currentRole === 'reseller' && (

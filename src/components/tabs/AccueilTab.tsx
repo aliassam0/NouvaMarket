@@ -52,7 +52,7 @@ export function AccueilTab({
     return () => window.removeEventListener('seller_notifications_updated', handleUpdate);
   }, []);
 
-  const storedBalance = getStoredWalletBalance(0);
+  const storedBalance = getStoredWalletBalance(user?.id, 0);
 
   const activeOrders = orders.filter((o) => o.status === 'PROCESSING' || o.status === 'SHIPPED');
   const deliveredOrdersCount = orders.filter((o) => o.status === 'DELIVERED').length;
