@@ -1,0 +1,6 @@
+{
+  "name": "Nouva Market - نوفا ماركت",
+  "description": "اكبر منصة للتسويق بالعمولة في الجزائر، حقق الملايين يوميا بالتسويق لمنتجات نوفا ماركت",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
