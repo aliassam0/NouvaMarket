@@ -1,7 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, ArrowDownRight, Clock, FileText, CheckCircle2, AlertCircle, Send, ShieldCheck, Download, CreditCard, Save, Check, Building } from 'lucide-react';
+import {
+  Wallet,
+  ArrowDownRight,
+  Clock,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  Send,
+  ShieldCheck,
+  Download,
+  CreditCard,
+  Save,
+  Check,
+  Building,
+  Truck,
+  Package,
+  Hourglass,
+  TrendingUp,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useOrders } from '../../context/OrderContext';
+import { Order } from '../../types';
 import { MoneyText } from '../ui/MoneyText';
 import { formatDate } from '../../lib/formatters';
 import {
@@ -21,9 +41,66 @@ interface WalletTabProps {
 export function WalletTab({ onShowToast }: WalletTabProps) {
   const { user } = useAuth();
   const { t, language } = useLanguage();
+  const { orders = [] } = useOrders();
+
+  // Filter orders relevant to current reseller
+  const resellerOrders = user?.id
+    ? orders.filter(
+        (o) =>
+          !o.resellerId ||
+          o.resellerId === user.id ||
+          o.resellerId === 'reseller-demo' ||
+          o.resellerId === user.email
+      )
+    : orders;
+
+  // Helper to extract net profit for reseller
+  const getOrderProfit = (o: Order) => {
+    if (typeof o.totalProfit === 'number' && o.totalProfit > 0) return o.totalProfit;
+    if (Array.isArray(o.items) && o.items.length > 0) {
+      const p = o.items.reduce((sum, it) => sum + (it.profit || 0), 0);
+      if (p > 0) return p;
+    }
+    return 1200; // fallback standard commission per order
+  };
+
+  // Orders currently progressing in the delivery queue
+  const deliveryQueueOrders = resellerOrders.filter((o) => {
+    if (o.status === 'DELIVERED' || o.status === 'CANCELLED' || o.status === 'REFUNDED' || o.status === 'FAILED') {
+      return false;
+    }
+    return (
+      o.status === 'PROCESSING' ||
+      o.status === 'SHIPPED' ||
+      o.status === 'CONFIRMED' ||
+      o.situation === 'EnPréparation' ||
+      o.situation === 'SortiEnLivraison' ||
+      o.situation === 'EnCours' ||
+      Boolean(o.trackingCode)
+    );
+  });
+
+  const inProcessingOrders = deliveryQueueOrders.filter(
+    (o) =>
+      o.status === 'PROCESSING' ||
+      o.status === 'CONFIRMED' ||
+      o.situation === 'EnPréparation' ||
+      o.situation === 'EnAttente'
+  );
+
+  const inTransitOrders = deliveryQueueOrders.filter(
+    (o) =>
+      o.status === 'SHIPPED' ||
+      o.situation === 'SortiEnLivraison' ||
+      o.situation === 'EnCours'
+  );
+
+  const estimatedPendingProfit = deliveryQueueOrders.reduce((sum, o) => sum + getOrderProfit(o), 0);
+  const processingProfit = inProcessingOrders.reduce((sum, o) => sum + getOrderProfit(o), 0);
+  const inTransitProfit = inTransitOrders.reduce((sum, o) => sum + getOrderProfit(o), 0);
 
   const [availableBalance, setAvailableBalance] = useState<number>(() => getStoredWalletBalance(user?.id, 0));
-  const [pendingBalance, setPendingBalance] = useState<number>(0);
+  const [pendingBalance, setPendingBalance] = useState<number>(estimatedPendingProfit);
 
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState<number>(5000);
@@ -37,7 +114,8 @@ export function WalletTab({ onShowToast }: WalletTabProps) {
   useEffect(() => {
     setAvailableBalance(getStoredWalletBalance(user?.id, 0));
     setTransactions(getStoredWalletTransactions(user?.id, false));
-  }, [user?.id]);
+    setPendingBalance(estimatedPendingProfit);
+  }, [user?.id, estimatedPendingProfit]);
 
   // Date parsing helpers for profit filtering & sorting
   const parseTxDate = (dateStr?: string): Date | null => {
@@ -269,6 +347,77 @@ export function WalletTab({ onShowToast }: WalletTabProps) {
           <Send className="w-4 h-4 text-purple-600" />
           <span>طلب سحب الأرباح</span>
         </button>
+      </div>
+
+      {/* Small Summary Card: Estimated Pending Profit based on delivery queue status */}
+      <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-amber-400/40 dark:border-amber-500/30 shadow-xs space-y-3 relative overflow-hidden">
+        {/* Subtle background glow */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/5 dark:bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-400 border border-amber-300 dark:border-amber-800/60 flex items-center justify-center shrink-0">
+              <Hourglass className="w-4 h-4 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                  الأرباح المعلقة المتوقعة
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 font-mono">
+                  طابور التوصيل: {deliveryQueueOrders.length} طلب
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                أرباح قيد التحصيل بناءً على حالة الطرود الحالية مع شركات التوصيل
+              </p>
+            </div>
+          </div>
+
+          <div className="text-left shrink-0">
+            <span className="text-[10px] font-bold text-slate-400 block">المبلغ المتوقع</span>
+            <div className="text-base sm:text-lg font-black text-amber-600 dark:text-amber-400 font-mono">
+              +<MoneyText amount={estimatedPendingProfit} />
+            </div>
+          </div>
+        </div>
+
+        {/* Detailed Breakdown: In-Preparation vs Out-For-Delivery */}
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          {/* In-Preparation / Warehouse Queue */}
+          <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/60 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+              <span className="flex items-center gap-1">
+                <Package className="w-3.5 h-3.5 text-sky-500" />
+                <span>قيد التجهيز بالمستودع</span>
+              </span>
+              <span className="font-mono text-sky-600 dark:text-sky-400">{inProcessingOrders.length}</span>
+            </div>
+            <div className="text-xs font-black text-sky-600 dark:text-sky-400 font-mono">
+              +<MoneyText amount={processingProfit} />
+            </div>
+          </div>
+
+          {/* Out for Delivery / In-Transit with Courier */}
+          <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/60 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+              <span className="flex items-center gap-1">
+                <Truck className="w-3.5 h-3.5 text-emerald-500" />
+                <span>قيد التوزيع (مع الشاحن)</span>
+              </span>
+              <span className="font-mono text-emerald-600 dark:text-emerald-400">{inTransitOrders.length}</span>
+            </div>
+            <div className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono">
+              +<MoneyText amount={inTransitProfit} />
+            </div>
+          </div>
+        </div>
+
+        {/* Reassurance text */}
+        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 pt-0.5">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+          <span>تُضاف الأرباح تلقائياً إلى رصيدك المتاح للسحب فور استلام الزبون وتأكيد شركة التوصيل (COD).</span>
+        </div>
       </div>
 
       {/* 4 Financial Filter Buttons: ارباح اليوم | ارباح الأسبوع | ارباح الشهر | جميع الارباح */}

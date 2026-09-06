@@ -15,22 +15,69 @@ export const DEFAULT_FEES: MarketplaceFeeSettings = {
 };
 
 // ---------------- SUPPLIERS HELPERS ----------------
+// In-memory cache to ensure sync across fast re-renders
+let cachedSuppliers: SupplierProfile[] | null = null;
+let isSyncingSuppliersWithServer = false;
+
 export function getStoredSuppliers(): SupplierProfile[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_SUPPLIERS);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY_SUPPLIERS, JSON.stringify(INITIAL_SUPPLIERS));
-      return INITIAL_SUPPLIERS;
+    let localList: SupplierProfile[] = [];
+    if (raw) {
+      localList = JSON.parse(raw);
+      if (!Array.isArray(localList)) localList = [];
     }
-    return JSON.parse(raw);
+
+    // Trigger background sync with server if not already running
+    if (!isSyncingSuppliersWithServer && typeof window !== 'undefined') {
+      isSyncingSuppliersWithServer = true;
+      fetch('/api/reseller/suppliers')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && Array.isArray(data.suppliers)) {
+            const serverSuppliers: SupplierProfile[] = data.suppliers;
+            const currentLocal = getStoredSuppliers();
+            // Merge local and server without losing any supplier
+            const map = new Map<string, SupplierProfile>();
+            serverSuppliers.forEach((s) => { if (s && s.id) map.set(s.id, s); });
+            currentLocal.forEach((s) => {
+              if (s && s.id) {
+                // If local has newer fields or exists only locally, push to server
+                if (!map.has(s.id)) {
+                  fetch('/api/reseller/suppliers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(s),
+                  }).catch(() => {});
+                }
+                map.set(s.id, { ...map.get(s.id), ...s });
+              }
+            });
+            const merged = Array.from(map.values());
+            if (merged.length > 0) {
+              localStorage.setItem(STORAGE_KEY_SUPPLIERS, JSON.stringify(merged));
+              cachedSuppliers = merged;
+              window.dispatchEvent(new CustomEvent('nouva_suppliers_updated', { detail: merged }));
+            }
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          isSyncingSuppliersWithServer = false;
+        });
+    }
+
+    cachedSuppliers = localList;
+    return localList;
   } catch (e) {
-    return INITIAL_SUPPLIERS;
+    return cachedSuppliers || INITIAL_SUPPLIERS;
   }
 }
 
 export function saveStoredSuppliers(suppliers: SupplierProfile[]): void {
   try {
     localStorage.setItem(STORAGE_KEY_SUPPLIERS, JSON.stringify(suppliers));
+    cachedSuppliers = suppliers;
     window.dispatchEvent(new CustomEvent('nouva_suppliers_updated', { detail: suppliers }));
   } catch (e) {
     console.error('Error saving suppliers:', e);
@@ -49,6 +96,36 @@ export function addSupplierRegistration(data: {
   baridiMobNumber?: string;
 }): SupplierProfile {
   const suppliers = getStoredSuppliers();
+  const existing = suppliers.find(
+    (s) => (s.email && s.email.trim().toLowerCase() === (data.email || '').trim().toLowerCase()) ||
+           (s.phone && s.phone.trim() === (data.phone || '').trim())
+  );
+
+  if (existing) {
+    // Update existing rather than creating duplicate, preserving account
+    const updatedSupplier: SupplierProfile = {
+      ...existing,
+      fullName: data.fullName || existing.fullName,
+      companyName: data.companyName || existing.companyName,
+      password: data.password || existing.password,
+      wilaya: data.wilaya || existing.wilaya,
+      activityType: data.activityType || existing.activityType,
+      ccpOrRip: data.ccpOrRip || existing.ccpOrRip,
+      baridiMobNumber: data.baridiMobNumber || existing.baridiMobNumber,
+    };
+    const updatedList = suppliers.map((s) => (s.id === existing.id ? updatedSupplier : s));
+    saveStoredSuppliers(updatedList);
+
+    // Sync with server
+    fetch(`/api/reseller/suppliers/${existing.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedSupplier),
+    }).catch(() => {});
+
+    return updatedSupplier;
+  }
+
   const newSupplier: SupplierProfile = {
     id: `sup-${Date.now().toString().slice(-5)}`,
     fullName: data.fullName,
@@ -72,6 +149,14 @@ export function addSupplierRegistration(data: {
 
   const updated = [newSupplier, ...suppliers];
   saveStoredSuppliers(updated);
+
+  // Sync to server immediately
+  fetch('/api/reseller/suppliers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newSupplier),
+  }).catch(() => {});
+
   return newSupplier;
 }
 
@@ -81,37 +166,56 @@ export function updateSupplierStatus(
   rejectionReason?: string
 ): void {
   const suppliers = getStoredSuppliers();
+  let updatedSupplierObj: SupplierProfile | null = null;
   const updated = suppliers.map((sup) => {
     if (sup.id === supplierId) {
-      return {
+      updatedSupplierObj = {
         ...sup,
         status,
         rejectionReason: rejectionReason || sup.rejectionReason,
       };
+      return updatedSupplierObj;
     }
     return sup;
   });
   saveStoredSuppliers(updated);
+
+  if (updatedSupplierObj) {
+    fetch(`/api/reseller/suppliers/${supplierId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedSupplierObj),
+    }).catch(() => {});
+  }
 }
 
 export function updateSupplierPassword(supplierIdOrEmail: string, newPassword: string): boolean {
   try {
     const suppliers = getStoredSuppliers();
     let found = false;
+    let targetSupplier: SupplierProfile | null = null;
     const target = (supplierIdOrEmail || '').trim().toLowerCase();
     const updated = suppliers.map((sup) => {
       if (sup.id === supplierIdOrEmail || (sup.email && sup.email.trim().toLowerCase() === target)) {
         found = true;
-        return {
+        targetSupplier = {
           ...sup,
           password: newPassword.trim(),
         };
+        return targetSupplier;
       }
       return sup;
     });
 
-    if (found) {
+    if (found && targetSupplier) {
       saveStoredSuppliers(updated);
+
+      // Sync with server
+      fetch(`/api/reseller/suppliers/${(targetSupplier as any).id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPassword.trim() }),
+      }).catch(() => {});
 
       // Also update session user if currently logged in
       const sessionRaw = localStorage.getItem('nouvamarket_session_v2');
@@ -159,6 +263,13 @@ export function updateSupplierProfile(
     if (updatedSupplier) {
       saveStoredSuppliers(updated);
 
+      // Sync with server
+      fetch(`/api/reseller/suppliers/${(updatedSupplier as any).id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      }).catch(() => {});
+
       // Also update session user if currently logged in
       const sessionRaw = localStorage.getItem('nouvamarket_session_v2');
       if (sessionRaw) {
@@ -182,6 +293,7 @@ export function updateSupplierProfile(
 }
 
 export function deleteSupplierRegistration(supplierId: string): void {
+  // Soft delete / remove from local if explicit
   const suppliers = getStoredSuppliers();
   const updated = suppliers.filter((sup) => sup.id !== supplierId);
   saveStoredSuppliers(updated);

@@ -6,6 +6,7 @@ import { useAuth } from './AuthContext';
 import { creditResellerCommission } from '../lib/walletHelper';
 import { addSellerNotification, addAdminNotification, addWarehouseNotification } from '../lib/notificationHelper';
 import { getStoredProducts, saveStoredProducts } from '../data/mockProducts';
+import { pollOrderStatusesFromDeliveryApis, getStoredSyncSettings } from '../lib/deliverySyncManager';
 
 interface OrderContextType {
   orders: Order[];
@@ -368,6 +369,48 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         situation: currOrder.situation,
       };
     });
+  }, [orders]);
+
+  // Automated Delivery Carrier API Polling Mechanism
+  // Periodically queries delivery APIs for active orders, updates database, and triggers app-toasts for the reseller
+  useEffect(() => {
+    let pollingInterval: any = null;
+
+    const executePolling = async () => {
+      const settings = getStoredSyncSettings();
+      if (!settings.autoPollingEnabled) return;
+
+      try {
+        const result = await pollOrderStatusesFromDeliveryApis(orders, {
+          forceStatusChange: false,
+          onOrderUpdated: (updatedOrder) => {
+            setOrders((prev) =>
+              prev.map((o) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o))
+            );
+          },
+        });
+
+        if (result.updatedOrdersCount > 0) {
+          setOrders(result.allOrders);
+        }
+      } catch (err) {
+        console.warn('Delivery API background polling loop warning:', err);
+      }
+    };
+
+    // Initial background poll after 20 seconds
+    const initialDelay = setTimeout(() => {
+      executePolling();
+    }, 20000);
+
+    const settings = getStoredSyncSettings();
+    const intervalMs = Math.max((settings.intervalSeconds || 45) * 1000, 20000);
+    pollingInterval = setInterval(executePolling, intervalMs);
+
+    return () => {
+      clearTimeout(initialDelay);
+      clearInterval(pollingInterval);
+    };
   }, [orders]);
 
   const createOrder = async (orderInput: Partial<Order>) => {

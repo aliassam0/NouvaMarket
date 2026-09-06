@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile } from '../types';
-import { getStoredSuppliers, updateSupplierPassword, updateSupplierProfile } from '../lib/supplierHelper';
-import { getStoredSellers, updateSellerPassword, updateSellerProfile } from '../lib/sellerHelper';
+import { getStoredSuppliers, addSupplierRegistration, updateSupplierPassword, updateSupplierProfile } from '../lib/supplierHelper';
+import { getStoredSellers, addSellerRegistration, updateSellerPassword, updateSellerProfile } from '../lib/sellerHelper';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -382,11 +382,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     role?: 'reseller' | 'warehouse' | 'admin';
   }): Promise<boolean> => {
     const targetRole = data.role || 'reseller';
+
+    let registeredId = `seller-${Date.now().toString().slice(-5)}`;
+
+    if (targetRole === 'warehouse') {
+      const sup = addSupplierRegistration({
+        fullName: data.fullName,
+        companyName: data.storeName || `مستودع ${data.fullName}`,
+        phone: data.phone,
+        email: data.email,
+        password: data.password,
+        wilaya: data.wilaya,
+        activityType: 'ألبسة ونسيج',
+        ccpOrRip: 'CCP / BaridiMob Pending',
+      });
+      registeredId = sup.id;
+    } else if (targetRole === 'reseller') {
+      const sel = addSellerRegistration({
+        fullName: data.fullName,
+        storeName: data.storeName || `متجر ${data.fullName}`,
+        phone: data.phone,
+        email: data.email,
+        password: data.password,
+        wilaya: data.wilaya,
+      });
+      registeredId = sel.id;
+    }
+
     const newSeller: UserProfile = {
-      id:
-        targetRole === 'warehouse'
-          ? `sup-${Date.now().toString().slice(-5)}`
-          : `seller-${Date.now().toString().slice(-5)}`,
+      id: registeredId,
       fullName: data.fullName,
       storeName:
         data.storeName || (targetRole === 'warehouse' ? `مستودع ${data.fullName}` : `متجر ${data.fullName}`),

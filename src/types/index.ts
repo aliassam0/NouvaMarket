@@ -193,6 +193,7 @@ export interface Order {
   supplierEmail?: string;
   returnedToWarehouse?: boolean;
   commissionCredited?: boolean;
+  trackingHistory?: any[];
 }
 
 export interface DeliveryApiConfig {

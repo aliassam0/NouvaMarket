@@ -15,19 +15,9 @@ export function cleanDatabaseSystem(): {
     }
     localStorage.setItem('nouva_orders', JSON.stringify([]));
 
-    const rawSellers = localStorage.getItem('nouva_sellers_v2');
-    if (rawSellers) {
-      const parsed = JSON.parse(rawSellers);
-      deletedSellersCount = Array.isArray(parsed) ? parsed.length : 0;
-    }
-    localStorage.setItem('nouva_sellers_v2', JSON.stringify([]));
-
-    const rawSuppliers = localStorage.getItem('nouva_suppliers_v2');
-    if (rawSuppliers) {
-      const parsed = JSON.parse(rawSuppliers);
-      deletedSuppliersCount = Array.isArray(parsed) ? parsed.length : 0;
-    }
-    localStorage.setItem('nouva_suppliers_v2', JSON.stringify([]));
+    // Note: Seller and supplier accounts are strictly preserved (never deleted), as requested.
+    deletedSellersCount = 0;
+    deletedSuppliersCount = 0;
 
     localStorage.setItem('nouva_wallet_balance', '0');
     localStorage.setItem('nouva_wallet_txs', JSON.stringify([]));

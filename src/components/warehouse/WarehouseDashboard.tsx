@@ -49,6 +49,7 @@ import {
   Key,
   Eye,
   EyeOff,
+  Radio,
 } from 'lucide-react';
 import { useOrders } from '../../context/OrderContext';
 import { useCategories } from '../../context/CategoryContext';
@@ -73,6 +74,7 @@ import { ProductUrlImportModal } from '../common/ProductUrlImportModal';
 import { LowStockBanner, LowStockModal, getLowStockProducts } from '../common/LowStockAlerts';
 import { addSellerNotification, addWarehouseNotification, addAdminNotification, getUnreadNotificationsCount } from '../../lib/notificationHelper';
 import { NotificationsModal } from '../tabs/NotificationsModal';
+import { DeliverySyncMonitor } from './DeliverySyncMonitor';
 
 interface WarehouseDashboardProps {
   onShowToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
@@ -89,7 +91,8 @@ type WarehouseTab =
   | 'couriers'
   | 'financial'
   | 'analytics'
-  | 'profile';
+  | 'profile'
+  | 'sync-monitor';
 
 const REJECTION_REASONS = [
   'المنتج غير متوفر بالمخزن',
@@ -811,6 +814,18 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
           </div>
 
           <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+            <button
+              onClick={() => setActiveTab(activeTab === 'sync-monitor' ? 'delivery' : 'sync-monitor')}
+              className={`px-3.5 py-2 rounded-2xl border text-xs font-black flex items-center gap-2 transition cursor-pointer shadow-lg active:scale-95 ${
+                activeTab === 'sync-monitor'
+                  ? 'bg-sky-500 text-white border-sky-400'
+                  : 'bg-sky-500/20 hover:bg-sky-500/30 border-sky-500/40 text-sky-300'
+              }`}
+              title="مراقب المزامنة الحية لشركات التوصيل (Sync Status Monitor)"
+            >
+              <Radio className="w-4 h-4 text-sky-400 animate-pulse" />
+              <span>📡 مراقب المزامنة (Sync Status)</span>
+            </button>
             <button
               onClick={() => setShowShippingRatesModal(true)}
               className="px-3.5 py-2 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black flex items-center gap-2 transition cursor-pointer shadow-lg active:scale-95"
@@ -1602,9 +1617,27 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
         </div>
       )}
 
+      {/* ==================== TAB: مراقب المزامنة اللحظية (Sync Status Monitor) ==================== */}
+      {activeTab === 'sync-monitor' && (
+        <div className="space-y-4 animate-fadeIn">
+          <DeliverySyncMonitor
+            orders={orders}
+            supplierId={user?.id || user?.email}
+            onShowToast={onShowToast}
+          />
+        </div>
+      )}
+
       {/* ==================== TAB 3: قيد التوصيل ==================== */}
       {activeTab === 'delivery' && (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          {/* Real-time Delivery API Connection & Sync Status Monitor */}
+          <DeliverySyncMonitor
+            orders={orders}
+            supplierId={user?.id || user?.email}
+            onShowToast={onShowToast}
+          />
+
           <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-xs text-blue-800 dark:text-blue-300 flex items-center gap-2">
             <Truck className="w-4 h-4 shrink-0 text-blue-500" />
             <span>
@@ -2386,6 +2419,13 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
               <span>+ إضافة شركة توصيل جديدة</span>
             </button>
           </div>
+
+          {/* Real-time Delivery API Connection & Sync Status Monitor */}
+          <DeliverySyncMonitor
+            orders={orders}
+            supplierId={user?.id || user?.email}
+            onShowToast={onShowToast}
+          />
 
           {/* Courier List */}
           <div className="space-y-3">

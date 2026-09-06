@@ -229,6 +229,8 @@ async function generateMultimodalAI(
 // Memory databases for server state
 const idempotencyStore = new Map<string, any>();
 const serverOrders: any[] = [];
+const serverSellers: any[] = [];
+const serverSuppliers: any[] = [];
 const orderSseClients = new Set<express.Response>();
 
 export function broadcastOrderUpdate(event: { type: string; order?: any; orderId?: string; orders?: any[] }) {
@@ -241,6 +243,110 @@ export function broadcastOrderUpdate(event: { type: string; order?: any; orderId
     }
   }
 }
+
+// Sellers and Suppliers endpoints for permanent synchronization
+app.get("/api/reseller/sellers", (req, res) => {
+  res.json({ success: true, sellers: serverSellers });
+});
+
+app.post("/api/reseller/sellers", (req, res) => {
+  const seller = req.body;
+  if (!seller || !seller.id) {
+    return res.status(400).json({ error: "بيانات البائع غير صالحة" });
+  }
+  const idx = serverSellers.findIndex((s) => s.id === seller.id || (s.email && s.email.toLowerCase() === (seller.email || "").toLowerCase()));
+  if (idx !== -1) {
+    serverSellers[idx] = { ...serverSellers[idx], ...seller };
+  } else {
+    serverSellers.unshift(seller);
+  }
+  res.json({ success: true, seller: idx !== -1 ? serverSellers[idx] : seller, sellers: serverSellers });
+});
+
+app.put("/api/reseller/sellers/:id", (req, res) => {
+  const sellerId = req.params.id;
+  const updates = req.body;
+  const idx = serverSellers.findIndex((s) => s.id === sellerId || (s.email && s.email.toLowerCase() === (updates.email || "").toLowerCase()));
+  if (idx !== -1) {
+    serverSellers[idx] = { ...serverSellers[idx], ...updates };
+    return res.json({ success: true, seller: serverSellers[idx] });
+  } else {
+    const newSeller = { id: sellerId, ...updates };
+    serverSellers.unshift(newSeller);
+    return res.json({ success: true, seller: newSeller });
+  }
+});
+
+app.get("/api/reseller/suppliers", (req, res) => {
+  res.json({ success: true, suppliers: serverSuppliers });
+});
+
+app.post("/api/reseller/suppliers", (req, res) => {
+  const supplier = req.body;
+  if (!supplier || !supplier.id) {
+    return res.status(400).json({ error: "بيانات المورد غير صالحة" });
+  }
+  const idx = serverSuppliers.findIndex((s) => s.id === supplier.id || (s.email && s.email.toLowerCase() === (supplier.email || "").toLowerCase()));
+  if (idx !== -1) {
+    serverSuppliers[idx] = { ...serverSuppliers[idx], ...supplier };
+  } else {
+    serverSuppliers.unshift(supplier);
+  }
+  res.json({ success: true, supplier: idx !== -1 ? serverSuppliers[idx] : supplier, suppliers: serverSuppliers });
+});
+
+app.put("/api/reseller/suppliers/:id", (req, res) => {
+  const supplierId = req.params.id;
+  const updates = req.body;
+  const idx = serverSuppliers.findIndex((s) => s.id === supplierId || (s.email && s.email.toLowerCase() === (updates.email || "").toLowerCase()));
+  if (idx !== -1) {
+    serverSuppliers[idx] = { ...serverSuppliers[idx], ...updates };
+    return res.json({ success: true, supplier: serverSuppliers[idx] });
+  } else {
+    const newSupplier = { id: supplierId, ...updates };
+    serverSuppliers.unshift(newSupplier);
+    return res.json({ success: true, supplier: newSupplier });
+  }
+});
+
+// Login endpoint with fallback to server memory
+app.post("/api/reseller/auth/login", (req, res) => {
+  const { email, password } = req.body;
+  const cleanEmail = (email || "").trim().toLowerCase();
+  const cleanPass = (password || "").trim();
+
+  // 1. Check sellers
+  const matchedSeller = serverSellers.find(
+    (s) => (s.email && s.email.toLowerCase() === cleanEmail) || (s.phone && s.phone === cleanEmail)
+  );
+  if (matchedSeller) {
+    if ((matchedSeller.password || "123456").trim() === cleanPass) {
+      return res.json({ success: true, user: matchedSeller });
+    }
+  }
+
+  // 2. Check suppliers
+  const matchedSupplier = serverSuppliers.find(
+    (s) => (s.email && s.email.toLowerCase() === cleanEmail) || (s.phone && s.phone === cleanEmail)
+  );
+  if (matchedSupplier) {
+    if ((matchedSupplier.password || "123456").trim() === cleanPass) {
+      const userObj = {
+        id: matchedSupplier.id,
+        fullName: matchedSupplier.fullName,
+        storeName: matchedSupplier.companyName || matchedSupplier.fullName,
+        phone: matchedSupplier.phone,
+        email: matchedSupplier.email,
+        role: "warehouse",
+        wilaya: matchedSupplier.wilaya,
+        approvalStatus: matchedSupplier.status || "PENDING",
+      };
+      return res.json({ success: true, user: userObj });
+    }
+  }
+
+  return res.json({ success: false, message: "بيانات الاعتماد غير موجودة على الخادم" });
+});
 
 const walletBalance = {
   available: 0,
