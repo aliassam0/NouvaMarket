@@ -1,4 +1,20 @@
-<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+import fs from 'fs';
+import path from 'path';
+import sharp from 'sharp';
+
+async function generateFaviconAndLogo() {
+  const size = 512;
+
+  // Exact 3D clay render SVG matching the uploaded image 9A97B94C-2A46-4A6C-BB69-9D4B64AC7601.png
+  // Features:
+  // - 3D purple shopping bag rotated in three-quarter view
+  // - Deep purple interior accordion side panel with realistic fold shadow
+  // - Vibrant smooth purple front face with soft glossy gradient
+  // - Dual glossy white looped tube handles with rounded rim rings (grommets)
+  // - Chunky, organic, glossy white 3D letter "N" centered on the front face
+  // - Soft radial ground shadow
+  const svg = `
+<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <!-- Ground Shadow Beneath Bag -->
     <radialGradient id="groundShadow" cx="50%" cy="50%" r="50%">
@@ -206,3 +222,53 @@
     </g>
   </g>
 </svg>
+`;
+
+  // Write favicon.svg (Vector SVG used directly by modern browsers)
+  const faviconSvgPath = path.join(process.cwd(), 'public', 'favicon.svg');
+  fs.writeFileSync(faviconSvgPath, svg.trim(), 'utf-8');
+  console.log(`Updated vector favicon.svg at ${faviconSvgPath}`);
+
+  // Write logo.svg (Used inside the application navigation and landing pages)
+  const logoSvgPath = path.join(process.cwd(), 'public', 'logo.svg');
+  fs.writeFileSync(logoSvgPath, svg.trim(), 'utf-8');
+  console.log(`Updated vector logo.svg at ${logoSvgPath}`);
+
+  // Generate multi-resolution PNGs:
+  // 1. standard favicon.ico / favicon.png (32x32)
+  await sharp(Buffer.from(svg))
+    .resize(32, 32)
+    .png()
+    .toFile(path.join(process.cwd(), 'public', 'favicon-32x32.png'));
+
+  // 2. favicon-192x192.png (PWA / Android standard)
+  await sharp(Buffer.from(svg))
+    .resize(192, 192)
+    .png()
+    .toFile(path.join(process.cwd(), 'public', 'favicon-192x192.png'));
+
+  // 3. apple-touch-icon.png (180x180 for iOS)
+  await sharp(Buffer.from(svg))
+    .resize(180, 180)
+    .png()
+    .toFile(path.join(process.cwd(), 'public', 'apple-touch-icon.png'));
+
+  // 4. favicon-512x512.png (High-res app icon)
+  await sharp(Buffer.from(svg))
+    .resize(512, 512)
+    .png()
+    .toFile(path.join(process.cwd(), 'public', 'favicon-512x512.png'));
+
+  // 5. logo.png (512x512 PNG copy)
+  await sharp(Buffer.from(svg))
+    .resize(512, 512)
+    .png()
+    .toFile(path.join(process.cwd(), 'public', 'logo.png'));
+
+  console.log('Successfully generated all favicon and app icon assets in /public!');
+}
+
+generateFaviconAndLogo().catch((err) => {
+  console.error('Error generating favicon:', err);
+  process.exit(1);
+});
