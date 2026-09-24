@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Disallow internal operational endpoints and raw API calls from search engine crawlers
+Disallow: /api/
+Disallow: /assets/
+Disallow: /scripts/
+
+# Sitemap location
+Sitemap: https://nouvamarket.com/sitemap.xml

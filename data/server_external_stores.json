@@ -1,0 +1,24 @@
+[
+  {
+    "id": "store-demo-youcan",
+    "resellerId": "seller-101",
+    "resellerName": "كريم بوزيد",
+    "platform": "youcan",
+    "storeName": "متجري على يوكان (YouCan)",
+    "storeUrl": "https://karim-boutique.youcan.shop",
+    "apiKey": "yc_live_tok_8492048194",
+    "currency": "DZD",
+    "status": "connected",
+    "statusMessage": "المتجر متصل وجاهز للمزامنة الفورية",
+    "lastSyncAt": "2026-09-24T17:40:06.019Z",
+    "lastOrdersSyncAt": "2026-09-24T17:39:56.458Z",
+    "autoSyncInventory": true,
+    "autoPullOrders": true,
+    "priceMarkupType": "fixed",
+    "priceMarkupValue": 600,
+    "defaultOrderStatus": "CONFIRMED",
+    "syncedProductsCount": 4,
+    "totalOrdersPulled": 13,
+    "createdAt": "2026-03-01T10:00:00.000Z"
+  }
+]

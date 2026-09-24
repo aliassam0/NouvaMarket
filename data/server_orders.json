@@ -1,0 +1,52 @@
+[
+  {
+    "id": "ORD-645866",
+    "idempotencyKey": "idemp-ext-YO-8996-1790271596458",
+    "customerName": "سارة بوزيان",
+    "phone": "0661904321",
+    "phone2": "",
+    "wilaya": "31 - وهران",
+    "wilayaCode": "31",
+    "commune": "السانية",
+    "address": "شارع العربي بن مهيدي بالقرب من الصيدلية",
+    "deliveryType": "home",
+    "stopdesk": 0,
+    "items": [
+      {
+        "productId": "prod-grooming-1",
+        "productName": "VGR Professional Trimmer - ماكينة الحلاقة الاحترافية للتنعيم والتحديد",
+        "productImage": "https://images.unsplash.com/photo-1621607512214-68297480165e?auto=format&fit=crop&q=80&w=600",
+        "variantSize": "0-3 أشهر",
+        "variantColor": "أزرق سماوي",
+        "quantity": 1,
+        "wholesalePrice": 3200,
+        "sellingPrice": 4800,
+        "profit": 1600,
+        "supplierId": "sup-201",
+        "supplierName": "مصنع الأقمشة والملابس الجاهزة"
+      }
+    ],
+    "totalAmount": 5300,
+    "shippingFee": 500,
+    "totalProfit": 1600,
+    "resellerId": "seller-101",
+    "resellerName": "كريم بوزيد",
+    "resellerPhone": "0551234567",
+    "supplierId": "sup-201",
+    "status": "CONFIRMED",
+    "statusAr": "تم التأكيد (طلب متجر خارجي)",
+    "statusFr": "Commande boutique externe",
+    "situation": "Confirmé",
+    "source": "youcan",
+    "externalOrderId": "YO-8996",
+    "externalOrderNumber": "#8996",
+    "externalStoreId": "store-demo-youcan",
+    "externalStoreName": "متجري على يوكان (YouCan)",
+    "externalStorePlatform": "youcan",
+    "externalCustomerNote": "طلب وارد أوتوماتيكياً عبر الربط المباشر",
+    "adminConfirmed": true,
+    "confirmedAt": "2026-09-24T17:39:56.458Z",
+    "createdAt": "2026-09-24T17:39:56.458Z",
+    "trackingCode": "EC-31-82409"
+  }
+]
