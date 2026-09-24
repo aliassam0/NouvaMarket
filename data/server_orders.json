@@ -33,8 +33,8 @@
     "resellerName": "كريم بوزيد",
     "resellerPhone": "0551234567",
     "supplierId": "sup-201",
-    "status": "CONFIRMED",
-    "statusAr": "تم التأكيد (طلب متجر خارجي)",
+    "status": "PROCESSING",
+    "statusAr": "قيد التجهيز والمعالجة",
     "statusFr": "Commande boutique externe",
     "situation": "Confirmé",
     "source": "youcan",
@@ -47,6 +47,47 @@
     "adminConfirmed": true,
     "confirmedAt": "2026-09-24T17:39:56.458Z",
     "createdAt": "2026-09-24T17:39:56.458Z",
-    "trackingCode": "EC-31-82409"
+    "trackingCode": "EC-31-82409",
+    "deliveryCompanyName": "Ecom Delivery (إيكوم ديليفري)",
+    "trackingHistory": [
+      {
+        "timestamp": "2026-09-24 19:15",
+        "statusAr": "قيد التجهيز والمعالجة",
+        "statusEn": "In Preparation at Warehouse",
+        "location": "31 - وهران",
+        "courierName": "Ecom Delivery (إيكوم ديليفري)",
+        "trackingCode": "EC-31-82409",
+        "note": "[Ecom API v2] Situation ID: #1 - المفتاح: [✓ X-API-Key/X-API-Token موثق]"
+      },
+      {
+        "timestamp": "2026-09-24 18:26",
+        "statusAr": "تم التسليم للزبون بنجاح - تحصيل 5 300 دج",
+        "statusEn": "Delivered & Cash Collected",
+        "location": "31 - وهران",
+        "courierName": "Ecom Delivery (إيكوم ديليفري)",
+        "trackingCode": "EC-31-82409",
+        "note": "[Ecom API v2] Situation ID: #7 - المفتاح: [✓ X-API-Key/X-API-Token موثق]"
+      },
+      {
+        "timestamp": "2026-09-24 18:26",
+        "statusAr": "الشحنة خرجت مع الموزع في 31 - وهران",
+        "statusEn": "Out for Delivery in 31 - وهران",
+        "location": "31 - وهران",
+        "courierName": "Ecom Delivery (إيكوم ديليفري)",
+        "trackingCode": "EC-31-82409",
+        "note": "[Ecom API v2] Situation ID: #26 - المفتاح: [✓ X-API-Key/X-API-Token موثق]"
+      },
+      {
+        "timestamp": "2026-09-24 18:26",
+        "statusAr": "قيد التجهيز والمعالجة",
+        "statusEn": "In Preparation at Warehouse",
+        "location": "31 - وهران",
+        "courierName": "Ecom Delivery (إيكوم ديليفري)",
+        "trackingCode": "EC-31-82409",
+        "note": "[Ecom API v2] Situation ID: #1 - المفتاح: [✓ X-API-Key/X-API-Token موثق]"
+      }
+    ],
+    "updatedAt": "2026-09-24T19:16:11.819Z",
+    "bordereauUrl": "/api/delivery/label/ORD-645866?tracking=EC-31-82409&v=1790277371819"
   }
 ]

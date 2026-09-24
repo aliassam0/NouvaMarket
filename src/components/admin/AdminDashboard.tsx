@@ -62,6 +62,9 @@ import {
   Bot,
   RotateCcw,
   Coins,
+  ChevronRight,
+  ChevronLeft,
+  Menu,
 } from 'lucide-react';
 import { AdminAiProviderSettings } from './AdminAiProviderSettings';
 import { ProductUrlImportModal } from '../common/ProductUrlImportModal';
@@ -130,6 +133,7 @@ import {
 } from '../../lib/notificationHelper';
 import { NotificationsModal } from '../tabs/NotificationsModal';
 import { AdminConfirmersAuditTab } from './AdminConfirmersAuditTab';
+import { AdminVerticalSidebar } from './AdminVerticalSidebar';
 
 interface AdminDashboardProps {
   onShowToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
@@ -232,6 +236,78 @@ export function AdminDashboard({
   const { orders, confirmAndShipOrder, updateOrder } = useOrders();
   const { switchUser } = useAuth();
   const [activeAdminTab, setActiveAdminTab] = useState<AdminTabKey>('products');
+
+  // Vertical Sidebar State
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('nouva_admin_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => isNotificationSoundEnabled());
+
+  const handleToggleSound = () => {
+    const nextState = !soundEnabled;
+    setSoundEnabled(nextState);
+    setNotificationSoundEnabled(nextState);
+    if (nextState) {
+      playNotificationTone();
+    }
+  };
+
+  const handleToggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('nouva_admin_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const getCurrentTabTitle = (tab: AdminTabKey) => {
+    switch (tab) {
+      case 'approvals': return 'طلبات الانضمام والاعتماد الفوري';
+      case 'products': return 'كتالوج وإدارة المنتجات';
+      case 'sellers': return 'شبكة البائعين والمسوقين';
+      case 'suppliers': return 'الموردين والمستودعات';
+      case 'confirmers': return 'مؤكدو الطلبيات (المراقبة)';
+      case 'couriers': return 'شركات التوصيل وربط API';
+      case 'wallet': return 'الخزينة وسحوبات الأموال';
+      case 'inventory': return 'المخزون وتنبيهات النفاذ';
+      case 'categories': return 'فئات وتصنيفات المنتجات';
+      case 'coupons': return 'الكوبونات والخصومات';
+      case 'rewards': return 'رتب ومكافآت المسوقين';
+      case 'users': return 'المستخدمين والصلاحيات';
+      case 'notifications': return 'سجل إشعارات الإدارة';
+      case 'ai_provider': return 'مزود الذكاء الاصطناعي (Gemini)';
+      case 'settings': return 'إعدادات المنصة العامة';
+      default: return 'لوحة الإدارة';
+    }
+  };
+
+  const getCurrentTabSubtitle = (tab: AdminTabKey) => {
+    switch (tab) {
+      case 'approvals': return 'مراجعة واعتماد طلبات تسجيل البائعين والموردين الجدد في الوقت الفعلي';
+      case 'products': return 'تعديل الأسعار والكميات والمخزون الحي والصور واستيراد المنتجات';
+      case 'sellers': return 'إدارة شبكة المسوقين، رتبهم، معلومات الدفع وتعديل كلمات المرور';
+      case 'suppliers': return 'إدارة مستودعات الموردين والشراكات والمنتجات الموردة';
+      case 'confirmers': return 'متابعة أداء فريق تأكيد المكالمات ونسب النجاح اللحظية';
+      case 'couriers': return 'ربط شركات التوصيل (Yalidine, ZR, Maystro, Ecom) عبر الـ API';
+      case 'wallet': return 'مراجعة طلبات السحب للبائعين وتحصيلات الموردين وإدارتها';
+      case 'inventory': return 'مراقبة كميات المخزون وتنبيهات النفاذ ومواقع الرفوف';
+      case 'categories': return 'إضافة وتعديل التصنيفات والفئات لمنتجات المتجر';
+      case 'coupons': return 'إنشاء قسائم التخفيض والخصومات الترويجية';
+      case 'rewards': return 'نظام الحوافز والنقاط والمستويات التنافسية للبائعين';
+      case 'users': return 'إدارة حسابات طاقم العمل وتوزيع الصلاحيات الإدارية';
+      case 'notifications': return 'بث الإشعارات الجماعية وسجل التنبيهات الإدارية';
+      case 'ai_provider': return 'تكوين وضبط نماذج Google Gemini API للوصف والمبيعات';
+      case 'settings': return 'إعدادات المنصة العامة وعمولات السوق والروابط';
+      default: return '';
+    }
+  };
 
   // Admin Notification Service State
   const [isAdminNotifModalOpen, setIsAdminNotifModalOpen] = useState(false);
@@ -1637,395 +1713,174 @@ export function AdminDashboard({
   };
 
   return (
-    <div className="flex-1 pb-24 overflow-y-auto p-2.5 sm:p-4 text-slate-900 dark:text-slate-100 space-y-4 overflow-x-hidden">
-      {/* Top Main Admin Banner */}
-      <div className="p-4 sm:p-6 rounded-[2rem] bg-gradient-to-r from-slate-950 via-purple-950 to-slate-900 border border-purple-800/80 text-white shadow-2xl space-y-5 relative overflow-hidden">
-        {/* Background Decorative Glow */}
-        <div className="absolute -top-24 -left-24 w-72 h-72 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
+    <div className="flex-1 flex flex-row h-full overflow-hidden bg-slate-950 text-slate-100" dir="rtl">
+      {/* 1. Admin Vertical Sidebar */}
+      <AdminVerticalSidebar
+        activeTab={activeAdminTab}
+        onSelectTab={setActiveAdminTab}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={handleToggleSidebarCollapse}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        counts={{
+          totalPendingApprovals,
+          productsCount: products.length,
+          sellersCount: sellers.length,
+          pendingSellersCount: pendingSellers.length,
+          suppliersCount: supplierList.length,
+          confirmersCount: systemUsers.filter((u) => u.role === 'ORDER_CONFIRMER').length,
+          pendingWithdrawalsCount: withdrawals.filter((w) => w.status === 'PENDING').length,
+          lowStockCount: getLowStockProducts(products).length,
+          categoriesCount: categories.length,
+          couponsCount: coupons.length,
+          rewardsCount: rewardRanks.length,
+          usersCount: systemUsers.length,
+          unreadNotifsCount: adminUnreadCount,
+        }}
+        soundEnabled={soundEnabled}
+        onToggleSound={handleToggleSound}
+        onOpenNotifications={() => setIsAdminNotifModalOpen(true)}
+      />
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-500/30 to-purple-500/30 border border-purple-400/40 text-purple-300 shadow-inner shrink-0">
-              <ShieldCheck className="w-6 h-6 sm:w-7 sm:h-7" />
-            </div>
-            <div>
+      {/* 2. Main Content Column */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
+        {/* Modern Sticky Vertical Top Navbar */}
+        <header className="sticky top-0 z-20 px-3 sm:px-6 py-3 bg-slate-900/95 backdrop-blur-md border-b border-purple-900/40 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Mobile Sidebar Hamburger Toggle */}
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-xl bg-purple-950/60 border border-purple-800/40 text-purple-300 hover:text-white hover:bg-purple-900/60 transition cursor-pointer shrink-0"
+              title="فتح القائمة الجانبية"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            {/* Current Active Tab Breadcrumb & Title */}
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
-                  <span>مركز الإدارة والتحكم الشامل</span>
+                <span className="text-xs font-bold text-purple-400">لوحة الإدارة</span>
+                <span className="text-slate-500 text-xs">/</span>
+                <h1 className="text-sm sm:text-base font-black text-white truncate flex items-center gap-1.5">
+                  {getCurrentTabTitle(activeAdminTab)}
                 </h1>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-extrabold font-mono">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-ping" />
-                  النظام مباشر
-                </span>
+                {activeAdminTab === 'approvals' && totalPendingApprovals > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 animate-pulse">
+                    {totalPendingApprovals} معلق
+                  </span>
+                )}
+                {activeAdminTab === 'products' && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-900/60 text-purple-300">
+                    {products.length} منتج
+                  </span>
+                )}
               </div>
-              <p className="text-[11px] sm:text-xs text-purple-200/80 font-medium mt-0.5">
-                متابعة المنتجات، البائعين، السحوبات المالية، الموردين، والمخزون في الوقت الفعلي
+              <p className="text-[11px] text-slate-400 hidden sm:block truncate">
+                {getCurrentTabSubtitle(activeAdminTab)}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+          {/* Quick Header Action Buttons */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Force Refresh Button */}
+            <button
+              onClick={handleForceRefreshRegistrations}
+              disabled={isRefreshingRegistrations}
+              className="p-2 rounded-xl bg-purple-950/40 border border-purple-800/40 text-purple-300 hover:text-white hover:bg-purple-900/60 transition cursor-pointer"
+              title="مزامنة وتحديث البيانات اللحظية من الخادم"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshingRegistrations ? 'animate-spin text-purple-400' : ''}`} />
+            </button>
+
+            {/* Gemini AI Quick Shortcut */}
             <button
               onClick={() => setActiveAdminTab('ai_provider')}
-              className="px-3.5 py-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 border border-indigo-400/50 text-white font-black text-xs flex items-center gap-2 transition cursor-pointer shadow-lg"
-              title="إعدادات مزود الذكاء الاصطناعي Gemini API"
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                activeAdminTab === 'ai_provider'
+                  ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/30'
+                  : 'bg-indigo-950/40 text-indigo-300 border-indigo-800/50 hover:bg-indigo-900/60'
+              }`}
+              title="إعدادات مزود الذكاء الاصطناعي Gemini"
             >
-              <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>🤖 مزود الذكاء الاصطناعي (Gemini)</span>
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span className="hidden md:inline">Gemini AI</span>
             </button>
 
+            {/* Delivery Couriers API Quick Shortcut */}
             <button
               onClick={() => setActiveAdminTab('couriers')}
-              className="px-3.5 py-2 rounded-2xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 border border-purple-400/50 text-white font-black text-xs flex items-center gap-2 transition cursor-pointer shadow-lg animate-pulse"
-              title="شركات التوصيل وربط الـ API"
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                activeAdminTab === 'couriers'
+                  ? 'bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-600/30'
+                  : 'bg-purple-950/40 text-purple-300 border-purple-800/50 hover:bg-purple-900/60'
+              }`}
+              title="شركات التوصيل وربط API"
             >
-              <Truck className="w-4 h-4 text-purple-100" />
-              <span>🚚 شركات التوصيل API</span>
+              <Truck className="w-3.5 h-3.5 text-purple-200" />
+              <span className="hidden md:inline">شركات التوصيل</span>
             </button>
 
+            {/* Notifications Button */}
             <button
               onClick={() => setIsAdminNotifModalOpen(true)}
-              className="px-3.5 py-2 rounded-2xl bg-purple-600/40 hover:bg-purple-600/60 border border-purple-500/50 text-white font-extrabold text-xs flex items-center gap-2 transition cursor-pointer relative shadow-lg hover:shadow-purple-500/20"
+              className="p-2 rounded-xl bg-purple-950/50 border border-purple-800/40 text-purple-300 hover:text-white hover:bg-purple-900/60 transition relative cursor-pointer"
               title="إشعارات وتنبيهات الإدارة"
             >
-              <Bell className="w-4 h-4 text-purple-300" />
-              <span>الإشعارات</span>
+              <Bell className="w-4 h-4" />
               {adminUnreadCount > 0 && (
-                <span className="min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white font-black text-[10px] flex items-center justify-center animate-pulse border-2 border-slate-950">
+                <span className="min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white font-black text-[9px] flex items-center justify-center absolute -top-1 -end-1 shadow-xs border border-slate-900 animate-pulse">
                   {adminUnreadCount}
                 </span>
               )}
             </button>
 
-            <span className="px-3 py-1.5 rounded-2xl bg-gradient-to-r from-purple-500/20 to-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-black whitespace-nowrap shadow-xs">
+            {/* Sound Toggle Button */}
+            <button
+              onClick={handleToggleSound}
+              className={`p-2 rounded-xl border transition cursor-pointer ${
+                soundEnabled
+                  ? 'bg-purple-950/60 text-amber-300 border-purple-800/40 hover:bg-purple-900/80'
+                  : 'bg-slate-800 text-slate-500 border-slate-700 hover:text-slate-300'
+              }`}
+              title={soundEnabled ? 'صوت التنبيهات: مفعل (انقر للتعطيل)' : 'صوت التنبيهات: صامت (انقر للتفعيل)'}
+            >
+              <Volume2 className="w-4 h-4" />
+            </button>
+
+            {/* Impersonate/Super Admin Tag */}
+            <span className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-black">
               👑 أدمن رئيسي
             </span>
           </div>
-        </div>
+        </header>
 
-        {/* Global Performance KPI Cards - All 12 Admin Tabs */}
-        <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-12 gap-2 pt-3 border-t border-purple-800/60 relative z-10">
-          {/* 1. Products */}
-          <div
-            onClick={() => setActiveAdminTab('products')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'products'
-                ? 'bg-purple-600/50 border-purple-400 text-white shadow-lg ring-1 ring-purple-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-purple-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">المنتجات</span>
-              <Layers className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-white font-mono">{products.length}</span>
-              <span className="text-[9px] text-purple-300 font-medium">عنصر</span>
-            </div>
-          </div>
-
-          {/* 1.5. Approvals (طلبات التسجيل المعلقة) */}
-          <div
-            id="admin-card-approvals"
-            onClick={() => {
-              setActiveAdminTab('approvals');
-              const el = document.getElementById('pending-approvals-hub');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'approvals'
-                ? 'bg-amber-600/60 border-amber-400 text-white shadow-lg ring-1 ring-amber-400/50 scale-[1.02]'
-                : totalPendingApprovals > 0
-                ? 'bg-amber-950/40 border-amber-500/60 hover:border-amber-400 hover:bg-amber-900/50 text-amber-200'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-amber-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate text-amber-400">طلبات التسجيل</span>
-              <UserCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-amber-300 font-mono">
-                {totalPendingApprovals}
+        {/* Inner Scrollable Workspace */}
+        <div className="p-3 sm:p-6 space-y-4 max-w-7xl w-full mx-auto pb-24">
+          {/* Subtle Pending Approvals Alert when NOT in approvals tab */}
+          {activeAdminTab !== 'approvals' && totalPendingApprovals > 0 && (
+            <div
+              onClick={() => setActiveAdminTab('approvals')}
+              className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-purple-500/10 to-amber-500/20 border border-amber-500/50 flex items-center justify-between gap-3 text-xs cursor-pointer hover:border-amber-400 transition shadow-md group"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black animate-pulse">
+                  <UserCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="font-extrabold text-amber-300">
+                    تنبيه اعتماد الحسابات: يوجد {totalPendingApprovals} طلب تسجيل جديد بانتظار الموافقة (بائعين وموردين)
+                  </span>
+                  <p className="text-[11px] text-slate-400">
+                    انقر هنا لمراجعة طلبات الانضمام والموافقة الفورية عليها لتفعيل نشاطهم في المنصة
+                  </p>
+                </div>
+              </div>
+              <span className="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-black text-[11px] group-hover:scale-105 transition shadow-xs">
+                مراجعة الآن 👈
               </span>
-              {totalPendingApprovals > 0 ? (
-                <span className="text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded-full animate-pulse shadow-xs">
-                  {totalPendingApprovals} معلق
-                </span>
-              ) : (
-                <span className="text-[9px] text-emerald-400 font-medium">الكل معتمد ✔</span>
-              )}
             </div>
-          </div>
-
-          {/* 2. Sellers */}
-          <div
-            onClick={() => setActiveAdminTab('sellers')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'sellers'
-                ? 'bg-purple-600/50 border-purple-400 text-white shadow-lg ring-1 ring-purple-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-purple-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">البائعين</span>
-              <Users className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-purple-400 font-mono">{sellers.length}</span>
-              {pendingSellers.length > 0 ? (
-                <span className="text-[9px] bg-amber-500/30 text-amber-300 font-black px-1.5 py-0.5 rounded-full border border-amber-500/50 animate-pulse">
-                  {pendingSellers.length} معلق
-                </span>
-              ) : (
-                <span className="text-[9px] text-purple-300 font-medium">تاجر</span>
-              )}
-            </div>
-          </div>
-
-          {/* 3. Wallet */}
-          <div
-            onClick={() => setActiveAdminTab('wallet')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'wallet'
-                ? 'bg-amber-600/50 border-amber-400 text-white shadow-lg ring-1 ring-amber-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-amber-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">السحوبات</span>
-              <Wallet className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-amber-400 font-mono">
-                {withdrawals.filter((w) => w.status === 'PENDING').length}
-              </span>
-              <span className="text-[9px] text-amber-300 font-medium">معلق</span>
-            </div>
-          </div>
-
-          {/* 4. Inventory */}
-          <div
-            onClick={() => setActiveAdminTab('inventory')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'inventory'
-                ? 'bg-orange-600/50 border-orange-400 text-white shadow-lg ring-1 ring-orange-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-orange-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">المخزون</span>
-              <WarehouseIcon className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-orange-300 font-mono">
-                {getLowStockProducts(products).length}
-              </span>
-              <span className="text-[9px] text-orange-200 font-medium">تنبيه</span>
-            </div>
-          </div>
-
-          {/* 5. Categories */}
-          <div
-            onClick={() => setActiveAdminTab('categories')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'categories'
-                ? 'bg-pink-600/50 border-pink-400 text-white shadow-lg ring-1 ring-pink-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-pink-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">الفئات</span>
-              <Tag className="w-3.5 h-3.5 text-pink-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-pink-400 font-mono">{categories.length}</span>
-              <span className="text-[9px] text-pink-300 font-medium">فئة</span>
-            </div>
-          </div>
-
-          {/* 6. Suppliers */}
-          <div
-            onClick={() => setActiveAdminTab('suppliers')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'suppliers'
-                ? 'bg-purple-600/50 border-purple-400 text-white shadow-lg ring-1 ring-purple-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-purple-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">الموردين</span>
-              <Building className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-purple-300 font-mono">{supplierList.length}</span>
-              {pendingSuppliers.length > 0 ? (
-                <span className="text-[9px] bg-amber-500/30 text-amber-300 font-black px-1.5 py-0.5 rounded-full border border-amber-500/50 animate-pulse">
-                  {pendingSuppliers.length} معلق
-                </span>
-              ) : (
-                <span className="text-[9px] text-purple-200 font-medium">مورد</span>
-              )}
-            </div>
-          </div>
-
-          {/* 7. Couriers */}
-          <div
-            onClick={() => setActiveAdminTab('couriers')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'couriers'
-                ? 'bg-sky-600/50 border-sky-400 text-white shadow-lg ring-1 ring-sky-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-sky-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">التوصيل</span>
-              <Truck className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-sky-400 font-mono">{couriers.length}</span>
-              <span className="text-[9px] text-sky-300 font-medium">شركة</span>
-            </div>
-          </div>
-
-          {/* 8. Coupons */}
-          <div
-            onClick={() => setActiveAdminTab('coupons')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'coupons'
-                ? 'bg-purple-600/50 border-purple-400 text-white shadow-lg ring-1 ring-purple-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-purple-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">الكوبونات</span>
-              <Percent className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-purple-300 font-mono">{coupons.length}</span>
-              <span className="text-[9px] text-purple-200 font-medium">كوبون</span>
-            </div>
-          </div>
-
-          {/* 9. Rewards Ranks */}
-          <div
-            onClick={() => setActiveAdminTab('rewards')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'rewards'
-                ? 'bg-rose-600/50 border-rose-400 text-white shadow-lg ring-1 ring-rose-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-rose-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">الجوائز</span>
-              <Award className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-amber-300 font-mono">{rewardRanks.length}</span>
-              <span className="text-[9px] text-amber-200 font-medium">مستوى</span>
-            </div>
-          </div>
-
-          {/* 10. Users & Roles */}
-          <div
-            onClick={() => setActiveAdminTab('users')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'users'
-                ? 'bg-blue-600/50 border-blue-400 text-white shadow-lg ring-1 ring-blue-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-blue-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">الصلاحيات</span>
-              <UserCheck className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-blue-300 font-mono">{systemUsers.length}</span>
-              <span className="text-[9px] text-blue-200 font-medium">مستخدم</span>
-            </div>
-          </div>
-
-          {/* 11. Order Confirmers Audit Card */}
-          <div
-            onClick={() => setActiveAdminTab('confirmers')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'confirmers'
-                ? 'bg-emerald-600/50 border-emerald-400 text-white shadow-lg ring-1 ring-emerald-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-emerald-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">مؤكدو الطلبيات</span>
-              <PhoneCall className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-emerald-300 font-mono">
-                {systemUsers.filter((u) => u.role === 'ORDER_CONFIRMER').length}
-              </span>
-              <span className="text-[9px] text-emerald-200 font-medium">مؤكد</span>
-            </div>
-          </div>
-
-          {/* 12. Notifications */}
-          <div
-            onClick={() => setActiveAdminTab('notifications')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'notifications'
-                ? 'bg-purple-600/50 border-purple-400 text-white shadow-lg ring-1 ring-purple-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-purple-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">الإشعارات</span>
-              <Bell className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-purple-300 font-mono">{adminUnreadCount}</span>
-              <span className="text-[9px] text-purple-200 font-medium">تنبيه</span>
-            </div>
-          </div>
-
-          {/* 13. AI Provider (Gemini) */}
-          <div
-            onClick={() => setActiveAdminTab('ai_provider')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'ai_provider'
-                ? 'bg-indigo-600/50 border-indigo-400 text-white shadow-lg ring-1 ring-indigo-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-indigo-500/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">الذكاء الاصطناعي</span>
-              <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-xs font-black text-indigo-300 font-mono">Gemini AI</span>
-              <span className="text-[9px] text-emerald-400 font-bold">مزوّد</span>
-            </div>
-          </div>
-
-          {/* 14. Settings */}
-          <div
-            onClick={() => setActiveAdminTab('settings')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeAdminTab === 'settings'
-                ? 'bg-slate-700/60 border-slate-400 text-white shadow-lg ring-1 ring-slate-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-slate-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">الإعدادات</span>
-              <Settings className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-xs font-black text-purple-400 font-mono">مُنشّط</span>
-              <span className="text-[9px] text-slate-300 font-medium">نظام</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
+          )}
       {/* LOW STOCK ALERT BANNER FOR ADMIN */}
       <LowStockBanner
         products={products}
@@ -2034,7 +1889,9 @@ export function AdminDashboard({
       />
 
       {/* ===================== PENDING APPROVALS CENTRAL HUB ===================== */}
-      <div id="pending-approvals-hub" className="rounded-2xl border transition-all duration-300 overflow-hidden shadow-md bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800">
+            {/* ===================== TAB: APPROVALS (PENDING APPROVALS CENTRAL HUB) ===================== */}
+      {activeAdminTab === 'approvals' && (
+        <div id="pending-approvals-hub" className="rounded-2xl border transition-all duration-300 overflow-hidden shadow-md bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800">
         <div className={`p-4 ${
           totalPendingApprovals > 0
             ? 'bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-amber-500/15 border-b border-amber-500/30'
@@ -2318,66 +2175,7 @@ export function AdminDashboard({
           </div>
         )}
       </div>
-
-      {/* ADMIN NAVIGATION BAR */}
-      <div className="p-1.5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-x-auto w-full max-w-full text-xs font-bold scrollbar-none shrink-0 min-w-0">
-        <div className="flex items-center gap-1.5">
-          {[
-            { id: 'products', label: '1. المنتجات والأسعار', icon: Layers },
-            {
-              id: 'approvals',
-              label: '2. طلبات الانضمام ⏳',
-              icon: UserCheck,
-              badge: totalPendingApprovals > 0 ? `${totalPendingApprovals} جديد` : null,
-            },
-            {
-              id: 'sellers',
-              label: '3. البائعين والمتاجر',
-              icon: Users,
-              badge: pendingSellers.length > 0 ? `${pendingSellers.length} معلق` : null,
-            },
-            { id: 'wallet', label: '4. المحفظة والسحوبات', icon: Wallet },
-            { id: 'inventory', label: '5. مسح المخزون والأماكن', icon: WarehouseIcon },
-            { id: 'categories', label: '6. الفئات والتصنيفات', icon: Tag },
-            {
-              id: 'suppliers',
-              label: '7. الموردين والمصانع',
-              icon: Building,
-              badge: pendingSuppliers.length > 0 ? `${pendingSuppliers.length} معلق` : null,
-            },
-            { id: 'couriers', label: '8. شركات التوصيل API', icon: Truck },
-            { id: 'coupons', label: '9. الكوبونات والعروض', icon: Percent },
-            { id: 'rewards', label: '10. مستويات الجوائز والبونص 🌟', icon: Award },
-            { id: 'users', label: '11. الأدوار والصلاحيات', icon: UserCheck },
-            { id: 'confirmers', label: '12. مراقبة مؤكدي الطلبيات 📞', icon: PhoneCall },
-            { id: 'notifications', label: '13. قوالب الإشعارات', icon: Bell },
-            { id: 'ai_provider', label: '14. مزود الذكاء الاصطناعي (Gemini API) 🤖', icon: Sparkles },
-            { id: 'settings', label: '15. إعدادات المنصة', icon: Settings },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeAdminTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveAdminTab(tab.id as AdminTabKey)}
-                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer ${
-                  isActive
-                    ? 'bg-gradient-to-r from-purple-600 to-purple-600 text-white shadow-md shadow-purple-500/25 font-black scale-[1.01]'
-                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`} />
-                <span>{tab.label}</span>
-                {tab.badge && (
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 animate-pulse shadow-xs">
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      )}
 
       {/* ---------------- 1. EDIT PRODUCTS & CATEGORY & QUANTITIES & IMAGES ---------------- */}
       {activeAdminTab === 'products' && (
@@ -6894,6 +6692,8 @@ export function AdminDashboard({
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

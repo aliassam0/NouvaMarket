@@ -51,7 +51,9 @@ import {
   Eye,
   EyeOff,
   Radio,
+  Menu,
 } from 'lucide-react';
+import { WarehouseVerticalSidebar } from './WarehouseVerticalSidebar';
 import { useOrders } from '../../context/OrderContext';
 import { useCategories } from '../../context/CategoryContext';
 import { useAuth } from '../../context/AuthContext';
@@ -118,6 +120,58 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
   } = useOrders();
 
   const [activeTab, setActiveTab] = useState<WarehouseTab>('pending');
+
+  // Vertical Sidebar State
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('nouva_wh_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+
+  const handleToggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('nouva_wh_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const getWarehouseTabTitle = (tab: WarehouseTab) => {
+    switch (tab) {
+      case 'pending': return '1. مراجعة وتأكيد الطلبيات';
+      case 'preparation': return '2. التحضير وتوليد البوردورو';
+      case 'delivery': return '3. قيد التوصيل مع الشركات';
+      case 'completed': return '4. طلبيات مسلمة ومكتملة';
+      case 'returned': return '5. المرتجعات والرجوع';
+      case 'products': return 'منتجاتي والمخزون الحي';
+      case 'tracking': return 'تتبع الشحنات ومزامنة API';
+      case 'financial': return 'التحصيلات وسحب المستحقات';
+      case 'analytics': return 'إحصائيات المبيعات والأداء';
+      case 'profile': return 'بيانات المستودع والحساب';
+      default: return 'لوحة المستودع';
+    }
+  };
+
+  const getWarehouseTabSubtitle = (tab: WarehouseTab) => {
+    switch (tab) {
+      case 'pending': return 'مراجعة بيانات الزبون، توفر المخزون، والتأكيد الهاتفي للشحن الفوري';
+      case 'preparation': return 'طباعة ملصقات الشحن (Bordereau) وتعيين شركات التوصيل وحزم الطرود';
+      case 'delivery': return 'متابعة مسار الشحنات المنطلقة مع شركات التوصيل بالتحديث اللحظي';
+      case 'completed': return 'سجل الطلبيات المسلمة للزبائن بنجاح وتحصيل أموال الـ COD';
+      case 'returned': return 'استلام الطرود المرتجعة وإعادة فحص المنتجات وإرجاعها للمخزون';
+      case 'products': return 'إدارة الكتالوج، أسعار الجملة، الكميات لكل مقاس ولون، وإضافة منتجات جديدة';
+      case 'tracking': return 'أداة الاستعلام اللحظي عن كود التتبع مع خوادم شركات التوصيل';
+      case 'financial': return 'كشف حساب الأرباح، المستحقات الصافية، وتقديم طلبات سحب الأموال';
+      case 'analytics': return 'معدلات تسليم الشحنات، أعلى المنتجات طلباً، ومؤشرات الأداء';
+      case 'profile': return 'معلومات المستودع، أرقام CCP / BaridiMob، والعنوان للتوصيل';
+      default: return '';
+    }
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [showShippingRatesModal, setShowShippingRatesModal] = useState(false);
 
@@ -1069,263 +1123,183 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
   };
 
   return (
-    <div className="flex-1 pb-24 overflow-y-auto p-2.5 sm:p-4 text-slate-900 dark:text-slate-100 space-y-4 max-w-7xl mx-auto overflow-x-hidden w-full min-w-0">
-      {/* HEADER BANNER - HIGH CREATIVE & PROFESSIONAL */}
-      <div className="p-4 sm:p-6 rounded-[2rem] bg-gradient-to-r from-slate-950 via-purple-950 to-slate-900 border border-purple-800/80 text-white shadow-2xl space-y-5 relative overflow-hidden">
-        {/* Background Decorative Ambient Glow */}
-        <div className="absolute -top-24 -left-24 w-72 h-72 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-sky-500/15 rounded-full blur-3xl pointer-events-none" />
+    <div className="flex-1 flex flex-row h-full overflow-hidden bg-slate-950 text-slate-100" dir="rtl">
+      {/* 1. Warehouse Vertical Sidebar */}
+      <WarehouseVerticalSidebar
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={handleToggleSidebarCollapse}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        counts={{
+          pendingCount: pendingOrders.length,
+          preparationCount: preparationOrders.length,
+          deliveryCount: deliveryOrders.length,
+          completedCount: completedOrders.length,
+          returnedCount: returnedOrders.length,
+          productsCount: mySupplierProducts.length,
+        }}
+        availableBalance={availableBalance}
+        supplierName={supplierProfile?.companyName || supplierProfile?.fullName || 'المستودع الرئيسي'}
+        onOpenPayoutModal={() => handleOpenPayoutModal()}
+        onOpenPickupModal={() => setIsPickupModalOpen(true)}
+        onOpenAddProduct={() => {
+          setActiveTab('products');
+          const newP: Product = {
+            id: 'p-new-' + Date.now(),
+            nameAr: '',
+            nameFr: '',
+            categoryAr: categories[0]?.nameAr || 'منتجات عامة',
+            categoryFr: categories[0]?.nameFr || 'Produits Divers',
+            ageGroup: 'all',
+            gender: 'unisex',
+            descriptionAr: '',
+            descriptionFr: '',
+            featuresAr: [],
+            featuresFr: [],
+            wholesalePrice: 0,
+            floorPrice: 0,
+            ceilingPrice: 0,
+            suggestedSellingPrice: 0,
+            images: [],
+            variants: [
+              { id: 'v1-' + Date.now(), size: 'Standard', color: 'Original', colorHex: '#2563eb', stockCount: 0 },
+            ],
+            supplierId: supplierProfile?.id || 'sup-01',
+            supplierName: supplierProfile?.companyName || supplierProfile?.fullName || 'المستودع الرئيسي',
+            isNewArrival: true,
+          };
+          setEditingProduct(newP);
+          setIsAddingNewProduct(true);
+        }}
+      />
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-500/30 to-sky-500/30 border border-purple-400/40 text-purple-300 shadow-inner shrink-0">
-              <Package className="w-6 h-6 sm:w-7 sm:h-7" />
-            </div>
-            <div>
+      {/* 2. Main Content Column */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
+        {/* Modern Sticky Vertical Top Navbar */}
+        <header className="sticky top-0 z-20 px-3 sm:px-6 py-3 bg-slate-900/95 backdrop-blur-md border-b border-purple-900/40 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Mobile Sidebar Hamburger Toggle */}
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-xl bg-purple-950/60 border border-purple-800/40 text-purple-300 hover:text-white hover:bg-purple-900/60 transition cursor-pointer shrink-0"
+              title="فتح القائمة الجانبية"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            {/* Current Active Tab Breadcrumb & Title */}
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
-                  <span>لوحة تحكم المورد والمستودع</span>
+                <span className="text-xs font-bold text-violet-400">لوحة المستودع</span>
+                <span className="text-slate-500 text-xs">/</span>
+                <h1 className="text-sm sm:text-base font-black text-white truncate flex items-center gap-1.5">
+                  {getWarehouseTabTitle(activeTab)}
                 </h1>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-extrabold font-mono">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-ping" />
-                  المستودع الرئيسي
-                </span>
+                {activeTab === 'pending' && pendingOrders.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 animate-pulse">
+                    {pendingOrders.length} معلق
+                  </span>
+                )}
+                {activeTab === 'preparation' && preparationOrders.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-violet-950 text-violet-300 border border-violet-800">
+                    {preparationOrders.length} طرد
+                  </span>
+                )}
+                {activeTab === 'products' && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-950 text-purple-300 border border-purple-800">
+                    {mySupplierProducts.length} صنف
+                  </span>
+                )}
               </div>
-              <p className="text-[11px] sm:text-xs text-purple-200/80 font-medium mt-0.5">
-                إدارة الكتالوج والمخزون، تجهيز الطلبات، تتبع بوليصات الشحن، ومتابعة الأرباح والتحويلات المالية
+              <p className="text-[11px] text-slate-400 hidden sm:block truncate">
+                {getWarehouseTabSubtitle(activeTab)}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+          {/* Quick Header Action Buttons & Search */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Search Input in header */}
+            {activeTab !== 'products' && (
+              <div className="relative hidden md:block w-48 lg:w-64">
+                <Search className="w-3.5 h-3.5 absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="بحث باسم الزبون أو الهاتف..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full ps-9 pe-3 py-1.5 rounded-xl bg-slate-800/80 border border-purple-900/40 text-xs font-medium text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 transition"
+                />
+              </div>
+            )}
+
+            {/* Ramassage Quick Button */}
+            <button
+              onClick={() => setIsPickupModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              title="طلب سيارة جمع الطرود (Demande Ramassage)"
+            >
+              <Truck className="w-3.5 h-3.5 text-purple-300" />
+              <span className="hidden sm:inline">طلب راماساج</span>
+            </button>
+
+            {/* Shipping Rates Modal Button */}
             <button
               onClick={() => setShowShippingRatesModal(true)}
-              className="px-3.5 py-2 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black flex items-center gap-2 transition cursor-pointer shadow-lg active:scale-95"
+              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-sm"
               title="جدول أسعار التوصيل لجميع الولايات"
             >
-              <Truck className="w-4 h-4 text-slate-950" />
-              <span>🚚 أسعار التوصيل (68 ولاية)</span>
+              <Truck className="w-3.5 h-3.5 text-slate-950" />
+              <span className="hidden sm:inline">أسعار التوصيل</span>
             </button>
+
+            {/* Notifications Button */}
             <button
               onClick={() => setIsWarehouseNotifOpen(true)}
-              className="px-3.5 py-2 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-black flex items-center gap-2 transition cursor-pointer relative shadow-lg hover:shadow-amber-500/20"
+              className="p-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:text-white hover:bg-amber-500/30 transition relative cursor-pointer"
               title="تنبيهات وإشعارات المستودع"
             >
               <Bell className="w-4 h-4 text-amber-400" />
-              <span>إشعارات المستودع</span>
               {unreadNotifCount > 0 && (
-                <span className="min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white font-black text-[10px] flex items-center justify-center animate-pulse border-2 border-slate-950">
+                <span className="min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white font-black text-[9px] flex items-center justify-center absolute -top-1 -end-1 shadow-xs border border-slate-900 animate-pulse">
                   {unreadNotifCount}
                 </span>
               )}
             </button>
-            <span className="px-3 py-1.5 rounded-2xl bg-gradient-to-r from-sky-500/20 to-purple-500/20 text-sky-300 border border-sky-500/30 text-xs font-black whitespace-nowrap shadow-xs">
-              🏭 المورد المعتمد
-            </span>
-          </div>
-        </div>
 
-        {/* 10 MAIN KPI CARDS - COVERING ALL WAREHOUSE SECTIONS */}
-        <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-5 xl:grid-cols-10 gap-2 pt-3 border-t border-purple-800/60 relative z-10">
-          {/* 1. Products */}
-          <div
-            onClick={() => setActiveTab('products')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeTab === 'products'
-                ? 'bg-purple-600/50 border-purple-400 text-white shadow-lg ring-1 ring-purple-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-purple-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">المنتجات</span>
-              <Box className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-purple-300 font-mono">{mySupplierProducts.length}</span>
-              <span className="text-[9px] text-purple-200 font-medium">منتج</span>
+            {/* Available Balance Pill */}
+            <div
+              onClick={() => handleOpenPayoutModal()}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-950/60 border border-emerald-800/50 text-emerald-300 text-xs font-black cursor-pointer hover:border-emerald-600 transition"
+              title="رصيدك المتاح للسحب (انقر لطلب سحب)"
+            >
+              <span>المتاح:</span>
+              <span className="font-mono text-emerald-400">{availableBalance.toLocaleString()} دج</span>
             </div>
           </div>
+        </header>
 
-          {/* 2. Pending */}
-          <div
-            onClick={() => setActiveTab('pending')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeTab === 'pending'
-                ? 'bg-amber-600/50 border-amber-400 text-white shadow-lg ring-1 ring-amber-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-amber-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">1. مراجعة</span>
-              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-amber-400 font-mono">{pendingOrders.length}</span>
-              <span className="text-[9px] text-amber-200 font-medium">طلب</span>
+        {/* Mobile Search Bar if active */}
+        {activeTab !== 'products' && (
+          <div className="md:hidden px-3 pt-3">
+            <div className="relative w-full">
+              <Search className="w-3.5 h-3.5 absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="بحث باسم الزبون، الهاتف، أو ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full ps-9 pe-3 py-2 rounded-xl bg-slate-900 border border-purple-900/40 text-xs font-medium text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 transition"
+              />
             </div>
           </div>
+        )}
 
-          {/* 3. Preparation */}
-          <div
-            onClick={() => setActiveTab('preparation')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeTab === 'preparation'
-                ? 'bg-violet-600/50 border-violet-400 text-white shadow-lg ring-1 ring-violet-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-violet-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">2. تحضير</span>
-              <Package className="w-3.5 h-3.5 text-violet-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-violet-300 font-mono">{preparationOrders.length}</span>
-              <span className="text-[9px] text-violet-200 font-medium">طلب</span>
-            </div>
-          </div>
-
-          {/* 4. Delivery */}
-          <div
-            onClick={() => setActiveTab('delivery')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeTab === 'delivery'
-                ? 'bg-blue-600/50 border-blue-400 text-white shadow-lg ring-1 ring-blue-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-blue-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">3. توصيل</span>
-              <Truck className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-blue-400 font-mono">{deliveryOrders.length}</span>
-              <span className="text-[9px] text-blue-200 font-medium">شحنة</span>
-            </div>
-          </div>
-
-          {/* 5. Completed */}
-          <div
-            onClick={() => setActiveTab('completed')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeTab === 'completed'
-                ? 'bg-purple-600/50 border-purple-400 text-white shadow-lg ring-1 ring-purple-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-purple-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">4. مكتملة</span>
-              <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-purple-400 font-mono">{completedOrders.length}</span>
-              <span className="text-[9px] text-purple-200 font-medium">طلب</span>
-            </div>
-          </div>
-
-          {/* 6. Returned */}
-          <div
-            onClick={() => setActiveTab('returned')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeTab === 'returned'
-                ? 'bg-rose-600/50 border-rose-400 text-white shadow-lg ring-1 ring-rose-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-rose-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">5. مرتجعات</span>
-              <RotateCcw className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-sm sm:text-base font-black text-rose-400 font-mono">{returnedOrders.length}</span>
-              <span className="text-[9px] text-rose-200 font-medium">مرتجع</span>
-            </div>
-          </div>
-
-          {/* 7. Financial */}
-          <div
-            onClick={() => setActiveTab('financial')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeTab === 'financial'
-                ? 'bg-purple-600/50 border-purple-400 text-white shadow-lg ring-1 ring-purple-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-purple-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">المستحقات</span>
-              <Wallet className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-xs sm:text-sm font-black text-purple-300 font-mono">
-                {availableBalance.toLocaleString()}
-              </span>
-              <span className="text-[9px] text-purple-200 font-medium">دج متاح</span>
-            </div>
-          </div>
-
-          {/* 8. Tracking Tool */}
-          <div
-            onClick={() => setActiveTab('tracking')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeTab === 'tracking'
-                ? 'bg-violet-600/50 border-violet-400 text-white shadow-lg ring-1 ring-violet-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-violet-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">تتبع الشحنة</span>
-              <Search className="w-3.5 h-3.5 text-violet-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-xs sm:text-sm font-black text-violet-300 font-mono">Ecom API</span>
-              <span className="text-[9px] text-violet-200 font-medium">بحث فوري</span>
-            </div>
-          </div>
-
-          {/* 9. Analytics */}
-          <div
-            onClick={() => setActiveTab('analytics')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeTab === 'analytics'
-                ? 'bg-purple-600/50 border-purple-400 text-white shadow-lg ring-1 ring-purple-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-purple-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">الإحصائيات</span>
-              <BarChart3 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-xs sm:text-sm font-black text-purple-300 font-mono">
-                {dateFilteredOrders.length > 0
-                  ? Math.round((completedOrders.length / dateFilteredOrders.length) * 100) + '%'
-                  : '100%'}
-              </span>
-              <span className="text-[9px] text-purple-200 font-medium">تسليم</span>
-            </div>
-          </div>
-
-          {/* 10. Profile */}
-          <div
-            onClick={() => setActiveTab('profile')}
-            className={`p-2.5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-              activeTab === 'profile'
-                ? 'bg-purple-600/50 border-purple-400 text-white shadow-lg ring-1 ring-purple-400/50 scale-[1.02]'
-                : 'bg-slate-900/70 border-purple-900/80 hover:border-purple-600/80 hover:bg-slate-800/80 text-slate-300'
-            }`}
-          >
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-bold">
-              <span className="truncate">الملف والحساب</span>
-              <User className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-xs sm:text-sm font-black text-purple-300 font-mono">مُعتمَد</span>
-              <span className="text-[9px] text-purple-200 font-medium">حساب</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* LOW STOCK ALERT BANNER FOR WAREHOUSE */}
+        {/* Inner Scrollable Workspace */}
+        <div className="p-3 sm:p-6 space-y-4 max-w-7xl w-full mx-auto pb-24">
+          {/* LOW STOCK ALERT BANNER FOR WAREHOUSE */}
       <LowStockBanner
         products={products}
         onOpenModal={() => setIsLowStockModalOpen(true)}
@@ -1365,145 +1339,6 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
           <Clock className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
           <span>مسار موحد: التأكيد ⬅️ قيد التحضير ⬅️ قيد التوصيل</span>
         </div>
-      </div>
-
-      {/* SEARCH & REORDERED HIGH-CREATIVE NAVIGATION TABS */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* Navigation Tabs - Cleanly Ordered & Categorized */}
-        <div className="p-1.5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800/80 shadow-xs overflow-x-auto w-full max-w-full text-xs font-bold scrollbar-none shrink-0 min-w-0">
-          <div className="flex items-center gap-1.5">
-            {/* 1. Products Management */}
-            <button
-              onClick={() => setActiveTab('products')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'products'
-                  ? 'bg-gradient-to-r from-purple-600 to-purple-600 text-white shadow-md shadow-purple-500/25 font-black scale-[1.01]'
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80'
-              }`}
-            >
-              <Box className="w-4 h-4 text-purple-400" />
-              <span>إدارة المنتجات والمخزون ({mySupplierProducts.length})</span>
-            </button>
-
-            {/* 2. Pending Orders */}
-            <button
-              onClick={() => setActiveTab('pending')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'pending'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-500/25 font-black scale-[1.01]'
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80'
-              }`}
-            >
-              <Clock className="w-4 h-4 text-amber-400" />
-              <span>1. قيد المراجعة ({pendingOrders.length})</span>
-            </button>
-
-            {/* 3. Preparation */}
-            <button
-              onClick={() => setActiveTab('preparation')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'preparation'
-                  ? 'bg-violet-600 text-white shadow-md shadow-violet-500/25 font-black scale-[1.01]'
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80'
-              }`}
-            >
-              <Package className="w-4 h-4 text-violet-400" />
-              <span>2. قيد التحضير ({preparationOrders.length})</span>
-            </button>
-
-            {/* 4. Delivery */}
-            <button
-              onClick={() => setActiveTab('delivery')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'delivery'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 font-black scale-[1.01]'
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80'
-              }`}
-            >
-              <Truck className="w-4 h-4 text-blue-400" />
-              <span>3. قيد التوصيل ({deliveryOrders.length})</span>
-            </button>
-
-            {/* 5. Completed */}
-            <button
-              onClick={() => setActiveTab('completed')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'completed'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-500/25 font-black scale-[1.01]'
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80'
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4 text-purple-400" />
-              <span>4. مكتملة ({completedOrders.length})</span>
-            </button>
-
-            {/* 6. Returned */}
-            <button
-              onClick={() => setActiveTab('returned')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'returned'
-                  ? 'bg-rose-600 text-white shadow-md shadow-rose-500/25 font-black scale-[1.01]'
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80'
-              }`}
-            >
-              <RotateCcw className="w-4 h-4 text-rose-400" />
-              <span>5. مرتجعات ({returnedOrders.length})</span>
-            </button>
-
-            {/* 7. Financial */}
-            <button
-              onClick={() => setActiveTab('financial')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'financial'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-500/25 font-black scale-[1.01]'
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80'
-              }`}
-            >
-              <DollarSign className="w-4 h-4 text-purple-400" />
-              <span>المستحقات والمالية</span>
-            </button>
-
-            {/* 8. Analytics */}
-            <button
-              onClick={() => setActiveTab('analytics')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'analytics'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-500/25 font-black scale-[1.01]'
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4 text-purple-400" />
-              <span>الإحصائيات والتحليلات</span>
-            </button>
-
-            {/* 10. Profile */}
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer ${
-                activeTab === 'profile'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 font-black scale-[1.01]'
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80'
-              }`}
-            >
-              <User className="w-4 h-4 text-blue-400" />
-              <span>الملف الشخصي والحساب</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Quick Search Input */}
-        {activeTab !== 'products' && (
-          <div className="relative min-w-[220px] shrink-0">
-            <Search className="w-4 h-4 absolute start-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="بحث باسم الزبون، الهاتف، أو ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full ps-10 pe-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 transition shadow-xs"
-            />
-          </div>
-        )}
       </div>
 
       {/* ==================== TAB 1: قيد المراجعة ==================== */}
@@ -4866,6 +4701,8 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }
