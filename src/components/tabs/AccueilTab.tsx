@@ -20,6 +20,9 @@ import { ProfitBadge } from '../ui/ProfitBadge';
 import { Product } from '../../types';
 import { getUnreadNotificationsCount } from '../../lib/notificationHelper';
 import { getStoredWalletBalance } from '../../lib/walletHelper';
+import { testSalePushNotification } from '../../lib/pwaNotificationManager';
+import { PWAInstallButton } from '../common/PWAInstallButton';
+
 
 interface AccueilTabProps {
   onOpenProduct: (p: Product) => void;
@@ -206,7 +209,40 @@ export function AccueilTab({
         </button>
       </div>
 
+      {/* PWA & Instant Sale Notification Alert Card */}
+      <div className="p-3.5 rounded-3xl bg-gradient-to-r from-violet-600/10 via-amber-500/15 to-purple-600/10 border border-amber-300/70 dark:border-amber-500/30 flex items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center font-black text-xl shadow-xs shrink-0">
+            🔔
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-black text-slate-900 dark:text-white">
+                إشعار المبيعة الفوري (PWA)
+              </span>
+              <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 text-[9px] font-black">
+                يهتز + رنين 💰
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+              صوت رنين كاش وهزّة بهاتفك كلما تحققت مبيعة: <strong>💰 مبيعة جديدة! ربحك: 2,500 دج</strong>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => testSalePushNotification(2500)}
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 font-black text-xs shadow-xs transition cursor-pointer whitespace-nowrap"
+            title="تجربة رنين المبيعة الفوري واهتزاز الهاتف"
+          >
+            جرّب الرنين 🔔
+          </button>
+        </div>
+      </div>
+
       {/* Stats Summary Bar */}
+
       <div className="grid grid-cols-3 gap-2.5">
         <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-center shadow-xs">
           <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">
@@ -254,9 +290,9 @@ export function AccueilTab({
           </div>
         ) : (
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
-            {activeOrders.map((ord) => (
+            {activeOrders.map((ord, idx) => (
               <div
-                key={ord.id}
+                key={`${ord.id || 'ord'}-${idx}`}
                 className="w-64 shrink-0 p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-2"
               >
                 <div className="flex items-center justify-between">

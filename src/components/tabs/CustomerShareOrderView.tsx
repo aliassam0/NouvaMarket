@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  ShoppingBag,
   Check,
   ArrowRight,
   ExternalLink,
   Truck,
-  ShieldCheck,
   User,
   Phone,
   MapPin,
@@ -1432,23 +1430,6 @@ export function CustomerShareOrderView({ product: initialProduct, onBackToApp, o
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* In-Section Direct Conversion Button */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  style={{ backgroundColor: effectiveButtonColor }}
-                  className="w-full py-4 px-6 rounded-2xl hover:brightness-95 active:scale-[0.99] text-white font-black text-base sm:text-lg shadow-lg flex items-center justify-center gap-2 cursor-pointer transition select-none"
-                >
-                  <ShoppingBag className="w-5 h-5 stroke-[2.5]" />
-                  <span>{isSubmitting ? 'جاري تأكيد وإرسال طلبك...' : 'تأكيد الطلب الآن ⚡'}</span>
-                </button>
-                <p className="text-[11px] text-center text-slate-500 dark:text-slate-400 mt-2 font-medium flex items-center justify-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>الدفع نقداً عند الاستلام بعد فحص المنتج والتأكد من مطابقته</span>
-                </p>
               </div>
             </div>
 

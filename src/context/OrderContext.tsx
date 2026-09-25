@@ -5,6 +5,7 @@ import { useNetworkStatus } from '../offline/networkStatus';
 import { useAuth } from './AuthContext';
 import { creditResellerCommission } from '../lib/walletHelper';
 import { addSellerNotification, addAdminNotification, addWarehouseNotification } from '../lib/notificationHelper';
+import { triggerSaleNotification } from '../lib/pwaNotificationManager';
 import { getStoredProducts, saveStoredProducts } from '../data/mockProducts';
 import { pollOrderStatusesFromDeliveryApis, getStoredSyncSettings } from '../lib/deliverySyncManager';
 import {
@@ -12,6 +13,7 @@ import {
   SyncOrderStatusOptions,
   SyncOrderStatusResult,
 } from '../lib/orderStatusSync';
+
 
 interface OrderContextType {
   orders: Order[];
@@ -87,67 +89,88 @@ function broadcastSync(payload: any) {
 }
 
 function mergeOrderLists(local: Order[], remote: Order[]): Order[] {
-  const map = new Map<string, Order>();
   const deletedIds = getDeletedOrderIds();
+  const ordersById = new Map<string, Order>();
+  const idByIdempotency = new Map<string, string>();
+  const idByTracking = new Map<string, string>();
 
-  // Add all remote orders that are not blacklisted
-  remote.forEach((o) => {
-    if (!o) return;
-    if (o.id && deletedIds.has(String(o.id))) return;
-    if (o.trackingCode && deletedIds.has(String(o.trackingCode))) return;
-    if (o.id) map.set(o.id, o);
-    if (o.idempotencyKey) map.set(o.idempotencyKey, o);
-    if (o.trackingCode) map.set(o.trackingCode, o);
-  });
+  function normalizeId(id: string): string {
+    // If an ID has multiple concatenated duplicate suffixes like ORD-645866-1-242-2-406...,
+    // normalize back to the base canonical ID
+    const match = id.match(/^(ORD-\d+)(?:-\d+-\d+)+$/);
+    return match ? match[1] : id;
+  }
 
-  // Add or update local orders that are not blacklisted
-  local.forEach((o) => {
+  function addOrMergeOrder(o: Order) {
     if (!o) return;
-    if (o.id && deletedIds.has(String(o.id))) return;
-    if (o.trackingCode && deletedIds.has(String(o.trackingCode))) return;
-    const key = o.id || o.idempotencyKey || o.trackingCode;
-    const existing = (o.id && map.get(o.id)) || (o.idempotencyKey && map.get(o.idempotencyKey)) || (o.trackingCode && map.get(o.trackingCode));
-    if (!existing) {
-      map.set(key || String(Math.random()), o);
+    const cleanId = o.id ? normalizeId(String(o.id)) : `ORD-LOCAL-${Date.now()}`;
+    const orderObj: Order = o.id !== cleanId ? { ...o, id: cleanId } : o;
+
+    if (deletedIds.has(String(orderObj.id))) return;
+    if (orderObj.trackingCode && deletedIds.has(String(orderObj.trackingCode))) return;
+
+    // Check if this order already exists in ordersById
+    let existingId: string | undefined = undefined;
+    if (ordersById.has(orderObj.id)) {
+      existingId = orderObj.id;
+    } else if (orderObj.idempotencyKey && idByIdempotency.has(orderObj.idempotencyKey)) {
+      existingId = idByIdempotency.get(orderObj.idempotencyKey);
+    } else if (orderObj.trackingCode && idByTracking.has(orderObj.trackingCode)) {
+      existingId = idByTracking.get(orderObj.trackingCode);
+    }
+
+    if (!existingId || !ordersById.has(existingId)) {
+      ordersById.set(orderObj.id, orderObj);
+      if (orderObj.idempotencyKey) idByIdempotency.set(orderObj.idempotencyKey, orderObj.id);
+      if (orderObj.trackingCode) idByTracking.set(orderObj.trackingCode, orderObj.id);
     } else {
+      const existing = ordersById.get(existingId)!;
       const merged: Order = {
         ...existing,
-        ...o,
-        status: existing.status || o.status,
-        statusAr: existing.statusAr || o.statusAr,
-        statusFr: existing.statusFr || o.statusFr,
-        situation: existing.situation || o.situation,
-        avancement: existing.avancement || o.avancement,
-        adminConfirmed: existing.adminConfirmed ?? o.adminConfirmed,
-        isLockedForEdit: existing.isLockedForEdit ?? o.isLockedForEdit,
-        trackingCode: existing.trackingCode || o.trackingCode,
-        bordereauUrl: existing.bordereauUrl || o.bordereauUrl,
-        assignedConfirmerId: o.assignedConfirmerId !== undefined ? o.assignedConfirmerId : existing.assignedConfirmerId,
-        assignedConfirmerName: o.assignedConfirmerName !== undefined ? o.assignedConfirmerName : existing.assignedConfirmerName,
-        assignedAt: o.assignedAt || existing.assignedAt,
-        confirmedBy: o.confirmedBy || existing.confirmedBy,
-        confirmerName: o.confirmerName || existing.confirmerName,
-        confirmedAt: o.confirmedAt || existing.confirmedAt,
-        confirmationNote: o.confirmationNote || existing.confirmationNote,
-        callAttempts: o.callAttempts ?? existing.callAttempts,
-        lastCallDate: o.lastCallDate || existing.lastCallDate,
-        lastCallResult: o.lastCallResult || existing.lastCallResult,
-        callHistory: o.callHistory || existing.callHistory,
-        trackingFollowedBy: o.trackingFollowedBy || existing.trackingFollowedBy,
-        trackingFollowedByName: o.trackingFollowedByName || existing.trackingFollowedByName,
-        deliveredAt: o.deliveredAt || existing.deliveredAt,
-        driverName: o.driverName || existing.driverName,
-        driverPhone: o.driverPhone || existing.driverPhone,
-        driverCompany: o.driverCompany || existing.driverCompany,
-        coordinationNotes: o.coordinationNotes || existing.coordinationNotes,
-        coordinationStatus: o.coordinationStatus || existing.coordinationStatus,
-        lastCoordinationAt: o.lastCoordinationAt || existing.lastCoordinationAt,
+        ...orderObj,
+        id: existing.id, // preserve existing canonical ID
+        status: existing.status || orderObj.status,
+        statusAr: existing.statusAr || orderObj.statusAr,
+        statusFr: existing.statusFr || orderObj.statusFr,
+        situation: existing.situation || orderObj.situation,
+        avancement: existing.avancement || orderObj.avancement,
+        adminConfirmed: existing.adminConfirmed ?? orderObj.adminConfirmed,
+        isLockedForEdit: existing.isLockedForEdit ?? orderObj.isLockedForEdit,
+        trackingCode: existing.trackingCode || orderObj.trackingCode,
+        bordereauUrl: existing.bordereauUrl || orderObj.bordereauUrl,
+        assignedConfirmerId: orderObj.assignedConfirmerId !== undefined ? orderObj.assignedConfirmerId : existing.assignedConfirmerId,
+        assignedConfirmerName: orderObj.assignedConfirmerName !== undefined ? orderObj.assignedConfirmerName : existing.assignedConfirmerName,
+        assignedAt: orderObj.assignedAt || existing.assignedAt,
+        confirmedBy: orderObj.confirmedBy || existing.confirmedBy,
+        confirmerName: orderObj.confirmerName || existing.confirmerName,
+        confirmedAt: orderObj.confirmedAt || existing.confirmedAt,
+        confirmationNote: orderObj.confirmationNote || existing.confirmationNote,
+        callAttempts: orderObj.callAttempts ?? existing.callAttempts,
+        lastCallDate: orderObj.lastCallDate || existing.lastCallDate,
+        lastCallResult: orderObj.lastCallResult || existing.lastCallResult,
+        callHistory: orderObj.callHistory || existing.callHistory,
+        trackingFollowedBy: orderObj.trackingFollowedBy || existing.trackingFollowedBy,
+        trackingFollowedByName: orderObj.trackingFollowedByName || existing.trackingFollowedByName,
+        deliveredAt: orderObj.deliveredAt || existing.deliveredAt,
+        driverName: orderObj.driverName || existing.driverName,
+        driverPhone: orderObj.driverPhone || existing.driverPhone,
+        driverCompany: orderObj.driverCompany || existing.driverCompany,
+        coordinationNotes: orderObj.coordinationNotes || existing.coordinationNotes,
+        coordinationStatus: orderObj.coordinationStatus || existing.coordinationStatus,
+        lastCoordinationAt: orderObj.lastCoordinationAt || existing.lastCoordinationAt,
       };
-      map.set(merged.id || key, merged);
+      ordersById.set(existing.id, merged);
+      if (merged.idempotencyKey) idByIdempotency.set(merged.idempotencyKey, existing.id);
+      if (merged.trackingCode) idByTracking.set(merged.trackingCode, existing.id);
     }
-  });
+  }
 
-  return Array.from(new Set(Array.from(map.values()))).sort((a, b) => {
+  // Remote orders first, then merge local modifications
+  remote.forEach(addOrMergeOrder);
+  local.forEach(addOrMergeOrder);
+
+  // Return strictly unique list sorted by date
+  return Array.from(ordersById.values()).sort((a, b) => {
     const timeA = new Date(a.createdAt || 0).getTime();
     const timeB = new Date(b.createdAt || 0).getTime();
     return timeB - timeA;
@@ -451,48 +474,6 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     });
   }, [orders]);
 
-  // Automated Delivery Carrier API Polling Mechanism
-  // Periodically queries delivery APIs for active orders, updates database, and triggers app-toasts for the reseller
-  useEffect(() => {
-    let pollingInterval: any = null;
-
-    const executePolling = async () => {
-      const settings = getStoredSyncSettings();
-      if (!settings.autoPollingEnabled) return;
-
-      try {
-        const result = await pollOrderStatusesFromDeliveryApis(orders, {
-          forceStatusChange: false,
-          onOrderUpdated: (updatedOrder) => {
-            setOrders((prev) =>
-              prev.map((o) => (o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o))
-            );
-          },
-        });
-
-        if (result.updatedOrdersCount > 0) {
-          setOrders(result.allOrders);
-        }
-      } catch (err) {
-        console.warn('Delivery API background polling loop warning:', err);
-      }
-    };
-
-    // Initial background poll after 20 seconds
-    const initialDelay = setTimeout(() => {
-      executePolling();
-    }, 20000);
-
-    const settings = getStoredSyncSettings();
-    const intervalMs = Math.max((settings.intervalSeconds || 45) * 1000, 20000);
-    pollingInterval = setInterval(executePolling, intervalMs);
-
-    return () => {
-      clearTimeout(initialDelay);
-      clearInterval(pollingInterval);
-    };
-  }, [orders]);
-
   const createOrder = async (orderInput: Partial<Order>) => {
     // 1. Always enqueue locally first (Rule Section 5.2)
     const enrichedInput: Partial<Order> = {
@@ -549,6 +530,17 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       productId: firstItem?.productId,
       productNameAr: firstItem?.productName,
     });
+
+    // إشعار فوري PWA + صوت رنين مميز للمبيعة + اهتزاز الهاتف للمسوق
+    const calculatedProfit = (localOrder.totalProfit && localOrder.totalProfit > 0) ? localOrder.totalProfit : 2500;
+    triggerSaleNotification({
+      profit: calculatedProfit,
+      orderId: localOrder.trackingCode || localOrder.id,
+      productName: firstItem?.productName || 'منتج من المتجر',
+      customerName: localOrder.customerName || 'زبون عبر الرابط',
+      wilaya: (localOrder as any).wilayaName || localOrder.wilayaCode || 'الجزائر',
+    });
+
 
     // 2. Try background immediate API sync if online
     if (isOnline) {
@@ -1018,8 +1010,17 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             situation = 'Livré';
             deliveredAt = deliveredAt || new Date().toISOString();
             if (!o.commissionCredited) {
-              creditResellerCommission(o.id, o.totalProfit || 1000, o.resellerId);
+              const creditedProfit = o.totalProfit || 2500;
+              creditResellerCommission(o.id, creditedProfit, o.resellerId);
+              triggerSaleNotification({
+                profit: creditedProfit,
+                orderId: o.trackingCode || o.id,
+                productName: o.items?.[0]?.productName || 'طلب تم تسليمه',
+                customerName: o.customerName || 'زبون',
+                wilaya: (o as any).wilayaName || o.wilayaCode || 'الجزائر',
+              });
             }
+
           } else if (targetStatus === 'SHIPPED') {
             statusAr = 'قيد التوصيل والشحن';
             statusFr = 'En cours de livraison';
@@ -1117,8 +1118,17 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             situation = 'Livré';
             deliveredAt = deliveredAt || new Date().toISOString();
             if (!o.commissionCredited) {
-              creditResellerCommission(o.id, o.totalProfit || 1000, o.resellerId);
+              const creditedProfit = o.totalProfit || 2500;
+              creditResellerCommission(o.id, creditedProfit, o.resellerId);
+              triggerSaleNotification({
+                profit: creditedProfit,
+                orderId: o.trackingCode || o.id,
+                productName: o.items?.[0]?.productName || 'طلب تم تسليمه',
+                customerName: o.customerName || 'زبون',
+                wilaya: (o as any).wilayaName || o.wilayaCode || 'الجزائر',
+              });
             }
+
           } else if (targetStatus === 'SHIPPED') {
             statusAr = 'خارج للتوصيل (Sorti en livraison)';
             statusFr = 'Sorti en livraison';

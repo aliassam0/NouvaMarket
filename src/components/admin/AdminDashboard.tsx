@@ -380,7 +380,7 @@ export function AdminDashboard({
     initialStatus: 'APPROVED' as 'APPROVED' | 'PENDING',
   });
 
-  const handleAddSupplierSubmit = (e: React.FormEvent) => {
+  const handleAddSupplierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSupplierForm.fullName || !newSupplierForm.email || !newSupplierForm.companyName || !newSupplierForm.phone) {
       onShowToast('يرجى ملء جميع الحقول المطلوبة (الاسم، البريد، اسم الشركة، والهاتف)', 'error');
@@ -391,7 +391,7 @@ export function AdminDashboard({
       return;
     }
 
-    const created = addSupplierRegistration({
+    const created = await addSupplierRegistration({
       fullName: newSupplierForm.fullName,
       companyName: newSupplierForm.companyName,
       phone: newSupplierForm.phone || '0550000000',
@@ -807,22 +807,42 @@ export function AdminDashboard({
     window.addEventListener('nouva_sellers_updated', handleSellersUpdate);
     window.addEventListener('nouva_suppliers_updated', handleSuppliersUpdate);
 
-    // Live background polling every 4 seconds to catch new registrations in real time
-    const interval = setInterval(() => {
-      syncSellersWithServer().catch(() => {});
-      syncSuppliersWithServer().catch(() => {});
-    }, 4000);
+    // Live background polling every 3 seconds to catch new registrations from Hostinger in real time
+    const pollServerRegistrations = async () => {
+      try {
+        const [liveSellers, liveSuppliers] = await Promise.all([
+          syncSellersWithServer(),
+          syncSuppliersWithServer(),
+        ]);
+        if (liveSellers && liveSellers.length > 0) {
+          setSellers(liveSellers);
+        }
+        if (liveSuppliers && liveSuppliers.length > 0) {
+          setSupplierList(liveSuppliers);
+        }
+      } catch (err) {}
+    };
+
+    pollServerRegistrations();
+
+    const interval = setInterval(pollServerRegistrations, 3000);
 
     const handleFocus = () => {
-      syncSellersWithServer().catch(() => {});
-      syncSuppliersWithServer().catch(() => {});
+      pollServerRegistrations();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        pollServerRegistrations();
+      }
     };
     window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       window.removeEventListener('nouva_sellers_updated', handleSellersUpdate);
       window.removeEventListener('nouva_suppliers_updated', handleSuppliersUpdate);
       window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
       clearInterval(interval);
     };
   }, []);
@@ -887,7 +907,10 @@ export function AdminDashboard({
       if (s) setSettlements(s);
     });
     syncSuppliersWithServer().then((sup) => {
-      if (sup) setSuppliers(sup);
+      if (sup) {
+        setSupplierList(sup);
+        setSuppliers(sup as any);
+      }
     });
     syncSellersWithServer().then((sel) => {
       if (sel) setSellers(sel);
@@ -1302,7 +1325,7 @@ export function AdminDashboard({
   };
 
   // Add New Seller
-  const handleAddSellerSubmit = () => {
+  const handleAddSellerSubmit = async () => {
     if (!newSellerForm.fullName || !newSellerForm.phone || !newSellerForm.email || !newSellerForm.password) {
       onShowToast('يرجى كتابة كافة البيانات الإجبارية (*)', 'error');
       return;
@@ -1311,7 +1334,7 @@ export function AdminDashboard({
       onShowToast('كلمة المرور وتأكيد كلمة المرور غير متطابقين!', 'error');
       return;
     }
-    const createdSeller = addSellerRegistration({
+    const createdSeller = await addSellerRegistration({
       fullName: newSellerForm.fullName,
       storeName: newSellerForm.storeName,
       phone: newSellerForm.phone,
@@ -1713,7 +1736,7 @@ export function AdminDashboard({
   };
 
   return (
-    <div className="flex-1 flex flex-row h-full overflow-hidden bg-slate-950 text-slate-100" dir="rtl">
+    <div className="flex-1 flex flex-row h-full overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
       {/* 1. Admin Vertical Sidebar */}
       <AdminVerticalSidebar
         activeTab={activeAdminTab}
@@ -1745,12 +1768,12 @@ export function AdminDashboard({
       {/* 2. Main Content Column */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
         {/* Modern Sticky Vertical Top Navbar */}
-        <header className="sticky top-0 z-20 px-3 sm:px-6 py-3 bg-slate-900/95 backdrop-blur-md border-b border-purple-900/40 flex items-center justify-between gap-3 shrink-0">
+        <header className="sticky top-0 z-20 px-3 sm:px-6 py-3 bg-white/95 backdrop-blur-md border-b border-slate-200/90 flex items-center justify-between gap-3 shrink-0 shadow-2xs">
           <div className="flex items-center gap-3 min-w-0">
             {/* Mobile Sidebar Hamburger Toggle */}
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-xl bg-purple-950/60 border border-purple-800/40 text-purple-300 hover:text-white hover:bg-purple-900/60 transition cursor-pointer shrink-0"
+              className="lg:hidden p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:text-purple-700 hover:bg-slate-200 transition cursor-pointer shrink-0"
               title="فتح القائمة الجانبية"
             >
               <Menu className="w-5 h-5" />
@@ -1759,23 +1782,23 @@ export function AdminDashboard({
             {/* Current Active Tab Breadcrumb & Title */}
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-purple-400">لوحة الإدارة</span>
-                <span className="text-slate-500 text-xs">/</span>
-                <h1 className="text-sm sm:text-base font-black text-white truncate flex items-center gap-1.5">
+                <span className="text-xs font-bold text-purple-600">لوحة الإدارة</span>
+                <span className="text-slate-300 text-xs">/</span>
+                <h1 className="text-sm sm:text-base font-black text-slate-900 truncate flex items-center gap-1.5">
                   {getCurrentTabTitle(activeAdminTab)}
                 </h1>
                 {activeAdminTab === 'approvals' && totalPendingApprovals > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 animate-pulse">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
                     {totalPendingApprovals} معلق
                   </span>
                 )}
                 {activeAdminTab === 'products' && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-900/60 text-purple-300">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-100 text-purple-800 font-bold border border-purple-200">
                     {products.length} منتج
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block truncate">
+              <p className="text-[11px] text-slate-500 hidden sm:block truncate">
                 {getCurrentTabSubtitle(activeAdminTab)}
               </p>
             </div>
@@ -1787,49 +1810,49 @@ export function AdminDashboard({
             <button
               onClick={handleForceRefreshRegistrations}
               disabled={isRefreshingRegistrations}
-              className="p-2 rounded-xl bg-purple-950/40 border border-purple-800/40 text-purple-300 hover:text-white hover:bg-purple-900/60 transition cursor-pointer"
+              className="p-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 hover:text-purple-700 transition cursor-pointer shadow-2xs"
               title="مزامنة وتحديث البيانات اللحظية من الخادم"
             >
-              <RefreshCw className={`w-4 h-4 ${isRefreshingRegistrations ? 'animate-spin text-purple-400' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isRefreshingRegistrations ? 'animate-spin text-purple-600' : ''}`} />
             </button>
 
             {/* Gemini AI Quick Shortcut */}
             <button
               onClick={() => setActiveAdminTab('ai_provider')}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs ${
                 activeAdminTab === 'ai_provider'
-                  ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/30'
-                  : 'bg-indigo-950/40 text-indigo-300 border-indigo-800/50 hover:bg-indigo-900/60'
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                  : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
               }`}
               title="إعدادات مزود الذكاء الاصطناعي Gemini"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
               <span className="hidden md:inline">Gemini AI</span>
             </button>
 
             {/* Delivery Couriers API Quick Shortcut */}
             <button
               onClick={() => setActiveAdminTab('couriers')}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs ${
                 activeAdminTab === 'couriers'
-                  ? 'bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-600/30'
-                  : 'bg-purple-950/40 text-purple-300 border-purple-800/50 hover:bg-purple-900/60'
+                  ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                  : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
               }`}
               title="شركات التوصيل وربط API"
             >
-              <Truck className="w-3.5 h-3.5 text-purple-200" />
+              <Truck className="w-3.5 h-3.5 text-purple-600" />
               <span className="hidden md:inline">شركات التوصيل</span>
             </button>
 
             {/* Notifications Button */}
             <button
               onClick={() => setIsAdminNotifModalOpen(true)}
-              className="p-2 rounded-xl bg-purple-950/50 border border-purple-800/40 text-purple-300 hover:text-white hover:bg-purple-900/60 transition relative cursor-pointer"
+              className="p-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 hover:text-purple-700 transition relative cursor-pointer shadow-2xs"
               title="إشعارات وتنبيهات الإدارة"
             >
-              <Bell className="w-4 h-4" />
+              <Bell className="w-4 h-4 text-purple-600" />
               {adminUnreadCount > 0 && (
-                <span className="min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white font-black text-[9px] flex items-center justify-center absolute -top-1 -end-1 shadow-xs border border-slate-900 animate-pulse">
+                <span className="min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white font-black text-[9px] flex items-center justify-center absolute -top-1 -end-1 shadow-xs border border-white animate-pulse">
                   {adminUnreadCount}
                 </span>
               )}
@@ -1838,10 +1861,10 @@ export function AdminDashboard({
             {/* Sound Toggle Button */}
             <button
               onClick={handleToggleSound}
-              className={`p-2 rounded-xl border transition cursor-pointer ${
+              className={`p-2 rounded-xl border transition cursor-pointer shadow-2xs ${
                 soundEnabled
-                  ? 'bg-purple-950/60 text-amber-300 border-purple-800/40 hover:bg-purple-900/80'
-                  : 'bg-slate-800 text-slate-500 border-slate-700 hover:text-slate-300'
+                  ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+                  : 'bg-slate-100 text-slate-500 border-slate-200 hover:text-slate-700'
               }`}
               title={soundEnabled ? 'صوت التنبيهات: مفعل (انقر للتعطيل)' : 'صوت التنبيهات: صامت (انقر للتفعيل)'}
             >
@@ -1849,7 +1872,7 @@ export function AdminDashboard({
             </button>
 
             {/* Impersonate/Super Admin Tag */}
-            <span className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-black">
+            <span className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 text-xs font-black shadow-2xs">
               👑 أدمن رئيسي
             </span>
           </div>
@@ -1861,22 +1884,22 @@ export function AdminDashboard({
           {activeAdminTab !== 'approvals' && totalPendingApprovals > 0 && (
             <div
               onClick={() => setActiveAdminTab('approvals')}
-              className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-purple-500/10 to-amber-500/20 border border-amber-500/50 flex items-center justify-between gap-3 text-xs cursor-pointer hover:border-amber-400 transition shadow-md group"
+              className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-50 via-amber-50/60 to-orange-50 border border-amber-300 flex items-center justify-between gap-3 text-xs cursor-pointer hover:border-amber-400 transition shadow-xs group"
             >
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black animate-pulse">
+                <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black animate-pulse shadow-xs">
                   <UserCheck className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-extrabold text-amber-300">
+                  <span className="font-extrabold text-amber-950">
                     تنبيه اعتماد الحسابات: يوجد {totalPendingApprovals} طلب تسجيل جديد بانتظار الموافقة (بائعين وموردين)
                   </span>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-amber-800">
                     انقر هنا لمراجعة طلبات الانضمام والموافقة الفورية عليها لتفعيل نشاطهم في المنصة
                   </p>
                 </div>
               </div>
-              <span className="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-black text-[11px] group-hover:scale-105 transition shadow-xs">
+              <span className="px-3 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[11px] group-hover:scale-105 transition shadow-xs">
                 مراجعة الآن 👈
               </span>
             </div>

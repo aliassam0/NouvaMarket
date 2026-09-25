@@ -29,6 +29,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { ALGERIA_WILAYAS } from '../../data/algeriaLocations';
 import { verifyPixelApi, verifyAllPixelsApi, PixelStatusResponse } from '../../lib/pixelTracker';
+import { PushNotificationCard } from '../common/PushNotificationCard';
+
 
 interface PixelStatusBadgeProps {
   id?: string;
@@ -472,8 +474,12 @@ export function ProfilTab({ onOpenGamification, onShowToast, onLogout }: ProfilT
         </div>
       </form>
 
+      {/* Instant Push Notifications & PWA Chime Settings */}
+      <PushNotificationCard onShowToast={onShowToast} />
+
       {/* Social Media Pixels Tracking Section (Meta, TikTok, Snapchat) with Status Badges */}
       <form onSubmit={handleSavePixels} className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4 text-right">
+
         <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex flex-wrap justify-between items-center gap-2">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">

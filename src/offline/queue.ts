@@ -78,42 +78,54 @@ export function saveLocalQueue(queue: QueuedOrder[]) {
   }
 }
 
-export function getStoredOrders(): Order[] {
+function normalizeOrderId(id: string): string {
+  const match = String(id).match(/^(ORD-\d+)(?:-\d+-\d+)+$/);
+  return match ? match[1] : String(id);
+}
+
+export function deduplicateOrderList(orderList: Order[]): Order[] {
   const deletedIds = getDeletedOrderIds();
+  const demoIds = ['ORD-9281', 'ORD-9290', 'ORD-9270', 'ORD-9821', 'ORD-7712', 'ORD-101', 'ORD-102', 'ORD-103', 'ORD-104', 'ORD-105', 'ORD-100'];
+
+  const seenIds = new Set<string>();
+  const seenIdempotency = new Set<string>();
+  const seenTracking = new Set<string>();
+  const result: Order[] = [];
+
+  for (const o of orderList) {
+    if (!o) continue;
+    const rawId = String(o.id || '');
+    const cleanId = rawId ? normalizeOrderId(rawId) : '';
+    if (!cleanId) continue;
+
+    if (deletedIds.has(cleanId) || (o.trackingCode && deletedIds.has(String(o.trackingCode)))) continue;
+    if (demoIds.includes(cleanId) || cleanId.startsWith('ORD-92') || cleanId.startsWith('ORD-98') || cleanId.startsWith('ORD-77')) continue;
+
+    const ord: Order = o.id !== cleanId ? { ...o, id: cleanId } : o;
+    const idem = ord.idempotencyKey;
+    const trk = ord.trackingCode;
+
+    if (seenIds.has(cleanId) || (idem && seenIdempotency.has(idem)) || (trk && seenTracking.has(trk))) {
+      continue;
+    }
+
+    seenIds.add(cleanId);
+    if (idem) seenIdempotency.add(idem);
+    if (trk) seenTracking.add(trk);
+    result.push(ord);
+  }
+
+  return result;
+}
+
+export function getStoredOrders(): Order[] {
   try {
     const raw = localStorage.getItem(STORED_ORDERS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        const demoIds = ['ORD-9281', 'ORD-9290', 'ORD-9270', 'ORD-9821', 'ORD-7712', 'ORD-101', 'ORD-102', 'ORD-103', 'ORD-104', 'ORD-105', 'ORD-100'];
-        const filtered = parsed.filter(
-          (o) =>
-            o &&
-            !deletedIds.has(String(o.id)) &&
-            !(o.trackingCode && deletedIds.has(String(o.trackingCode))) &&
-            !demoIds.includes(o.id) &&
-            !o.id?.startsWith('ORD-92') &&
-            !o.id?.startsWith('ORD-98') &&
-            !o.id?.startsWith('ORD-77')
-        );
-
-        // Deduplicate any repeated IDs to eliminate React duplicate key errors
-        const seenIds = new Set<string>();
-        let hasDuplicates = false;
-        const deduplicated = filtered.map((ord, idx) => {
-          if (!ord || !ord.id) {
-            hasDuplicates = true;
-            return { ...ord, id: `ORD-LOCAL-${Date.now()}-${idx}` };
-          }
-          if (seenIds.has(ord.id)) {
-            hasDuplicates = true;
-            return { ...ord, id: `${ord.id}-${idx}-${Math.floor(Math.random() * 1000)}` };
-          }
-          seenIds.add(ord.id);
-          return ord;
-        });
-
-        if (filtered.length !== parsed.length || hasDuplicates) {
+        const deduplicated = deduplicateOrderList(parsed);
+        if (deduplicated.length !== parsed.length || parsed.some(p => p && normalizeOrderId(p.id) !== p.id)) {
           try {
             localStorage.setItem(STORED_ORDERS_KEY, JSON.stringify(deduplicated));
           } catch {}
@@ -129,8 +141,7 @@ export function getStoredOrders(): Order[] {
 
 export function saveStoredOrders(orders: Order[]) {
   try {
-    const deletedIds = getDeletedOrderIds();
-    const active = orders.filter((o) => o && !deletedIds.has(String(o.id)) && !(o.trackingCode && deletedIds.has(String(o.trackingCode))));
+    const active = deduplicateOrderList(orders);
     localStorage.setItem(STORED_ORDERS_KEY, JSON.stringify(active));
 
     // Background push sync to server

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "WTH-1092",
+    "sellerId": "u-seller-1",
+    "sellerName": "أحمد محمود",
+    "storeName": "متجر التميز والروائع",
+    "phone": "0550123456",
+    "amountDzd": 15000,
+    "method": "BARIDIMOB",
+    "accountDetails": "RIP: 00799999000123456789",
+    "requestDate": "2026-08-12 14:30",
+    "status": "PENDING",
+    "userType": "SELLER"
+  },
+  {
+    "id": "WTH-1088",
+    "sellerId": "u-seller-2",
+    "sellerName": "سارة العلمي",
+    "storeName": "سارة شوب للتجميل",
+    "phone": "0661987654",
+    "amountDzd": 28500,
+    "method": "CCP",
+    "accountDetails": "CCP: 1234567 Cle 89",
+    "requestDate": "2026-08-11 10:15",
+    "status": "APPROVED",
+    "proofReference": "CCP-TRANS-9921",
+    "userType": "SELLER"
+  }
+]

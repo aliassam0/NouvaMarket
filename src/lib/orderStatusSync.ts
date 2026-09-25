@@ -7,6 +7,8 @@ import {
   addAdminNotification,
   addConfirmerNotification,
 } from './notificationHelper';
+import { triggerSaleNotification } from './pwaNotificationManager';
+
 import { fetchDriverInfoFromCourierApi } from './deliveryApiManager';
 import { addSyncLog, SyncLogItem } from './deliverySyncManager';
 import { getStoredCouriers } from './courierHelper';
@@ -353,7 +355,7 @@ export async function syncOrderStatus(
     updatedOrder.deliveryCompanyName = preferredCourier;
     updatedOrder.coordinationStatus = options.coordinationStatus || 'out_for_delivery';
 
-    // 4. Fetch / assign courier driver and distribution center information
+    // 4. Assign courier driver if provided
     if (options.driverInfo) {
       updatedOrder.driverName = options.driverInfo.driverName || updatedOrder.driverName;
       updatedOrder.driverPhone = options.driverInfo.driverPhone || updatedOrder.driverPhone;
@@ -361,16 +363,13 @@ export async function syncOrderStatus(
     } else if (!updatedOrder.driverName || !updatedOrder.driverPhone) {
       try {
         const driverRes = await fetchDriverInfoFromCourierApi(updatedOrder, preferredCourier);
-        if (driverRes && driverRes.driverName) {
+        if (driverRes && driverRes.status === 'SUCCESS' && driverRes.driverName) {
           updatedOrder.driverName = driverRes.driverName;
           updatedOrder.driverPhone = driverRes.driverPhone;
           updatedOrder.driverCompany = driverRes.driverCompany;
         }
       } catch {
-        // Fallback realistic driver data if offline
-        updatedOrder.driverName = updatedOrder.driverName || `موزع ${updatedOrder.wilaya || 'الجزائر'}`;
-        updatedOrder.driverPhone = updatedOrder.driverPhone || '0555000000';
-        updatedOrder.driverCompany = updatedOrder.driverCompany || `${preferredCourier} (مركز ${updatedOrder.wilaya || 'التوزيع'})`;
+        // Keep actual state without inventing fake driver
       }
     }
 
@@ -379,29 +378,31 @@ export async function syncOrderStatus(
     const trackingHistory = Array.isArray(updatedOrder.trackingHistory) ? [...updatedOrder.trackingHistory] : [];
     trackingHistory.unshift({
       timestamp: nowIso,
-      statusAr: `خرج للتوزيع مع ${preferredCourier} في ولاية ${updatedOrder.wilaya || 'المقصد'}`,
-      statusEn: 'Out for Delivery / En tournée',
-      location: updatedOrder.wilaya || 'مركز التوزيع',
+      statusAr: options.note || `تم تسليم الشحنة لشركة التوصيل (${preferredCourier}) برقم تتبع: ${trackingCode}`,
+      statusEn: 'Handed Over to Courier',
+      location: updatedOrder.wilaya || 'مركز الشحن',
       courierName: preferredCourier,
       trackingCode,
-      note: options.note || `تم تسليم الطرد لشركة التوصيل (${preferredCourier}) وتعيين الموزع`,
+      note: options.note || `تم استلام الطرد وتأكيد إرساله مع شركة التوصيل (${preferredCourier})`,
     });
     updatedOrder.trackingHistory = trackingHistory;
 
-    // 6. Record in delivery sync log
-    const syncLogItem: SyncLogItem = {
-      id: `synclog-${Date.now()}-${Math.floor(Math.random() * 899 + 100)}`,
-      timestamp: new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      orderId: updatedOrder.id,
-      trackingCode,
-      courierName: preferredCourier,
-      previousStatus,
-      newStatus: 'SHIPPED',
-      statusLabelAr: meta.statusAr,
-      customerName: updatedOrder.customerName,
-      wilaya: updatedOrder.wilaya,
-    };
-    addSyncLog(syncLogItem);
+    // 6. Record in delivery sync log if requested
+    if (options.silentToast !== true) {
+      const syncLogItem: SyncLogItem = {
+        id: `synclog-${Date.now()}-${Math.floor(Math.random() * 899 + 100)}`,
+        timestamp: new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        orderId: updatedOrder.id,
+        trackingCode,
+        courierName: preferredCourier,
+        previousStatus,
+        newStatus: 'SHIPPED',
+        statusLabelAr: meta.statusAr,
+        customerName: updatedOrder.customerName,
+        wilaya: updatedOrder.wilaya,
+      };
+      addSyncLog(syncLogItem);
+    }
 
     // 7. Dispatch to backend courier API route
     if (options.dispatchToCourier !== false) {
@@ -438,8 +439,17 @@ export async function syncOrderStatus(
         );
         updatedOrder.commissionCredited = true;
         commissionCredited = true;
+
+        triggerSaleNotification({
+          profit: resellerProfit,
+          orderId: updatedOrder.trackingCode || updatedOrder.id,
+          productName: updatedOrder.items?.[0]?.productName || 'منتج مسوق',
+          customerName: updatedOrder.customerName || 'زبون',
+          wilaya: (updatedOrder as any).wilayaName || updatedOrder.wilayaCode,
+        });
       }
     }
+
 
     // Append delivery log
     const nowIso = new Date().toISOString().replace('T', ' ').slice(0, 16);

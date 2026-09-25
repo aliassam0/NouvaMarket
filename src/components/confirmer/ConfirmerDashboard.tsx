@@ -49,6 +49,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Order, OrderStatus } from '../../types';
 import { ALGERIA_WILAYAS } from '../../data/algeriaLocations';
 import { fetchDriverInfoFromCourierApi } from '../../lib/deliveryApiManager';
+import { DateFilterBar, DateFilterMode, matchesDateFilter } from '../common/DateFilterBar';
 
 interface ConfirmerDashboardProps {
   onShowToast: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -96,6 +97,12 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
   const [selectedWilaya, setSelectedWilaya] = useState<string>('all');
   const [selectedSupplier, setSelectedSupplier] = useState<string>('all');
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned' | 'others'>('all');
+
+  // Date filter state for confirmer (الكل, اليوم, الاسبوع, الشهر, تحديد تاريخ معين)
+  const [dateMode, setDateMode] = useState<DateFilterMode>('all');
+  const [singleDate, setSingleDate] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Call & Note modal state
   const [selectedOrderForCall, setSelectedOrderForCall] = useState<Order | null>(null);
@@ -248,14 +255,19 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
         if (!isMine) return false;
       }
 
-      // 2. Wilaya filter
+      // 2. Date filter (الكل, اليوم, الاسبوع, الشهر, تحديد تاريخ معين)
+      if (!matchesDateFilter(o.createdAt, dateMode, singleDate, startDate, endDate)) {
+        return false;
+      }
+
+      // 3. Wilaya filter
       if (selectedWilaya !== 'all') {
         if (!o.wilaya?.includes(selectedWilaya) && !o.wilayaCode?.includes(selectedWilaya)) {
           return false;
         }
       }
 
-      // 3. Supplier filter
+      // 4. Supplier filter
       if (selectedSupplier !== 'all') {
         const matchesSupplier =
           o.supplierEmail === selectedSupplier ||
@@ -263,7 +275,7 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
         if (!matchesSupplier) return false;
       }
 
-      // 4. Search query
+      // 5. Search query
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase().trim();
         const matchName = o.customerName?.toLowerCase().includes(q);
@@ -278,7 +290,7 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
         }
       }
 
-      // 5. Assignment Exclusivity Filter
+      // 6. Assignment Exclusivity Filter
       const isMine =
         o.assignedConfirmerId === agentId ||
         o.confirmedBy === agentId ||
@@ -299,7 +311,7 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
 
       return true;
     });
-  }, [orders, activeTab, selectedWilaya, selectedSupplier, searchTerm, assignmentFilter, agentId, agentName, user?.role]);
+  }, [orders, activeTab, dateMode, singleDate, startDate, endDate, selectedWilaya, selectedSupplier, searchTerm, assignmentFilter, agentId, agentName, user?.role]);
 
   // Helper to verify if this order is exclusively locked by another confirmer
   const checkOrderExclusivity = (order: Order): { isLockedByOther: boolean; ownerName: string } => {
@@ -775,51 +787,6 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
 
   return (
     <div className="flex-1 bg-slate-50 dark:bg-slate-950 p-3 sm:p-5 overflow-y-auto space-y-4">
-      {/* 1. TOP HEADER & CONFIRMER IDENTITY */}
-      <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white shadow-xl border border-emerald-500/20 relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 shadow-inner">
-              <PhoneCall className="w-6 h-6 animate-pulse" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 font-bold text-[10px] flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                  مؤكد الطلبيات الرسمي • موظف الشركة
-                </span>
-                <span className="text-xs text-emerald-200/80 font-mono">
-                  {new Date().toLocaleDateString('ar-DZ')}
-                </span>
-              </div>
-              <h2 className="text-lg sm:text-xl font-black tracking-tight text-white mt-0.5">
-                مرحباً، {agentName} 🎧
-              </h2>
-              <p className="text-xs text-emerald-100/70 mt-0.5">
-                تأكيد ومراجعة الطلبيات لجميع الموردين، الاتصال الهاتفي بالزبائن، وتتبع الشحن حتى التسليم الفعلي.
-              </p>
-            </div>
-          </div>
-
-          {/* Sync Status Badge */}
-          <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-emerald-500/30 self-start md:self-auto">
-            <RefreshCw className="w-4 h-4 text-emerald-400 animate-spin" />
-            <div className="text-[11px]">
-              <div className="font-black text-white flex items-center gap-1">
-                <span>المزامنة الفورية:</span>
-                <span className="text-emerald-400">100% متزامن</span>
-              </div>
-              <span className="text-[10px] text-slate-300">
-                مربوط مع المسوقين، المستودع، وشركات التوصيل
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Decorative background glow */}
-        <div className="absolute -top-16 -end-16 w-56 h-56 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none"></div>
-      </div>
-
       {/* 1.1 COURIER & BUYER COORDINATION GUIDE BANNER */}
       <div className="p-4 rounded-3xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 border border-blue-500/30 text-white shadow-lg space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1027,6 +994,20 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
       {/* 4. SEARCH & FILTERS ROW (For order lists) */}
       {activeTab !== 'my_stats' && (
         <div className="space-y-2">
+          {/* Date Filter Bar for Confirmer */}
+          <DateFilterBar
+            dateMode={dateMode}
+            setDateMode={setDateMode}
+            singleDate={singleDate}
+            setSingleDate={setSingleDate}
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            accentColor="emerald"
+            title="تصفية طلبيات المؤكد حسب التاريخ:"
+          />
+
           <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-center gap-3">
             {/* Search Box */}
             <div className="relative flex-1 w-full">
@@ -1150,7 +1131,7 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3.5">
-              {filteredOrders.map((order) => {
+              {filteredOrders.map((order, idx) => {
                 const isConfirmed = order.adminConfirmed;
                 const totalWithShipping = (order.totalAmount || 0) + (order.shippingFee || 0);
                 const lock = checkOrderExclusivity(order);
@@ -1159,7 +1140,7 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
 
                 return (
                   <div
-                    key={order.id}
+                    key={`${order.id || 'ord'}-${idx}`}
                     className={`p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900 border shadow-xs hover:shadow-md transition-all space-y-4 ${
                       lock.isLockedByOther
                         ? 'border-rose-300/80 dark:border-rose-900/60 bg-rose-50/10'

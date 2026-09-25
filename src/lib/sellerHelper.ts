@@ -102,8 +102,27 @@ export function unmarkSellerDeleted(sellerId: string): void {
 export async function syncSellersWithServer(): Promise<ExtendedSeller[]> {
   if (typeof window === 'undefined') return cachedSellers || INITIAL_SELLERS;
   try {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return getStoredSellers();
+    }
     const deletedIds = getDeletedSellerIds();
-    const res = await fetch('/api/reseller/sellers');
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 6000) : null;
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/reseller/sellers?_t=${Date.now()}`, {
+        signal: controller ? controller.signal : undefined,
+        cache: 'no-store',
+      });
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+
+    if (!res || !res.ok) {
+      return getStoredSellers();
+    }
+
     const text = await res.text();
     if (text && !text.trim().startsWith('<')) {
       const data = JSON.parse(text);
@@ -134,23 +153,17 @@ export async function syncSellersWithServer(): Promise<ExtendedSeller[]> {
         INITIAL_SELLERS.forEach((s) => {
           if (!deletedIds.has(s.id)) map.set(s.id, s);
         });
-        // Then add server sellers
-        validServerSellers.forEach((s) => {
-          map.set(s.id, { ...map.get(s.id), ...s });
-        });
         // Then merge local sellers
         currentLocal.forEach((s) => {
           if (s && s.id && !deletedIds.has(s.id)) {
-            if (!map.has(s.id)) {
-              fetch('/api/reseller/sellers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(s),
-              }).catch(() => {});
-            }
             map.set(s.id, { ...map.get(s.id), ...s });
           }
         });
+        // Server sellers take final precedence for fresh real-time status and new registrations
+        validServerSellers.forEach((s) => {
+          map.set(s.id, { ...map.get(s.id), ...s });
+        });
+
         const merged = Array.from(map.values());
         if (merged.length > 0) {
           localStorage.setItem(STORAGE_KEY_SELLERS, JSON.stringify(merged));
@@ -161,7 +174,8 @@ export async function syncSellersWithServer(): Promise<ExtendedSeller[]> {
       }
     }
   } catch (e) {
-    console.error('Error syncing sellers from server:', e);
+    // Graceful fallback to stored sellers during network reload / offline
+    console.warn('Seller server sync deferred, using local persistence.');
   }
   return getStoredSellers();
 }
@@ -245,14 +259,14 @@ export function saveStoredSellers(sellers: ExtendedSeller[]): void {
   }
 }
 
-export function addSellerRegistration(data: {
+export async function addSellerRegistration(data: {
   fullName: string;
   storeName?: string;
   phone: string;
   email: string;
   password?: string;
   wilaya: string;
-}): ExtendedSeller {
+}): Promise<ExtendedSeller> {
   const sellers = getStoredSellers();
   const existing = sellers.find(
     (s) => (s.email && s.email.trim().toLowerCase() === (data.email || '').trim().toLowerCase()) ||
@@ -272,17 +286,20 @@ export function addSellerRegistration(data: {
     const updatedList = sellers.map((s) => (s.id === existing.id ? updatedSeller : s));
     saveStoredSellers(updatedList);
 
-    // Sync with server
-    fetch(`/api/reseller/sellers/${existing.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedSeller),
-    }).catch(() => {});
+    // Sync with server immediately
+    try {
+      await fetch(`/api/reseller/sellers/${existing.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedSeller),
+        cache: 'no-store',
+      });
+    } catch {}
 
     return updatedSeller;
   }
 
-  const newSeller: ExtendedSeller = {
+  let newSeller: ExtendedSeller = {
     id: `seller-${Date.now().toString().slice(-5)}`,
     fullName: data.fullName,
     storeName: data.storeName || `متجر ${data.fullName}`,
@@ -305,12 +322,25 @@ export function addSellerRegistration(data: {
   const updated = [newSeller, ...sellers];
   saveStoredSellers(updated);
 
-  // Sync to server immediately
-  fetch('/api/reseller/sellers', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(newSeller),
-  }).catch(() => {});
+  // Sync to server immediately and await response
+  try {
+    const res = await fetch('/api/reseller/sellers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSeller),
+      cache: 'no-store',
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.seller) {
+        newSeller = { ...newSeller, ...json.seller };
+        const finalUpdated = [newSeller, ...sellers.filter((s) => s.id !== newSeller.id)];
+        saveStoredSellers(finalUpdated);
+      }
+    }
+  } catch (err) {
+    console.warn('Deferred server sync for registered seller, saved locally:', err);
+  }
 
   return newSeller;
 }

@@ -7,7 +7,6 @@ import {
   AlertCircle,
   Activity,
   Layers,
-  Zap,
   Globe,
   Radio,
   Sliders,
@@ -16,6 +15,7 @@ import {
   ShieldCheck,
   Play,
   Pause,
+  Trash2,
 } from 'lucide-react';
 import { Order } from '../../types';
 import {
@@ -25,6 +25,7 @@ import {
   getStoredSyncSettings,
   saveStoredSyncSettings,
   getStoredSyncLogs,
+  clearStoredSyncLogs,
   SyncLogItem,
   pollOrderStatusesFromDeliveryApis,
 } from '../../lib/deliverySyncManager';
@@ -115,34 +116,6 @@ export function DeliverySyncMonitor({
     } catch (err) {
       console.error(err);
       onShowToast('حدث خطأ أثناء الاتصال بشركات التوصيل', 'error');
-    } finally {
-      setIsSyncingNow(false);
-    }
-  };
-
-  // Test simulation: Force a state transition to verify toast alerts for resellers
-  const handleSimulateStatusAlert = async () => {
-    if (isSyncingNow) return;
-    setIsSyncingNow(true);
-    onShowToast('⚡ جاري محاكاة تحديث حالة شحنة لاختبار إشعار البائع (App-Toast)...', 'info');
-
-    try {
-      const result = await pollOrderStatusesFromDeliveryApis(orders, {
-        forceStatusChange: true,
-      });
-
-      if (onOrdersUpdated && result.updatedOrdersCount > 0) {
-        onOrdersUpdated(result.allOrders);
-      }
-
-      setPartnerStates(getDeliveryPartnerSyncStates(result.allOrders, supplierId));
-      setSettings(getStoredSyncSettings());
-      setSyncLogs(getStoredSyncLogs());
-
-      onShowToast('✔ تم إطلاق إشعار التحديث الفوري (App-Toast) وحفظ الحالة في السجل!', 'success');
-    } catch (err) {
-      console.error(err);
-      onShowToast('تعذر إجراء المحاكاة', 'error');
     } finally {
       setIsSyncingNow(false);
     }
@@ -245,17 +218,6 @@ export function DeliverySyncMonitor({
           >
             {settings.autoPollingEnabled ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
             <span>{settings.autoPollingEnabled ? 'المزامنة الدورية شَغّالة' : 'المزامنة موقوفة'}</span>
-          </button>
-
-          {/* Simulate Status Alert */}
-          <button
-            onClick={handleSimulateStatusAlert}
-            disabled={isSyncingNow}
-            className="px-3 py-2 rounded-xl bg-purple-900/60 hover:bg-purple-800/80 text-purple-200 border border-purple-700/60 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
-            title="محاكاة تحديث حالة طرد لاختبار إشعار البائع App-Toast"
-          >
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span>محاكاة إشعار بائع 🔔</span>
           </button>
 
           {/* Sync Now Button */}
@@ -434,9 +396,26 @@ export function DeliverySyncMonitor({
             <Activity className="w-3.5 h-3.5 text-purple-400" />
             <span>سجل آخر التحديثات وتنبيهات البائع اللحظية (Recent Delivery Sync Alerts)</span>
           </span>
-          <span className="text-[10px] text-slate-500 font-mono">
-            {syncLogs.length} عمليات مسجلة
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-slate-500 font-mono">
+              {syncLogs.length} عمليات مسجلة
+            </span>
+            {syncLogs.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  clearStoredSyncLogs();
+                  setSyncLogs([]);
+                  onShowToast('تم مسح سجل التحديثات', 'info');
+                }}
+                className="px-2 py-0.5 rounded text-[10px] bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 transition-colors flex items-center gap-1"
+                title="مسح السجل"
+              >
+                <Trash2 className="w-2.5 h-2.5" />
+                <span>مسح السجل</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {syncLogs.length === 0 ? (

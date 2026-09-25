@@ -114,8 +114,27 @@ export function unmarkSupplierDeleted(supplierId: string): void {
 export async function syncSuppliersWithServer(): Promise<SupplierProfile[]> {
   if (typeof window === 'undefined') return cachedSuppliers || INITIAL_SUPPLIERS;
   try {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return getStoredSuppliers();
+    }
     const deletedIds = getDeletedSupplierIds();
-    const res = await fetch('/api/reseller/suppliers');
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 6000) : null;
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/reseller/suppliers?_t=${Date.now()}`, {
+        signal: controller ? controller.signal : undefined,
+        cache: 'no-store',
+      });
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+
+    if (!res || !res.ok) {
+      return getStoredSuppliers();
+    }
+
     const text = await res.text();
     if (text && !text.trim().startsWith('<')) {
       const data = JSON.parse(text);
@@ -146,23 +165,17 @@ export async function syncSuppliersWithServer(): Promise<SupplierProfile[]> {
         INITIAL_SUPPLIERS.forEach((s) => {
           if (!deletedIds.has(s.id)) map.set(s.id, s);
         });
-        // Then add server suppliers
-        validServerSuppliers.forEach((s) => {
-          map.set(s.id, { ...map.get(s.id), ...s });
-        });
         // Then merge local suppliers
         currentLocal.forEach((s) => {
           if (s && s.id && !deletedIds.has(s.id)) {
-            if (!map.has(s.id)) {
-              fetch('/api/reseller/suppliers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(s),
-              }).catch(() => {});
-            }
             map.set(s.id, { ...map.get(s.id), ...s });
           }
         });
+        // Server suppliers take final precedence for fresh real-time status and new registrations
+        validServerSuppliers.forEach((s) => {
+          map.set(s.id, { ...map.get(s.id), ...s });
+        });
+
         const merged = Array.from(map.values());
         if (merged.length > 0) {
           localStorage.setItem(STORAGE_KEY_SUPPLIERS, JSON.stringify(merged));
@@ -173,7 +186,8 @@ export async function syncSuppliersWithServer(): Promise<SupplierProfile[]> {
       }
     }
   } catch (e) {
-    console.error('Error syncing suppliers from server:', e);
+    // Graceful fallback to stored suppliers during network reload / offline
+    console.warn('Supplier server sync deferred, using local persistence.');
   }
   return getStoredSuppliers();
 }
@@ -257,7 +271,7 @@ export function saveStoredSuppliers(suppliers: SupplierProfile[]): void {
   }
 }
 
-export function addSupplierRegistration(data: {
+export async function addSupplierRegistration(data: {
   fullName: string;
   companyName: string;
   phone: string;
@@ -267,7 +281,7 @@ export function addSupplierRegistration(data: {
   activityType: string;
   ccpOrRip: string;
   baridiMobNumber?: string;
-}): SupplierProfile {
+}): Promise<SupplierProfile> {
   const suppliers = getStoredSuppliers();
   const existing = suppliers.find(
     (s) => (s.email && s.email.trim().toLowerCase() === (data.email || '').trim().toLowerCase()) ||
@@ -290,17 +304,20 @@ export function addSupplierRegistration(data: {
     const updatedList = suppliers.map((s) => (s.id === existing.id ? updatedSupplier : s));
     saveStoredSuppliers(updatedList);
 
-    // Sync with server
-    fetch(`/api/reseller/suppliers/${existing.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedSupplier),
-    }).catch(() => {});
+    // Sync with server immediately
+    try {
+      await fetch(`/api/reseller/suppliers/${existing.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedSupplier),
+        cache: 'no-store',
+      });
+    } catch {}
 
     return updatedSupplier;
   }
 
-  const newSupplier: SupplierProfile = {
+  let newSupplier: SupplierProfile = {
     id: `sup-${Date.now().toString().slice(-5)}`,
     fullName: data.fullName,
     companyName: data.companyName,
@@ -324,12 +341,26 @@ export function addSupplierRegistration(data: {
   const updated = [newSupplier, ...suppliers];
   saveStoredSuppliers(updated);
 
-  // Sync to server immediately
-  fetch('/api/reseller/suppliers', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(newSupplier),
-  }).catch(() => {});
+  // Sync to server immediately and await response
+  try {
+    const res = await fetch('/api/reseller/suppliers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSupplier),
+      cache: 'no-store',
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.supplier) {
+        newSupplier = { ...newSupplier, ...json.supplier };
+        // Update local with server-confirmed object
+        const finalUpdated = [newSupplier, ...suppliers.filter((s) => s.id !== newSupplier.id)];
+        saveStoredSuppliers(finalUpdated);
+      }
+    }
+  } catch (err) {
+    console.warn('Deferred server sync for registered supplier, saved locally:', err);
+  }
 
   return newSupplier;
 }

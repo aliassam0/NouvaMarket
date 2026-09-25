@@ -485,9 +485,9 @@ export function AdminConfirmersAuditTab({
                       لم يقم هذا الموظف بتأكيد أي طلبيات حتى الآن.
                     </div>
                   ) : (
-                    userOrders.map((order) => (
+                    userOrders.map((order, idx) => (
                       <div
-                        key={order.id}
+                        key={`${order.id || 'ord'}-${idx}`}
                         className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5 text-xs"
                       >
                         <div className="flex items-center justify-between flex-wrap gap-2">

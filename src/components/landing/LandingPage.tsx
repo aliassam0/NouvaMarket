@@ -244,7 +244,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
     setIsRegistering(true);
     try {
       if (regAccountType === 'supplier') {
-        addSupplierRegistration({
+        await addSupplierRegistration({
           fullName: regFullName,
           companyName: supplierCompany || `مستودع ${regFullName}`,
           phone: regPhone || '0550000000',
@@ -281,7 +281,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
           'info'
         );
       } else {
-        addSellerRegistration({
+        await addSellerRegistration({
           fullName: regFullName,
           storeName: regStoreName || `متجر ${regFullName}`,
           phone: regPhone || '0550000000',

@@ -11,6 +11,16 @@ import {
   setNotificationSoundEnabled,
   AppNotification,
 } from '../../lib/notificationHelper';
+import {
+  testSalePushNotification,
+  playSaleChime,
+  vibratePhoneForSale,
+  getSaleNotifSettings,
+  saveSaleNotifSettings,
+  requestPushPermission,
+  getPushPermissionStatus,
+} from '../../lib/pwaNotificationManager';
+
 
 interface NotificationsModalProps {
   onClose: () => void;
@@ -169,9 +179,35 @@ export function NotificationsModal({ onClose, role = 'seller' }: NotificationsMo
             className="px-2.5 py-1 rounded-xl bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300 font-bold text-[10px] hover:bg-violet-200 dark:hover:bg-violet-800 transition flex items-center gap-1 cursor-pointer"
           >
             <Music className="w-3 h-3" />
-            <span>تجربة الصوت</span>
+            <span>نغمة النظام</span>
           </button>
         </div>
+
+        {/* PWA Instant Sale Alert Test Button */}
+        {role === 'seller' && (
+          <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/15 via-purple-500/15 to-amber-500/15 border border-amber-300/60 dark:border-amber-500/40 flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">💰</span>
+              <div>
+                <p className="text-xs font-black text-slate-900 dark:text-white">
+                  رنين وهزّة المبيعة الجديدة الفورية
+                </p>
+                <p className="text-[10px] text-slate-600 dark:text-slate-400">
+                  إشعار يهتز في هاتفك مع رنين كاش مميز عند كل مبيعة
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                testSalePushNotification(2500);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 font-black text-[11px] shadow-xs transition cursor-pointer whitespace-nowrap"
+            >
+              جرّب الرنين 🔔
+            </button>
+          </div>
+        )}
+
 
         {/* Action Toolbar */}
         {notifications.length > 0 && (

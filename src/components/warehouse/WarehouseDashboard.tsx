@@ -1123,7 +1123,7 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
   };
 
   return (
-    <div className="flex-1 flex flex-row h-full overflow-hidden bg-slate-950 text-slate-100" dir="rtl">
+    <div className="flex-1 flex flex-row h-full overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
       {/* 1. Warehouse Vertical Sidebar */}
       <WarehouseVerticalSidebar
         activeTab={activeTab}
@@ -1178,12 +1178,12 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
       {/* 2. Main Content Column */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
         {/* Modern Sticky Vertical Top Navbar */}
-        <header className="sticky top-0 z-20 px-3 sm:px-6 py-3 bg-slate-900/95 backdrop-blur-md border-b border-purple-900/40 flex items-center justify-between gap-3 shrink-0">
+        <header className="sticky top-0 z-20 px-3 sm:px-6 py-3 bg-white/95 backdrop-blur-md border-b border-slate-200/90 flex items-center justify-between gap-3 shrink-0 shadow-2xs">
           <div className="flex items-center gap-3 min-w-0">
             {/* Mobile Sidebar Hamburger Toggle */}
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-xl bg-purple-950/60 border border-purple-800/40 text-purple-300 hover:text-white hover:bg-purple-900/60 transition cursor-pointer shrink-0"
+              className="lg:hidden p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:text-violet-700 hover:bg-slate-200 transition cursor-pointer shrink-0"
               title="فتح القائمة الجانبية"
             >
               <Menu className="w-5 h-5" />
@@ -1192,28 +1192,28 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
             {/* Current Active Tab Breadcrumb & Title */}
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-violet-400">لوحة المستودع</span>
-                <span className="text-slate-500 text-xs">/</span>
-                <h1 className="text-sm sm:text-base font-black text-white truncate flex items-center gap-1.5">
+                <span className="text-xs font-bold text-violet-600">لوحة المستودع</span>
+                <span className="text-slate-300 text-xs">/</span>
+                <h1 className="text-sm sm:text-base font-black text-slate-900 truncate flex items-center gap-1.5">
                   {getWarehouseTabTitle(activeTab)}
                 </h1>
                 {activeTab === 'pending' && pendingOrders.length > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 animate-pulse">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
                     {pendingOrders.length} معلق
                   </span>
                 )}
                 {activeTab === 'preparation' && preparationOrders.length > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-violet-950 text-violet-300 border border-violet-800">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-violet-100 text-violet-800 border border-violet-200 font-bold">
                     {preparationOrders.length} طرد
                   </span>
                 )}
                 {activeTab === 'products' && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-950 text-purple-300 border border-purple-800">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-100 text-purple-800 border border-purple-200 font-bold">
                     {mySupplierProducts.length} صنف
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block truncate">
+              <p className="text-[11px] text-slate-500 hidden sm:block truncate">
                 {getWarehouseTabSubtitle(activeTab)}
               </p>
             </div>
@@ -1230,7 +1230,7 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                   placeholder="بحث باسم الزبون أو الهاتف..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full ps-9 pe-3 py-1.5 rounded-xl bg-slate-800/80 border border-purple-900/40 text-xs font-medium text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 transition"
+                  className="w-full ps-9 pe-3 py-1.5 rounded-xl bg-slate-100/90 border border-slate-200 text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-violet-500 shadow-2xs transition"
                 />
               </div>
             )}
@@ -1238,32 +1238,32 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
             {/* Ramassage Quick Button */}
             <button
               onClick={() => setIsPickupModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-200 text-violet-800 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
               title="طلب سيارة جمع الطرود (Demande Ramassage)"
             >
-              <Truck className="w-3.5 h-3.5 text-purple-300" />
+              <Truck className="w-3.5 h-3.5 text-violet-600" />
               <span className="hidden sm:inline">طلب راماساج</span>
             </button>
 
             {/* Shipping Rates Modal Button */}
             <button
               onClick={() => setShowShippingRatesModal(true)}
-              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs"
               title="جدول أسعار التوصيل لجميع الولايات"
             >
-              <Truck className="w-3.5 h-3.5 text-slate-950" />
+              <Truck className="w-3.5 h-3.5 text-white" />
               <span className="hidden sm:inline">أسعار التوصيل</span>
             </button>
 
             {/* Notifications Button */}
             <button
               onClick={() => setIsWarehouseNotifOpen(true)}
-              className="p-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:text-white hover:bg-amber-500/30 transition relative cursor-pointer"
+              className="p-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 hover:text-violet-700 transition relative cursor-pointer shadow-2xs"
               title="تنبيهات وإشعارات المستودع"
             >
-              <Bell className="w-4 h-4 text-amber-400" />
+              <Bell className="w-4 h-4 text-amber-500" />
               {unreadNotifCount > 0 && (
-                <span className="min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white font-black text-[9px] flex items-center justify-center absolute -top-1 -end-1 shadow-xs border border-slate-900 animate-pulse">
+                <span className="min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white font-black text-[9px] flex items-center justify-center absolute -top-1 -end-1 shadow-xs border border-white animate-pulse">
                   {unreadNotifCount}
                 </span>
               )}
@@ -1272,11 +1272,11 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
             {/* Available Balance Pill */}
             <div
               onClick={() => handleOpenPayoutModal()}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-950/60 border border-emerald-800/50 text-emerald-300 text-xs font-black cursor-pointer hover:border-emerald-600 transition"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black cursor-pointer hover:bg-emerald-100 transition shadow-2xs"
               title="رصيدك المتاح للسحب (انقر لطلب سحب)"
             >
               <span>المتاح:</span>
-              <span className="font-mono text-emerald-400">{availableBalance.toLocaleString()} دج</span>
+              <span className="font-mono text-emerald-600">{availableBalance.toLocaleString()} دج</span>
             </div>
           </div>
         </header>
@@ -1291,7 +1291,7 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                 placeholder="بحث باسم الزبون، الهاتف، أو ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full ps-9 pe-3 py-2 rounded-xl bg-slate-900 border border-purple-900/40 text-xs font-medium text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 transition"
+                className="w-full ps-9 pe-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-500 shadow-2xs transition"
               />
             </div>
           </div>
@@ -3780,7 +3780,7 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
             <div className="space-y-6 print:space-y-0">
               {bulkPrintOrders.map((ord, idx) => (
                 <div
-                  key={ord.id}
+                  key={`${ord.id || 'ord'}-${idx}`}
                   className="border-2 border-slate-900 rounded-2xl p-4 bg-white space-y-4 print:rounded-none print:border-2 print:border-black print:mb-6 print:break-after-page"
                 >
                   {/* Label Header */}

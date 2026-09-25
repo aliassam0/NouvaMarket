@@ -6,7 +6,6 @@ import { useLanguage } from '../../context/LanguageContext';
 import { MoneyText } from '../ui/MoneyText';
 import { ProfitBadge } from '../ui/ProfitBadge';
 import { removeProductShareData, getProductShareLinks } from '../../utils/shareUtils';
-import { MarketerChecklist } from './MarketerChecklist';
 
 interface MarketedProductsTabProps {
   onOpenProduct: (product: Product) => void;
@@ -132,14 +131,6 @@ export function MarketedProductsTab({
       </div>
 
       <div className="flex-1 p-3 sm:p-4 overflow-y-auto">
-        {/* Interactive Marketer Onboarding Checklist */}
-        <MarketerChecklist
-          marketedProducts={marketedProducts}
-          onNavigateTab={onNavigateTab}
-          onOpenShareModal={onOpenShareModal}
-          onShowToast={onShowToast}
-        />
-
         {filteredProducts.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-slate-400 dark:text-slate-500 space-y-3 bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
             <LinkIcon className="w-10 h-10 opacity-20 text-purple-500" />

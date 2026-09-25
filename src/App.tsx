@@ -14,6 +14,10 @@ import {
   Wand2,
   LogOut,
   Store,
+  Globe,
+  ShieldCheck,
+  Boxes,
+  Headphones,
 } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -47,7 +51,11 @@ import { ShareProductModal } from './components/tabs/ShareProductModal';
 import { CustomerShareOrderView } from './components/tabs/CustomerShareOrderView';
 import { ExternalStoreSyncModal } from './components/common/ExternalStoreSyncModal';
 import { StoresManagementModal } from './components/common/StoresManagementModal';
+import { PWAInstallButton } from './components/common/PWAInstallButton';
+import { DashboardSwitcher, DashboardRole } from './components/common/DashboardSwitcher';
+import { InstantSaleBanner } from './components/common/InstantSaleBanner';
 import { MOCK_PRODUCTS, getStoredProducts, syncProductsWithServer } from './data/mockProducts';
+
 import { Product, ProductVariant } from './types';
 
 type TabType = 'accueil' | 'produits' | 'commandes' | 'wallet' | 'analytics' | 'marketing' | 'profil';
@@ -107,6 +115,42 @@ function AppContent() {
     setCurrentRole('reseller');
     setActiveTab('accueil');
     showToast('تم تسجيل الخروج بنجاح 👋', 'info');
+  };
+
+  // Check if current session can switch between all 4 dashboards
+  const canSwitchAll = Boolean(
+    user?.role === 'admin' ||
+    user?.email?.includes('admin') ||
+    impersonatedSellerName ||
+    impersonatedSupplierName ||
+    impersonatedConfirmerName ||
+    !user
+  );
+
+  const handleSwitchDashboard = (newRole: DashboardRole) => {
+    if (newRole === 'admin') {
+      setImpersonatedSellerName(null);
+      setImpersonatedSupplierName(null);
+      setImpersonatedConfirmerName(null);
+      setCurrentRole('admin');
+      showToast('تم الانتقال إلى: لوحة الأدمن (Admin HQ)', 'info');
+    } else if (newRole === 'confirmer') {
+      if (user?.role === 'admin' && !impersonatedConfirmerName) {
+        setImpersonatedConfirmerName('معاينة مؤكد الطلبيات');
+      }
+      setCurrentRole('confirmer');
+      showToast('تم الانتقال إلى: واجهة المؤكد (Confirmer Desk)', 'info');
+    } else if (newRole === 'warehouse') {
+      if (user?.role === 'admin' && !impersonatedSupplierName) {
+        setImpersonatedSupplierName('مستودع نوفا ماركت المركزي');
+      }
+      setCurrentRole('warehouse');
+      showToast('تم الانتقال إلى: لوحة المورّد والمستودع (Supplier Hub)', 'info');
+    } else if (newRole === 'reseller') {
+      setCurrentRole('reseller');
+      setActiveTab('accueil');
+      showToast('تم الانتقال إلى: لوحة المسوّق (Seller Hub)', 'info');
+    }
   };
 
   // Modals state
@@ -242,22 +286,28 @@ function AppContent() {
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 relative">
+      {/* Instant Push Sale Celebration Alert Banner */}
+      <InstantSaleBanner
+        onGoToOrders={() => setActiveTab('commandes')}
+        onGoToWallet={() => setActiveTab('wallet')}
+      />
+
       {/* Top Offline Network Alert Banner */}
       <OfflineBanner />
 
+
       {/* App Top Header Bar */}
-      <header className="px-3 py-2.5 bg-white/95 dark:bg-slate-900/95 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between sticky top-0 z-30 backdrop-blur-md shadow-xs gap-2">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setViewMode('landing')}
-            className="px-2.5 py-1 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 font-extrabold text-[11px] border border-purple-200 dark:border-purple-800 flex items-center gap-1.5 transition"
-            title="الرجوع إلى الصفحة الرئيسية"
-          >
-            <span>🌐 الرئيسية</span>
-          </button>
-          <div className="hidden sm:flex items-center gap-2">
-            <img src="/logo.svg" alt="Nouva Market Logo" className="w-8 h-8 rounded-xl object-contain drop-shadow-sm shrink-0" referrerPolicy="no-referrer" />
-            <div>
+      <header className="px-3 py-2 bg-white/95 dark:bg-slate-900/95 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between sticky top-0 z-30 backdrop-blur-md shadow-2xs gap-2">
+        {/* Right Section: Brand & Home / Landing Switcher */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2">
+            <img
+              src="/logo.svg"
+              alt="Nouva Market Logo"
+              className="w-8 h-8 rounded-xl object-contain drop-shadow-2xs shrink-0"
+              referrerPolicy="no-referrer"
+            />
+            <div className="hidden xl:block">
               <h1 className="text-xs font-black tracking-tight text-slate-900 dark:text-white leading-none">
                 {t('app.title')}
               </h1>
@@ -266,67 +316,38 @@ function AppContent() {
               </span>
             </div>
           </div>
+
+          <button
+            onClick={() => setViewMode('landing')}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100/90 hover:bg-purple-50 dark:bg-slate-800/90 dark:hover:bg-purple-950/60 text-slate-700 hover:text-purple-700 dark:text-slate-300 dark:hover:text-purple-300 font-extrabold text-[11px] border border-slate-200 dark:border-slate-700 hover:border-purple-200 dark:hover:border-purple-800 transition cursor-pointer shadow-2xs"
+            title="الانتقال إلى الصفحة الرئيسية / المتجر"
+          >
+            <Globe className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+            <span className="hidden sm:inline">الرئيسية</span>
+          </button>
         </div>
 
-        {/* Active Role Status Badge (Secured - isolated per user login) */}
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-xs font-bold">
-          {currentRole === 'admin' && (
-            <div className="flex items-center gap-2">
-              <span className="text-purple-700 dark:text-purple-300 font-black flex items-center gap-1">
-                🛠️ لوحة الأدمن (Admin)
-              </span>
-              <button
-                onClick={() => {
-                  setImpersonatedConfirmerName('معاينة مؤكد الطلبيات');
-                  setCurrentRole('confirmer');
-                }}
-                className="px-2 py-0.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold transition cursor-pointer flex items-center gap-0.5"
-                title="الانتقال لواجهة مؤكد الطلبيات"
-              >
-                <span>🎧 واجهة المؤكد</span>
-              </button>
-            </div>
-          )}
-          {currentRole === 'confirmer' && (
-            <div className="flex items-center gap-2">
-              <span className="text-emerald-700 dark:text-emerald-300 font-black flex items-center gap-1">
-                🎧 مؤكد الطلبيات (Confirmer)
-              </span>
-              {(user?.email?.includes('admin') || impersonatedConfirmerName) && (
-                <button
-                  onClick={() => {
-                    setImpersonatedConfirmerName(null);
-                    setCurrentRole('admin');
-                  }}
-                  className="px-2 py-0.5 rounded-lg bg-purple-100 hover:bg-purple-200 dark:bg-purple-950 text-purple-800 dark:text-purple-300 text-[10px] font-bold transition cursor-pointer"
-                  title="العودة للوحة الأدمن"
-                >
-                  🛠️ لوحة الأدمن
-                </button>
-              )}
-            </div>
-          )}
-          {currentRole === 'warehouse' && (
-            <span className="text-amber-700 dark:text-amber-300 font-black flex items-center gap-1">
-              🏭 المستودع والمورد
-            </span>
-          )}
-          {currentRole === 'reseller' && (
-            <span className="text-purple-700 dark:text-purple-300 font-black flex items-center gap-1">
-              🛍️ لوحة البائع
-            </span>
-          )}
+        {/* Center Section: Unified 4 Dashboards Switcher */}
+        <div className="flex-1 flex justify-center max-w-2xl px-1">
+          <DashboardSwitcher
+            currentRole={currentRole}
+            onSwitchRole={handleSwitchDashboard}
+            canSwitchAll={canSwitchAll}
+          />
         </div>
 
-        <div className="flex items-center gap-1.5">
+        {/* Left Section: PWA Install, Quick Tools, Notifications, Logout */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <PWAInstallButton />
+
           {currentRole === 'reseller' && (
             <button
               onClick={() => setIsStoresManagerOpen(true)}
-              className="px-2.5 py-1.5 rounded-xl bg-violet-50 hover:bg-violet-100 dark:bg-violet-950/80 text-violet-700 dark:text-violet-300 font-extrabold text-[11px] border border-violet-200 dark:border-violet-800 flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+              className="px-2.5 py-1.5 rounded-xl bg-violet-50 hover:bg-violet-100 dark:bg-violet-950/80 text-violet-700 dark:text-violet-300 font-extrabold text-[11px] border border-violet-200 dark:border-violet-800 hidden md:flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
               title="إدارة ربط المتاجر (Shopify / YouCan / WooCommerce)"
             >
               <Store className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">ربط المتاجر</span>
+              <span>ربط المتاجر</span>
             </button>
           )}
 
@@ -337,7 +358,7 @@ function AppContent() {
           >
             <Bell className="w-4 h-4" />
             {unreadNotifCount > 0 && (
-              <span className="min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white font-black text-[9px] flex items-center justify-center absolute -top-1 -end-1 shadow-xs border border-white dark:border-slate-900 animate-pulse">
+              <span className="min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white font-black text-[9px] flex items-center justify-center absolute -top-1 -end-1 shadow-2xs border border-white dark:border-slate-900 animate-pulse">
                 {unreadNotifCount}
               </span>
             )}
@@ -345,7 +366,7 @@ function AppContent() {
 
           <button
             onClick={handleLogout}
-            className="px-2.5 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold text-[11px] border border-rose-200 dark:border-rose-900 flex items-center gap-1 transition cursor-pointer"
+            className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold text-[11px] border border-rose-200 dark:border-rose-900 flex items-center gap-1 transition cursor-pointer"
             title="تسجيل الخروج"
           >
             <LogOut className="w-3.5 h-3.5" />
@@ -356,10 +377,11 @@ function AppContent() {
 
       {/* Admin Impersonation Notice Banner */}
       {currentRole !== 'admin' && impersonatedSellerName && (
-        <div className="bg-gradient-to-r from-violet-700 via-purple-700 to-violet-800 text-white px-3 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-purple-500/50">
+        <div className="bg-gradient-to-r from-purple-800 via-indigo-800 to-purple-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-purple-500/40">
           <div className="flex items-center gap-2">
-            <span className="bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide">
-              👁️ معاينة الأدمن
+            <span className="bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3 text-purple-200" />
+              <span>معاينة الأدمن</span>
             </span>
             <span>
               أنت تتصفح الآن في وضع المعاينة:{' '}
@@ -371,18 +393,19 @@ function AppContent() {
               setImpersonatedSellerName(null);
               setCurrentRole('admin');
             }}
-            className="px-3 py-1 rounded-xl bg-white text-purple-950 hover:bg-amber-300 font-black text-[11px] flex items-center gap-1 shadow-sm transition cursor-pointer shrink-0"
+            className="px-3 py-1 rounded-xl bg-white text-purple-950 hover:bg-amber-300 font-black text-[11px] flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
           >
-            <span>العودة للأدمن 🛠️</span>
+            <span>العودة للوحة الأدمن</span>
           </button>
         </div>
       )}
 
       {currentRole !== 'admin' && impersonatedSupplierName && (
-        <div className="bg-gradient-to-r from-purple-700 via-purple-800 to-slate-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-purple-500/50">
+        <div className="bg-gradient-to-r from-amber-800 via-orange-900 to-slate-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-amber-500/40">
           <div className="flex items-center gap-2">
-            <span className="bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide">
-              🏭 معاينة الأدمن للمورد
+            <span className="bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide flex items-center gap-1">
+              <Boxes className="w-3 h-3 text-amber-200" />
+              <span>معاينة المورد</span>
             </span>
             <span>
               أنت تتصفح الآن حساب المورد:{' '}
@@ -394,18 +417,19 @@ function AppContent() {
               setImpersonatedSupplierName(null);
               setCurrentRole('admin');
             }}
-            className="px-3 py-1 rounded-xl bg-white text-purple-950 hover:bg-amber-300 font-black text-[11px] flex items-center gap-1 shadow-sm transition cursor-pointer shrink-0"
+            className="px-3 py-1 rounded-xl bg-white text-amber-950 hover:bg-amber-300 font-black text-[11px] flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
           >
-            <span>العودة للأدمن 🛠️</span>
+            <span>العودة للوحة الأدمن</span>
           </button>
         </div>
       )}
 
       {currentRole !== 'admin' && impersonatedConfirmerName && (
-        <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-emerald-500/50">
+        <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-emerald-500/40">
           <div className="flex items-center gap-2">
-            <span className="bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide">
-              🎧 معاينة الأدمن لمؤكد الطلبيات
+            <span className="bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide flex items-center gap-1">
+              <Headphones className="w-3 h-3 text-emerald-200" />
+              <span>معاينة المؤكد</span>
             </span>
             <span>
               أنت تتصفح الآن واجهة مؤكد الطلبيات:{' '}
@@ -417,9 +441,9 @@ function AppContent() {
               setImpersonatedConfirmerName(null);
               setCurrentRole('admin');
             }}
-            className="px-3 py-1 rounded-xl bg-white text-emerald-950 hover:bg-emerald-300 font-black text-[11px] flex items-center gap-1 shadow-sm transition cursor-pointer shrink-0"
+            className="px-3 py-1 rounded-xl bg-white text-emerald-950 hover:bg-emerald-300 font-black text-[11px] flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
           >
-            <span>العودة للأدمن 🛠️</span>
+            <span>العودة للوحة الأدمن</span>
           </button>
         </div>
       )}

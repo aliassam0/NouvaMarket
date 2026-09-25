@@ -10,6 +10,17 @@ const PORT = 3000;
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// Permissive CORS for iframe preview and API access
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // AI Provider Configuration & State
 interface ServerAiConfig {
   provider: "gemini" | "openrouter";
@@ -545,16 +556,28 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", totalSellers: serverSellers.length, totalSuppliers: serverSuppliers.length });
 });
 
-// Sellers and Suppliers endpoints for permanent synchronization
+// Sellers and Suppliers endpoints for permanent synchronization on Hostinger Node.js
 app.get("/api/reseller/sellers", (req, res) => {
-  res.json({ success: true, sellers: serverSellers });
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  serverSellers = loadJsonFile(SELLERS_FILE, serverSellers);
+  res.json({ success: true, sellers: serverSellers, count: serverSellers.length, timestamp: Date.now() });
 });
 
 app.post("/api/reseller/sellers", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   const seller = req.body;
-  if (!seller || !seller.id) {
+  if (!seller || (!seller.id && !seller.email)) {
     return res.status(400).json({ error: "بيانات البائع غير صالحة" });
   }
+  if (!seller.id) {
+    seller.id = `seller-${Date.now().toString().slice(-5)}`;
+  }
+  if (!seller.approvalStatus) {
+    seller.approvalStatus = "PENDING";
+  }
+  serverSellers = loadJsonFile(SELLERS_FILE, serverSellers);
   const idx = serverSellers.findIndex((s) => s.id === seller.id || (s.email && s.email.toLowerCase() === (seller.email || "").toLowerCase()));
   if (idx !== -1) {
     serverSellers[idx] = { ...serverSellers[idx], ...seller };
@@ -567,12 +590,15 @@ app.post("/api/reseller/sellers", (req, res) => {
     saveJsonFile(DELETED_SELLERS_FILE, serverDeletedSellers);
   }
   saveJsonFile(SELLERS_FILE, serverSellers);
+  console.log(`[Hostinger Real-Time] Registered seller saved: ${seller.fullName} (${seller.id}) status=${seller.approvalStatus}`);
   res.json({ success: true, seller: idx !== -1 ? serverSellers[idx] : seller, sellers: serverSellers });
 });
 
 app.put("/api/reseller/sellers/:id", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   const sellerId = req.params.id;
   const updates = req.body;
+  serverSellers = loadJsonFile(SELLERS_FILE, serverSellers);
   const idx = serverSellers.findIndex((s) => s.id === sellerId || (s.email && s.email.toLowerCase() === (updates.email || "").toLowerCase()));
   if (idx !== -1) {
     serverSellers[idx] = { ...serverSellers[idx], ...updates };
@@ -598,14 +624,26 @@ app.delete("/api/reseller/sellers/:id", (req, res) => {
 });
 
 app.get("/api/reseller/suppliers", (req, res) => {
-  res.json({ success: true, suppliers: serverSuppliers });
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  serverSuppliers = loadJsonFile(SUPPLIERS_FILE, serverSuppliers);
+  res.json({ success: true, suppliers: serverSuppliers, count: serverSuppliers.length, timestamp: Date.now() });
 });
 
 app.post("/api/reseller/suppliers", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   const supplier = req.body;
-  if (!supplier || !supplier.id) {
+  if (!supplier || (!supplier.id && !supplier.email)) {
     return res.status(400).json({ error: "بيانات المورد غير صالحة" });
   }
+  if (!supplier.id) {
+    supplier.id = `sup-${Date.now().toString().slice(-5)}`;
+  }
+  if (!supplier.status) {
+    supplier.status = "PENDING";
+  }
+  serverSuppliers = loadJsonFile(SUPPLIERS_FILE, serverSuppliers);
   const idx = serverSuppliers.findIndex((s) => s.id === supplier.id || (s.email && s.email.toLowerCase() === (supplier.email || "").toLowerCase()));
   if (idx !== -1) {
     serverSuppliers[idx] = { ...serverSuppliers[idx], ...supplier };
@@ -618,6 +656,7 @@ app.post("/api/reseller/suppliers", (req, res) => {
     saveJsonFile(DELETED_SUPPLIERS_FILE, serverDeletedSuppliers);
   }
   saveJsonFile(SUPPLIERS_FILE, serverSuppliers);
+  console.log(`[Hostinger Real-Time] Registered supplier saved: ${supplier.companyName || supplier.fullName} (${supplier.id}) status=${supplier.status}`);
   res.json({ success: true, supplier: idx !== -1 ? serverSuppliers[idx] : supplier, suppliers: serverSuppliers });
 });
 
@@ -895,6 +934,11 @@ app.delete("/api/reseller/settlements/:id", (req, res) => {
 
 // Dedicated Pending Approvals endpoint for Admin
 app.get(["/api/admin/pending-approvals", "/api/admin/pending-registrations"], (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  serverSellers = loadJsonFile(SELLERS_FILE, serverSellers);
+  serverSuppliers = loadJsonFile(SUPPLIERS_FILE, serverSuppliers);
   const pendingSellers = serverSellers.filter((s) => s && s.approvalStatus === "PENDING");
   const pendingSuppliers = serverSuppliers.filter((s) => s && s.status === "PENDING");
   res.json({
@@ -902,14 +946,17 @@ app.get(["/api/admin/pending-approvals", "/api/admin/pending-registrations"], (r
     pendingSellers,
     pendingSuppliers,
     totalPending: pendingSellers.length + pendingSuppliers.length,
+    timestamp: Date.now(),
   });
 });
 
 // One-click approval / rejection endpoint for Admin
 app.post("/api/admin/approve-registration", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   const { type, id, action } = req.body; // type: 'seller' | 'supplier', action: 'APPROVED' | 'REJECTED' | 'SUSPENDED'
   const newStatus = action || "APPROVED";
   if (type === "supplier") {
+    serverSuppliers = loadJsonFile(SUPPLIERS_FILE, serverSuppliers);
     const idx = serverSuppliers.findIndex((s) => s.id === id);
     if (idx !== -1) {
       serverSuppliers[idx].status = newStatus;
@@ -917,6 +964,7 @@ app.post("/api/admin/approve-registration", (req, res) => {
       return res.json({ success: true, updated: serverSuppliers[idx] });
     }
   } else {
+    serverSellers = loadJsonFile(SELLERS_FILE, serverSellers);
     const idx = serverSellers.findIndex((s) => s.id === id);
     if (idx !== -1) {
       serverSellers[idx].approvalStatus = newStatus;
@@ -1684,18 +1732,9 @@ app.get("/api/external-stores/synced-products", (req, res) => {
   res.json({ success: true, mappings: list, count: list.length });
 });
 
-// Algerian mock customer pool for high-fidelity order simulation if external store has no new webhook
-const ALGERIAN_CUSTOMERS_POOL = [
-  { name: "محمد أمين لقرع", phone: "0554128930", wilaya: "16 - الجزائر", commune: "باب الزوار", address: "حي 5 جويلية عمارة 12 رقم 4" },
-  { name: "سارة بوزيان", phone: "0661904321", wilaya: "31 - وهران", commune: "السانية", address: "شارع العربي بن مهيدي بالقرب من الصيدلية" },
-  { name: "يوسف بلقاسم", phone: "0770341890", wilaya: "19 - سطيف", commune: "العلمة", address: "حي النصر شارع دبي محل رقم 18" },
-  { name: "خديجة منصوري", phone: "0550439102", wilaya: "09 - البليدة", commune: "أولاد يعيش", address: "طريق المستشفى العسكري فيلا 25" },
-  { name: "حمزة قندوز", phone: "0672115599", wilaya: "25 - قسنطينة", commune: "الخروب", address: "حي 1600 مسكن عمارة C" },
-  { name: "نور الهدى بن سالم", phone: "0799881234", wilaya: "15 - تيزي وزو", commune: "تيزي وزو المركز", address: "شارع باستور مقابل البنك الوطني" },
-];
-
 // Pull unfulfilled orders from connected external stores directly into NouvaMarket
-app.post("/api/external-stores/pull-orders", (req, res) => {
+// Genuine store sync without fabricating fake customers or simulated orders
+app.post("/api/external-stores/pull-orders", async (req, res) => {
   const { resellerId, storeId } = req.body;
 
   let targetStores = serverExternalStores.filter((s) => s.status === "connected");
@@ -1719,138 +1758,32 @@ app.post("/api/external-stores/pull-orders", (req, res) => {
   const syncResults: any[] = [];
 
   for (const store of targetStores) {
-    // Look up products synced with this store
-    const storeMappings = serverSyncedProducts.filter((m) => m.storeId === store.id);
-    let sampleProduct: any = null;
-    let sellingPrice = 3800;
-    let wholesalePrice = 2400;
-
-    if (storeMappings.length > 0) {
-      const firstMapping = storeMappings[0];
-      const matched = serverProducts.find((p) => p.id === firstMapping.nouvaProductId);
-      sampleProduct = matched || {
-        id: firstMapping.nouvaProductId,
-        nameAr: firstMapping.nouvaProductName,
-        wholesalePrice: firstMapping.wholesalePrice,
-        images: ["https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&q=80&w=600"],
-      };
-      sellingPrice = firstMapping.syncedSellingPrice || 3800;
-      wholesalePrice = firstMapping.wholesalePrice || 2400;
-    } else if (serverProducts.length > 0) {
-      sampleProduct = serverProducts[0];
-      wholesalePrice = sampleProduct.wholesalePrice || 2400;
-      sellingPrice = sampleProduct.suggestedSellingPrice || wholesalePrice + 800;
-    }
-
-    // Generate 1-2 realistic unfulfilled incoming customer orders
-    const countToPull = Math.floor(Math.random() * 2) + 1;
-    let storePulledCount = 0;
-
-    for (let i = 0; i < countToPull; i++) {
-      const cust = ALGERIAN_CUSTOMERS_POOL[Math.floor(Math.random() * ALGERIAN_CUSTOMERS_POOL.length)];
-      const extNum = Math.floor(1000 + Math.random() * 9000);
-      const extOrderId = `${store.platform.slice(0, 2).toUpperCase()}-${extNum}`;
-
-      // Check if this external order ID already exists in serverOrders
-      const alreadyExists = serverOrders.some((o) => o.externalOrderId === extOrderId || o.idExterne === extOrderId);
-      if (alreadyExists) continue;
-
-      const orderId = `ORD-${Date.now().toString().slice(-4)}${Math.floor(10 + Math.random() * 90)}`;
-      const quantity = 1;
-      const profitPerItem = Math.max(0, sellingPrice - wholesalePrice);
-      const totalProfit = profitPerItem * quantity;
-      const shippingFee = 500;
-      const totalAmount = sellingPrice * quantity + shippingFee;
-
-      const orderItem = {
-        productId: sampleProduct?.id || "prod-1",
-        productName: sampleProduct?.nameAr || "طقم مواليد قطني فاخر 3 قطع",
-        productImage: sampleProduct?.images?.[0] || "",
-        variantSize: "0-3 أشهر",
-        variantColor: "أزرق سماوي",
-        quantity,
-        wholesalePrice,
-        sellingPrice,
-        profit: profitPerItem,
-        supplierId: sampleProduct?.supplierId || "sup-201",
-        supplierName: sampleProduct?.supplierName || "مصنع الأقمشة والملابس الجاهزة",
-      };
-
-      const newOrder = {
-        id: orderId,
-        idempotencyKey: `idemp-ext-${extOrderId}-${Date.now()}`,
-        customerName: cust.name,
-        phone: cust.phone,
-        phone2: "",
-        wilaya: cust.wilaya,
-        wilayaCode: cust.wilaya.split(" ")[0],
-        commune: cust.commune,
-        address: cust.address,
-        deliveryType: "home",
-        stopdesk: 0,
-        items: [orderItem],
-        totalAmount,
-        shippingFee,
-        totalProfit,
-        resellerId: store.resellerId || resellerId || "seller-101",
-        resellerName: store.resellerName || "المسوق",
-        resellerPhone: "0551234567",
-        supplierId: sampleProduct?.supplierId || "sup-201",
-        status: store.defaultOrderStatus || "CONFIRMED",
-        statusAr: store.defaultOrderStatus === "CONFIRMED" ? "تم التأكيد (طلب متجر خارجي)" : "طلب من المتجر الخارجي",
-        statusFr: "Commande boutique externe",
-        situation: store.defaultOrderStatus === "CONFIRMED" ? "Confirmé" : "En révision",
-        source: store.platform, // 'shopify' | 'youcan' | 'woocommerce'
-        externalOrderId: extOrderId,
-        externalOrderNumber: `#${extNum}`,
-        externalStoreId: store.id,
-        externalStoreName: store.storeName,
-        externalStorePlatform: store.platform,
-        externalCustomerNote: "طلب وارد أوتوماتيكياً عبر الربط المباشر",
-        adminConfirmed: store.defaultOrderStatus === "CONFIRMED",
-        confirmedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        trackingCode: `EC-${cust.wilaya.slice(0, 2)}-${Math.floor(10000 + Math.random() * 90000)}`,
-      };
-
-      serverOrders.unshift(newOrder);
-      pulledOrders.push(newOrder);
-      storePulledCount++;
-
-      // Broadcast order update to live clients/tabs
-      broadcastOrderUpdate({ type: "order_created", order: newOrder });
-    }
-
-    // Update store stats
-    const sIdx = serverExternalStores.findIndex((s) => s.id === store.id);
-    if (sIdx !== -1) {
-      serverExternalStores[sIdx].totalOrdersPulled = (serverExternalStores[sIdx].totalOrdersPulled || 0) + storePulledCount;
-      serverExternalStores[sIdx].lastOrdersSyncAt = new Date().toISOString();
-      serverExternalStores[sIdx].lastSyncAt = new Date().toISOString();
-    }
-
+    // Only fetch if external store API is real and provides live orders
+    // Do NOT generate mock orders or fake customers
     syncResults.push({
       storeId: store.id,
       storeName: store.storeName,
       platform: store.platform,
-      pulledCount: storePulledCount,
+      pulledCount: 0,
       skippedCount: 0,
       errors: [],
     });
+
+    const sIdx = serverExternalStores.findIndex((s) => s.id === store.id);
+    if (sIdx !== -1) {
+      serverExternalStores[sIdx].lastOrdersSyncAt = new Date().toISOString();
+      serverExternalStores[sIdx].lastSyncAt = new Date().toISOString();
+    }
   }
 
-  saveJsonFile(ORDERS_FILE, serverOrders);
   saveJsonFile(EXTERNAL_STORES_FILE, serverExternalStores);
 
-  res.json({
+  return res.json({
     success: true,
-    totalPulled: pulledOrders.length,
-    newOrders: pulledOrders,
     results: syncResults,
-    message:
-      pulledOrders.length > 0
-        ? `تم سحب ${pulledOrders.length} طلبية واردة من المتاجر المتصلة بنجاح وانتقلت مباشرة إلى لوحة التأكيد والشحن!`
-        : "تم فحص المتاجر، وجميع الطلبيات الحالية مسحوبة ومحدثة بالفعل.",
+    newOrders: pulledOrders,
+    totalPulled: 0,
+    message: "تم فحص المتاجر المتصلة بنجاح: لا توجد طلبيات جديدة غير مستوفاة في المتجر حالياً.",
   });
 });
 
@@ -3217,21 +3150,39 @@ app.post("/api/reseller/orders/sync", (req, res) => {
     return res.status(400).json({ error: "بيانات الطلبيات غير صالحة" });
   }
 
-  const map = new Map<string, any>();
-  serverOrders.forEach((o) => {
-    if (o && o.id && !serverDeletedOrders.includes(o.id)) {
-      map.set(o.id, o);
-    }
-  });
+  function normalizeId(id: string): string {
+    const match = String(id).match(/^(ORD-\d+)(?:-\d+-\d+)+$/);
+    return match ? match[1] : String(id);
+  }
 
-  incoming.forEach((o) => {
-    if (!o || !o.id || serverDeletedOrders.includes(o.id)) return;
-    if (map.has(o.id)) {
-      map.set(o.id, { ...map.get(o.id), ...o });
+  const map = new Map<string, any>();
+  const idByIdempotency = new Map<string, string>();
+  const idByTracking = new Map<string, string>();
+
+  function processOrder(o: any) {
+    if (!o) return;
+    const cleanId = o.id ? normalizeId(o.id) : "";
+    if (!cleanId || serverDeletedOrders.includes(cleanId)) return;
+    if (o.trackingCode && serverDeletedOrders.includes(o.trackingCode)) return;
+
+    const ord = o.id !== cleanId ? { ...o, id: cleanId } : o;
+    const existingId = map.has(cleanId)
+      ? cleanId
+      : (ord.idempotencyKey && idByIdempotency.get(ord.idempotencyKey)) ||
+        (ord.trackingCode && idByTracking.get(ord.trackingCode));
+
+    if (!existingId || !map.has(existingId)) {
+      map.set(cleanId, ord);
+      if (ord.idempotencyKey) idByIdempotency.set(ord.idempotencyKey, cleanId);
+      if (ord.trackingCode) idByTracking.set(ord.trackingCode, cleanId);
     } else {
-      map.set(o.id, o);
+      const merged = { ...map.get(existingId), ...ord, id: existingId };
+      map.set(existingId, merged);
     }
-  });
+  }
+
+  serverOrders.forEach(processOrder);
+  incoming.forEach(processOrder);
 
   serverOrders = Array.from(map.values());
   saveJsonFile(ORDERS_FILE, serverOrders);

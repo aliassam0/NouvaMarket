@@ -53,8 +53,8 @@ export function getStoredSyncSettings(): SyncSettings {
     // ignore
   }
   return {
-    autoPollingEnabled: true,
-    intervalSeconds: 45,
+    autoPollingEnabled: false,
+    intervalSeconds: 120,
     lastGlobalSyncTimestamp: Date.now() - 30000,
   };
 }
@@ -85,6 +85,15 @@ export function addSyncLog(log: SyncLogItem) {
     const existing = getStoredSyncLogs();
     const updated = [log, ...existing].slice(0, 50);
     localStorage.setItem(SYNC_LOGS_STORAGE_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('delivery_sync_logs_updated'));
+  } catch {
+    // ignore
+  }
+}
+
+export function clearStoredSyncLogs() {
+  try {
+    localStorage.removeItem(SYNC_LOGS_STORAGE_KEY);
     window.dispatchEvent(new CustomEvent('delivery_sync_logs_updated'));
   } catch {
     // ignore
@@ -227,10 +236,8 @@ export async function pollOrderStatusesFromDeliveryApis(
     return { updatedOrdersCount: 0, deliveredCount: 0, newLogs: [], allOrders: currentOrders };
   }
 
-  // To simulate realistic courier delivery polling, pick candidate orders or test simulate
-  const targetOrders = options?.forceStatusChange
-    ? candidateOrders.slice(0, 3)
-    : candidateOrders.filter(() => Math.random() > 0.4).slice(0, 2);
+  // Only check orders that have a real tracking code assigned
+  const targetOrders = candidateOrders.filter((o) => o.trackingCode);
 
   const updatedOrdersMap = new Map<string, Order>();
 
@@ -238,21 +245,13 @@ export async function pollOrderStatusesFromDeliveryApis(
     try {
       const trackingResult = await fetchLiveTrackingFromCourier(order, order.supplierId);
       
-      // Only proceed if status actually changed or new history entry
+      // Only proceed if status actually changed from real courier API
       const statusChanged = trackingResult.newStatus !== order.status;
 
-      if (statusChanged || options?.forceStatusChange) {
+      if (statusChanged) {
         const previousStatus = order.status;
         const newStatus = trackingResult.newStatus;
-
-        let statusAr = trackingResult.trackingHistory[0]?.statusAr || order.statusAr || 'تم تحديث مسار الطرد';
-        if (newStatus === 'SHIPPED') {
-          statusAr = `خرج للتوزيع مع ${trackingResult.courierName} في ${order.wilaya || 'الوجهة'}`;
-        } else if (newStatus === 'DELIVERED') {
-          statusAr = `تم تسليم الطرد للزبون وتحصيل ${order.totalAmount?.toLocaleString()} دج بنجاح`;
-        } else if (newStatus === 'FAILED') {
-          statusAr = `فشل التسليم / إرجاع للمستودع`;
-        }
+        const statusAr = trackingResult.messageAr || order.statusAr || 'تم تحديث حالة الطرد';
 
         const updatedOrder: Order = {
           ...order,
@@ -269,8 +268,7 @@ export async function pollOrderStatusesFromDeliveryApis(
 
         if (newStatus === 'DELIVERED' && previousStatus !== 'DELIVERED') {
           deliveredCount++;
-          // Credit reseller commission automatically to wallet
-          const resellerProfit = order.totalProfit || 1200;
+          const resellerProfit = order.totalProfit || 0;
           if (resellerProfit > 0) {
             creditResellerCommission(
               order.id,
@@ -280,33 +278,7 @@ export async function pollOrderStatusesFromDeliveryApis(
           }
         }
 
-        // 1. App-Toast Alert specifically for the reseller & app user
-        const toastType = newStatus === 'DELIVERED' ? 'success' : newStatus === 'FAILED' ? 'error' : 'info';
-        const toastMessage = `🚚 تحديث شركة التوصيل (${trackingResult.courierName}) للطلب #${updatedOrder.trackingCode || updatedOrder.id} [${order.customerName}]: ${statusAr}`;
-        
-        window.dispatchEvent(
-          new CustomEvent('app-toast', {
-            detail: {
-              message: toastMessage,
-              type: toastType,
-            },
-          })
-        );
-
-        // 2. Notification Center alerts
-        addSellerNotification({
-          type: 'order',
-          titleAr: `📦 تحديث حالة الشحنة #${updatedOrder.trackingCode || updatedOrder.id}`,
-          bodyAr: `أفادت شركة ${trackingResult.courierName} بتحديث حالة طرد الزبون (${updatedOrder.customerName}): ${statusAr}`,
-        });
-
-        addWarehouseNotification({
-          type: 'order',
-          titleAr: `🚚 تحديث API لشركة التوصيل #${updatedOrder.trackingCode || updatedOrder.id}`,
-          bodyAr: `تم مزامنة حالة الطرد مع خوادم ${trackingResult.courierName}: ${statusAr}`,
-        });
-
-        // 3. Record in sync log
+        // Record in sync log
         const logItem: SyncLogItem = {
           id: `synclog-${Date.now()}-${Math.floor(Math.random() * 899 + 100)}`,
           timestamp: new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),

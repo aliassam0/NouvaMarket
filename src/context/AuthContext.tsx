@@ -632,7 +632,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let registeredId = `seller-${Date.now().toString().slice(-5)}`;
 
     if (targetRole === 'warehouse') {
-      const sup = addSupplierRegistration({
+      const sup = await addSupplierRegistration({
         fullName: data.fullName,
         companyName: data.storeName || `مستودع ${data.fullName}`,
         phone: data.phone,
@@ -644,7 +644,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       registeredId = sup.id;
     } else if (targetRole === 'reseller') {
-      const sel = addSellerRegistration({
+      const sel = await addSellerRegistration({
         fullName: data.fullName,
         storeName: data.storeName || `متجر ${data.fullName}`,
         phone: data.phone,

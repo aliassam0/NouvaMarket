@@ -51,34 +51,7 @@
     "deliveryCompanyName": "Ecom Delivery (إيكوم ديليفري)",
     "trackingHistory": [
       {
-        "timestamp": "2026-09-24 19:15",
-        "statusAr": "قيد التجهيز والمعالجة",
-        "statusEn": "In Preparation at Warehouse",
-        "location": "31 - وهران",
-        "courierName": "Ecom Delivery (إيكوم ديليفري)",
-        "trackingCode": "EC-31-82409",
-        "note": "[Ecom API v2] Situation ID: #1 - المفتاح: [✓ X-API-Key/X-API-Token موثق]"
-      },
-      {
-        "timestamp": "2026-09-24 18:26",
-        "statusAr": "تم التسليم للزبون بنجاح - تحصيل 5 300 دج",
-        "statusEn": "Delivered & Cash Collected",
-        "location": "31 - وهران",
-        "courierName": "Ecom Delivery (إيكوم ديليفري)",
-        "trackingCode": "EC-31-82409",
-        "note": "[Ecom API v2] Situation ID: #7 - المفتاح: [✓ X-API-Key/X-API-Token موثق]"
-      },
-      {
-        "timestamp": "2026-09-24 18:26",
-        "statusAr": "الشحنة خرجت مع الموزع في 31 - وهران",
-        "statusEn": "Out for Delivery in 31 - وهران",
-        "location": "31 - وهران",
-        "courierName": "Ecom Delivery (إيكوم ديليفري)",
-        "trackingCode": "EC-31-82409",
-        "note": "[Ecom API v2] Situation ID: #26 - المفتاح: [✓ X-API-Key/X-API-Token موثق]"
-      },
-      {
-        "timestamp": "2026-09-24 18:26",
+        "timestamp": "2026-09-24 23:02",
         "statusAr": "قيد التجهيز والمعالجة",
         "statusEn": "In Preparation at Warehouse",
         "location": "31 - وهران",
@@ -87,7 +60,7 @@
         "note": "[Ecom API v2] Situation ID: #1 - المفتاح: [✓ X-API-Key/X-API-Token موثق]"
       }
     ],
-    "updatedAt": "2026-09-24T19:16:11.819Z",
-    "bordereauUrl": "/api/delivery/label/ORD-645866?tracking=EC-31-82409&v=1790277371819"
+    "updatedAt": "2026-09-24T22:38:23.450Z",
+    "bordereauUrl": "/api/delivery/label/ORD-645866?tracking=EC-31-82409&v=1790290941977"
   }
 ]
