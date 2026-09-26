@@ -1,0 +1,696 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Home,
+  Layers,
+  Package,
+  Wallet,
+  User,
+  Bell,
+  Sparkles,
+  Zap,
+  BarChart3,
+  Share2,
+  Link as LinkIcon,
+  Wand2,
+  LogOut,
+  Store,
+  Globe,
+  ShieldCheck,
+  Boxes,
+  Headphones,
+} from 'lucide-react';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { OrderProvider, useOrders } from './context/OrderContext';
+import { CategoryProvider } from './context/CategoryContext';
+import { MobileDeviceFrame } from './components/ui/MobileDeviceFrame';
+import { OfflineBanner } from './components/ui/OfflineBanner';
+import { Toast, ToastMessage } from './components/ui/Toast';
+
+import { AccueilTab } from './components/tabs/AccueilTab';
+import { ProduitsTab } from './components/tabs/ProduitsTab';
+import { ProductDetailModal } from './components/tabs/ProductDetailModal';
+import { CommandesTab } from './components/tabs/CommandesTab';
+import { NewOrderModal } from './components/tabs/NewOrderModal';
+import { WalletTab } from './components/tabs/WalletTab';
+import { AnalyticsTab } from './components/tabs/AnalyticsTab';
+import { MarketingTab } from './components/tabs/MarketingTab';
+import { GamificationModal } from './components/tabs/GamificationModal';
+import { ProfilTab } from './components/tabs/ProfilTab';
+import { PendingSellerScreen } from './components/common/PendingSellerScreen';
+import { NotificationsModal } from './components/tabs/NotificationsModal';
+import { getUnreadNotificationsCount } from './lib/notificationHelper';
+import { DevToolsDrawer } from './components/tabs/DevToolsDrawer';
+
+import { AdminDashboard } from './components/admin/AdminDashboard';
+import { WarehouseDashboard } from './components/warehouse/WarehouseDashboard';
+import { ConfirmerDashboard } from './components/confirmer/ConfirmerDashboard';
+import { LandingPage } from './components/landing/LandingPage';
+import { MarketedProductsTab } from './components/tabs/MarketedProductsTab';
+import { ShareProductModal } from './components/tabs/ShareProductModal';
+import { CustomerShareOrderView } from './components/tabs/CustomerShareOrderView';
+import { ExternalStoreSyncModal } from './components/common/ExternalStoreSyncModal';
+import { StoresManagementModal } from './components/common/StoresManagementModal';
+import { PWAInstallButton } from './components/common/PWAInstallButton';
+import { DashboardSwitcher, DashboardRole } from './components/common/DashboardSwitcher';
+import { InstantSaleBanner } from './components/common/InstantSaleBanner';
+import { MOCK_PRODUCTS, getStoredProducts, syncProductsWithServer } from './data/mockProducts';
+
+import { Product, ProductVariant } from './types';
+
+type TabType = 'accueil' | 'produits' | 'commandes' | 'wallet' | 'analytics' | 'marketing' | 'profil';
+type RoleType = 'reseller' | 'admin' | 'warehouse' | 'confirmer';
+type ViewMode = 'landing' | 'app';
+
+function AppContent() {
+  const { t, language, isRtl } = useLanguage();
+  const { user, logout } = useAuth();
+  const { pendingLinkOrdersCount } = useOrders();
+
+  const [viewMode, setViewMode] = useState<ViewMode>(user ? 'app' : 'landing');
+  const [currentRole, setCurrentRole] = useState<RoleType>((user?.role as RoleType) || 'reseller');
+  const [activeTab, setActiveTab] = useState<TabType>('accueil');
+  const [impersonatedSellerName, setImpersonatedSellerName] = useState<string | null>(null);
+  const [impersonatedSupplierName, setImpersonatedSupplierName] = useState<string | null>(null);
+  const [impersonatedConfirmerName, setImpersonatedConfirmerName] = useState<string | null>(null);
+
+  const handleImpersonateSupplier = (supplier: any) => {
+    const name = supplier.companyName || supplier.fullName;
+    setImpersonatedSupplierName(name);
+    const supplierData = {
+      id: supplier.id || 'SUP-DEMO',
+      fullName: supplier.fullName || name,
+      companyName: supplier.companyName || name,
+      phone: supplier.phone || '',
+      email: supplier.email || '',
+      wilaya: supplier.wilaya || '16 - الجزائر',
+      activityType: supplier.activityType || 'مصنع / مورد',
+      ccpOrRip: supplier.ccpOrRip || '',
+      status: supplier.status || 'APPROVED',
+    };
+    localStorage.setItem('nouva_supplier_profile', JSON.stringify(supplierData));
+    setCurrentRole('warehouse');
+    showToast(`تم الدخول لحساب المورد: ${name}`, 'info');
+  };
+
+  useEffect(() => {
+    if (user) {
+      setViewMode('app');
+      if (user.role) {
+        setCurrentRole(user.role as RoleType);
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    syncProductsWithServer();
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    setViewMode('landing');
+    setImpersonatedSellerName(null);
+    setImpersonatedSupplierName(null);
+    setImpersonatedConfirmerName(null);
+    setCurrentRole('reseller');
+    setActiveTab('accueil');
+    showToast('تم تسجيل الخروج بنجاح 👋', 'info');
+  };
+
+  // Check if current session can switch between all 4 dashboards
+  const canSwitchAll = Boolean(
+    user?.role === 'admin' ||
+    user?.email?.includes('admin') ||
+    impersonatedSellerName ||
+    impersonatedSupplierName ||
+    impersonatedConfirmerName ||
+    !user
+  );
+
+  const handleSwitchDashboard = (newRole: DashboardRole) => {
+    if (newRole === 'admin') {
+      setImpersonatedSellerName(null);
+      setImpersonatedSupplierName(null);
+      setImpersonatedConfirmerName(null);
+      setCurrentRole('admin');
+      showToast('تم الانتقال إلى: لوحة الأدمن (Admin HQ)', 'info');
+    } else if (newRole === 'confirmer') {
+      if (user?.role === 'admin' && !impersonatedConfirmerName) {
+        setImpersonatedConfirmerName('معاينة مؤكد الطلبيات');
+      }
+      setCurrentRole('confirmer');
+      showToast('تم الانتقال إلى: واجهة المؤكد (Confirmer Desk)', 'info');
+    } else if (newRole === 'warehouse') {
+      if (user?.role === 'admin' && !impersonatedSupplierName) {
+        setImpersonatedSupplierName('مستودع نوفا ماركت المركزي');
+      }
+      setCurrentRole('warehouse');
+      showToast('تم الانتقال إلى: لوحة المورّد والمستودع (Supplier Hub)', 'info');
+    } else if (newRole === 'reseller') {
+      setCurrentRole('reseller');
+      setActiveTab('accueil');
+      showToast('تم الانتقال إلى: لوحة المسوّق (Seller Hub)', 'info');
+    }
+  };
+
+  // Modals state
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [shareModalProduct, setShareModalProduct] = useState<Product | null>(null);
+  const [syncModalProduct, setSyncModalProduct] = useState<Product | null>(null);
+  const [isStoresManagerOpen, setIsStoresManagerOpen] = useState(false);
+  const [customerSharedProduct, setCustomerSharedProduct] = useState<Product | null>(null);
+  const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
+  const [prefilledOrderProduct, setPrefilledOrderProduct] = useState<Product | null>(null);
+
+  // Check URL query param or hash for ?share=productId
+  React.useEffect(() => {
+    const checkShareUrl = () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      let shareId = searchParams.get('share');
+      if (!shareId && window.location.hash.includes('share=')) {
+        const hashMatch = window.location.hash.match(/share=([^&]+)/);
+        if (hashMatch) shareId = hashMatch[1];
+      }
+
+      if (shareId) {
+        const allProducts = getStoredProducts();
+        const found = allProducts.find((p) => p.id === shareId);
+        if (found) {
+          setCustomerSharedProduct(found);
+        }
+      }
+    };
+
+    checkShareUrl();
+    window.addEventListener('popstate', checkShareUrl);
+    window.addEventListener('products_updated', checkShareUrl);
+    return () => {
+      window.removeEventListener('popstate', checkShareUrl);
+      window.removeEventListener('products_updated', checkShareUrl);
+    };
+  }, []);
+
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0);
+
+  useEffect(() => {
+    const handleNotifUpdate = () => {
+      const targetRole = currentRole === 'admin' ? 'admin' : 'seller';
+      setUnreadNotifCount(getUnreadNotificationsCount(targetRole));
+    };
+    handleNotifUpdate();
+    window.addEventListener('seller_notifications_updated', handleNotifUpdate);
+    window.addEventListener('admin_notifications_updated', handleNotifUpdate);
+    return () => {
+      window.removeEventListener('seller_notifications_updated', handleNotifUpdate);
+      window.removeEventListener('admin_notifications_updated', handleNotifUpdate);
+    };
+  }, [currentRole]);
+
+  const [isGamificationOpen, setIsGamificationOpen] = useState(false);
+  const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
+
+  // Toast
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ id: 't-' + Date.now(), message, type });
+  };
+
+  useEffect(() => {
+    const handleAppToast = (e: Event) => {
+      const customEvent = e as CustomEvent<{ message: string; type?: 'success' | 'error' | 'info' }>;
+      if (customEvent.detail?.message) {
+        setTimeout(() => {
+          showToast(customEvent.detail.message, customEvent.detail.type || 'success');
+        }, 0);
+      }
+    };
+    window.addEventListener('app-toast', handleAppToast);
+    return () => window.removeEventListener('app-toast', handleAppToast);
+  }, []);
+
+  const handleOpenNewOrder = (product?: Product) => {
+    if (product) setPrefilledOrderProduct(product);
+    else setPrefilledOrderProduct(null);
+    setIsNewOrderModalOpen(true);
+  };
+
+  const handleOrderFromDetail = (product: Product, variant: ProductVariant, customSellingPrice: number) => {
+    setPrefilledOrderProduct(product);
+    setIsNewOrderModalOpen(true);
+  };
+
+  const handleGenerateAiCopyFromDetail = (product: Product) => {
+    setSelectedProduct(null);
+    setPrefilledOrderProduct(product);
+    setActiveTab('marketing');
+  };
+
+  if (customerSharedProduct) {
+    return (
+      <div className="w-full h-full min-h-screen relative bg-slate-50 dark:bg-slate-950 overflow-y-auto">
+        <CustomerShareOrderView
+          product={customerSharedProduct}
+          onBackToApp={() => {
+            setCustomerSharedProduct(null);
+            const url = new URL(window.location.href);
+            url.searchParams.delete('share');
+            window.history.replaceState({}, '', url.pathname + url.search);
+          }}
+          onShowToast={showToast}
+        />
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </div>
+    );
+  }
+
+  if (viewMode === 'landing') {
+    return (
+      <div className="w-full h-full min-h-screen relative">
+        <LandingPage
+          onEnterApp={(role) => {
+            if (role === 'admin' || role === 'warehouse' || role === 'reseller' || role === 'confirmer') {
+              setCurrentRole(role);
+            } else {
+              setCurrentRole('reseller');
+            }
+            setViewMode('app');
+          }}
+          onShowToast={showToast}
+        />
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 relative">
+      {/* Instant Push Sale Celebration Alert Banner */}
+      <InstantSaleBanner
+        onGoToOrders={() => setActiveTab('commandes')}
+        onGoToWallet={() => setActiveTab('wallet')}
+      />
+
+      {/* Top Offline Network Alert Banner */}
+      <OfflineBanner />
+
+
+      {/* App Top Header Bar */}
+      <header className="px-3 py-2 bg-white/95 dark:bg-slate-900/95 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between sticky top-0 z-30 backdrop-blur-md shadow-2xs gap-2">
+        {/* Right Section: Brand & Home / Landing Switcher */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2">
+            <img
+              src="/logo.svg"
+              alt="Nouva Market Logo"
+              className="w-8 h-8 rounded-xl object-contain drop-shadow-2xs shrink-0"
+              referrerPolicy="no-referrer"
+            />
+            <div className="hidden xl:block">
+              <h1 className="text-xs font-black tracking-tight text-slate-900 dark:text-white leading-none">
+                {t('app.title')}
+              </h1>
+              <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                Operating System
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setViewMode('landing')}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100/90 hover:bg-purple-50 dark:bg-slate-800/90 dark:hover:bg-purple-950/60 text-slate-700 hover:text-purple-700 dark:text-slate-300 dark:hover:text-purple-300 font-extrabold text-[11px] border border-slate-200 dark:border-slate-700 hover:border-purple-200 dark:hover:border-purple-800 transition cursor-pointer shadow-2xs"
+            title="الانتقال إلى الصفحة الرئيسية / المتجر"
+          >
+            <Globe className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+            <span className="hidden sm:inline">الرئيسية</span>
+          </button>
+        </div>
+
+        {/* Center Section: Unified 4 Dashboards Switcher */}
+        <div className="flex-1 flex justify-center max-w-2xl px-1">
+          <DashboardSwitcher
+            currentRole={currentRole}
+            onSwitchRole={handleSwitchDashboard}
+            canSwitchAll={canSwitchAll}
+          />
+        </div>
+
+        {/* Left Section: PWA Install, Quick Tools, Notifications, Logout */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <PWAInstallButton />
+
+          {currentRole === 'reseller' && (
+            <button
+              onClick={() => setIsStoresManagerOpen(true)}
+              className="px-2.5 py-1.5 rounded-xl bg-violet-50 hover:bg-violet-100 dark:bg-violet-950/80 text-violet-700 dark:text-violet-300 font-extrabold text-[11px] border border-violet-200 dark:border-violet-800 hidden md:flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+              title="إدارة ربط المتاجر (Shopify / YouCan / WooCommerce)"
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>ربط المتاجر</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setIsNotificationsOpen(true)}
+            className="flex p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition relative cursor-pointer"
+            title="إشعارات وتنبيهات البائعين"
+          >
+            <Bell className="w-4 h-4" />
+            {unreadNotifCount > 0 && (
+              <span className="min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white font-black text-[9px] flex items-center justify-center absolute -top-1 -end-1 shadow-2xs border border-white dark:border-slate-900 animate-pulse">
+                {unreadNotifCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 font-bold text-[11px] border border-rose-200 dark:border-rose-900 flex items-center gap-1 transition cursor-pointer"
+            title="تسجيل الخروج"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">خروج</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Admin Impersonation Notice Banner */}
+      {currentRole !== 'admin' && impersonatedSellerName && (
+        <div className="bg-gradient-to-r from-purple-800 via-indigo-800 to-purple-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-purple-500/40">
+          <div className="flex items-center gap-2">
+            <span className="bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3 text-purple-200" />
+              <span>معاينة الأدمن</span>
+            </span>
+            <span>
+              أنت تتصفح الآن في وضع المعاينة:{' '}
+              <strong className="text-amber-300 font-extrabold">{impersonatedSellerName}</strong>
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setImpersonatedSellerName(null);
+              setCurrentRole('admin');
+            }}
+            className="px-3 py-1 rounded-xl bg-white text-purple-950 hover:bg-amber-300 font-black text-[11px] flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
+          >
+            <span>العودة للوحة الأدمن</span>
+          </button>
+        </div>
+      )}
+
+      {currentRole !== 'admin' && impersonatedSupplierName && (
+        <div className="bg-gradient-to-r from-amber-800 via-orange-900 to-slate-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-amber-500/40">
+          <div className="flex items-center gap-2">
+            <span className="bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide flex items-center gap-1">
+              <Boxes className="w-3 h-3 text-amber-200" />
+              <span>معاينة المورد</span>
+            </span>
+            <span>
+              أنت تتصفح الآن حساب المورد:{' '}
+              <strong className="text-amber-300 font-extrabold">{impersonatedSupplierName}</strong>
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setImpersonatedSupplierName(null);
+              setCurrentRole('admin');
+            }}
+            className="px-3 py-1 rounded-xl bg-white text-amber-950 hover:bg-amber-300 font-black text-[11px] flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
+          >
+            <span>العودة للوحة الأدمن</span>
+          </button>
+        </div>
+      )}
+
+      {currentRole !== 'admin' && impersonatedConfirmerName && (
+        <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-emerald-500/40">
+          <div className="flex items-center gap-2">
+            <span className="bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide flex items-center gap-1">
+              <Headphones className="w-3 h-3 text-emerald-200" />
+              <span>معاينة المؤكد</span>
+            </span>
+            <span>
+              أنت تتصفح الآن واجهة مؤكد الطلبيات:{' '}
+              <strong className="text-emerald-300 font-extrabold">{impersonatedConfirmerName}</strong>
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setImpersonatedConfirmerName(null);
+              setCurrentRole('admin');
+            }}
+            className="px-3 py-1 rounded-xl bg-white text-emerald-950 hover:bg-emerald-300 font-black text-[11px] flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
+          >
+            <span>العودة للوحة الأدمن</span>
+          </button>
+        </div>
+      )}
+
+      {/* Main View rendering based on currentRole */}
+      <main className="flex-1 overflow-hidden flex flex-col">
+        {currentRole === 'admin' && (
+          <AdminDashboard
+            onShowToast={showToast}
+            onSwitchToSellerDashboard={(seller) => {
+              setImpersonatedSellerName(`${seller.fullName} (${seller.storeName})`);
+              setCurrentRole('reseller');
+              setActiveTab('accueil');
+            }}
+            onImpersonateSupplier={handleImpersonateSupplier}
+            onSwitchToConfirmerDashboard={(confirmer) => {
+              setImpersonatedConfirmerName(confirmer?.fullName || 'مؤكد الطلبيات');
+              setCurrentRole('confirmer');
+            }}
+          />
+        )}
+
+        {currentRole === 'confirmer' && (
+          <ConfirmerDashboard onShowToast={showToast} />
+        )}
+
+        {currentRole === 'warehouse' && (
+          user?.approvalStatus !== 'APPROVED' && !impersonatedSupplierName ? (
+            <PendingSellerScreen
+              onLogout={handleLogout}
+              onGoToLanding={() => setViewMode('landing')}
+            />
+          ) : (
+            <WarehouseDashboard onShowToast={showToast} />
+          )
+        )}
+
+        {currentRole === 'reseller' && (
+          user?.approvalStatus !== 'APPROVED' && !impersonatedSellerName ? (
+            <PendingSellerScreen
+              onLogout={handleLogout}
+              onGoToLanding={() => setViewMode('landing')}
+            />
+          ) : (
+            <>
+              {activeTab === 'accueil' && (
+              <AccueilTab
+                onOpenProduct={(p) => setSelectedProduct(p)}
+                onNavigateToCatalog={() => setActiveTab('produits')}
+                onOpenWallet={() => setActiveTab('wallet')}
+                onOpenGamification={() => setIsGamificationOpen(true)}
+                onGoToOrders={() => setActiveTab('commandes')}
+                onOpenNotifications={() => setIsNotificationsOpen(true)}
+              />
+            )}
+
+            {activeTab === 'produits' && (
+              <ProduitsTab
+                onOpenProduct={(p) => setSelectedProduct(p)}
+                onOpenNewOrderForProduct={(p) => handleOpenNewOrder(p)}
+                onOpenShareModal={(p) => setShareModalProduct(p)}
+                onOpenSyncToStore={(p) => setSyncModalProduct(p)}
+                onOpenStoreManager={() => setIsStoresManagerOpen(true)}
+              />
+            )}
+
+            {activeTab === 'marketed' && (
+              <MarketedProductsTab
+                onOpenProduct={(p) => setSelectedProduct(p)}
+                onOpenNewOrderForProduct={(p) => handleOpenNewOrder(p)}
+                onOpenShareModal={(p) => setShareModalProduct(p)}
+                onShowToast={showToast}
+                onNavigateTab={(tab) => setActiveTab(tab as any)}
+              />
+            )}
+
+            {activeTab === 'commandes' && <CommandesTab />}
+
+            {activeTab === 'wallet' && <WalletTab onShowToast={showToast} />}
+
+            {activeTab === 'analytics' && <AnalyticsTab />}
+
+            {activeTab === 'marketing' && (
+              <MarketingTab
+                initialProduct={prefilledOrderProduct}
+                onShowToast={showToast}
+                onReturnToOrder={(product) => handleOpenNewOrder(product)}
+              />
+            )}
+
+            {activeTab === 'profil' && (
+              <ProfilTab
+                onOpenGamification={() => setIsGamificationOpen(true)}
+                onShowToast={showToast}
+                onLogout={handleLogout}
+              />
+            )}
+            </>
+          )
+        )}
+      </main>
+
+      {/* Reseller Floating CTA & Mobile Navigation Bar */}
+      {currentRole === 'reseller' && (user?.approvalStatus === 'APPROVED' || impersonatedSellerName) && (
+        <>
+          <button
+            onClick={() => handleOpenNewOrder()}
+            className="fixed bottom-20 end-5 z-30 p-3.5 rounded-full bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-extrabold shadow-2xl flex items-center gap-2 border-2 border-white/20 transition duration-200"
+            title="إنشاء طلبية جديدة"
+          >
+            <Zap className="w-5 h-5 fill-current" />
+            <span className="hidden sm:inline text-xs">طلب جديد</span>
+          </button>
+
+          <nav className="px-2 py-2 bg-white/95 dark:bg-slate-900/95 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-around sticky bottom-0 z-30 backdrop-blur-md shadow-lg">
+            {[
+              { id: 'accueil', label: t('tab.home'), icon: Home },
+              { id: 'produits', label: t('tab.products'), icon: Layers },
+              { id: 'marketed', label: t('tab.links', 'الروابط'), icon: LinkIcon },
+              { id: 'commandes', label: t('tab.orders'), icon: Package, badge: pendingLinkOrdersCount },
+              { id: 'wallet', label: t('tab.wallet'), icon: Wallet },
+              { id: 'profil', label: t('tab.profile'), icon: User },
+            ].map((tab) => {
+              const IconComponent = tab.icon;
+              const isActive = activeTab === tab.id;
+              const badgeCount = tab.badge || 0;
+
+              return (
+                <button
+                  key={tab.id}
+                  id={`nav-tab-${tab.id}`}
+                  onClick={() => setActiveTab(tab.id as TabType)}
+                  className={`flex flex-col items-center gap-1 py-1 px-3 rounded-2xl transition relative ${
+                    isActive
+                      ? 'text-violet-600 dark:text-violet-400 font-extrabold scale-105'
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-medium'
+                  }`}
+                >
+                  <div className="relative flex items-center justify-center">
+                    <IconComponent className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
+                    {badgeCount > 0 && (
+                      <span className="absolute -top-2 -end-2.5 px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[9px] font-black leading-none animate-bounce shadow-md border-2 border-white dark:border-slate-900 flex items-center justify-center min-w-[18px] min-h-[18px]">
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] tracking-tight">{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </>
+      )}
+
+      {/* Modals */}
+      {selectedProduct && (
+        <ProductDetailModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onOrderNow={handleOrderFromDetail}
+          onGenerateAiCopy={handleGenerateAiCopyFromDetail}
+          onShowToast={showToast}
+          onOpenSyncToStore={(p) => setSyncModalProduct(p)}
+        />
+      )}
+
+      {syncModalProduct && (
+        <ExternalStoreSyncModal
+          product={syncModalProduct}
+          onClose={() => setSyncModalProduct(null)}
+          onOpenStoreManager={() => setIsStoresManagerOpen(true)}
+          onShowToast={showToast}
+        />
+      )}
+
+      {isStoresManagerOpen && (
+        <StoresManagementModal
+          onClose={() => setIsStoresManagerOpen(false)}
+          onShowToast={showToast}
+          onOrdersPulled={(count) => {
+            showToast(`🎉 تم سحب ${count} طلبية واردة من المتاجر بنجاح!`, 'success');
+          }}
+        />
+      )}
+
+      {shareModalProduct && (
+        <ShareProductModal
+          product={shareModalProduct}
+          onClose={() => setShareModalProduct(null)}
+          onShowToast={showToast}
+          onPreviewCustomerView={(product, linkId) => {
+            setShareModalProduct(null);
+            setCustomerSharedProduct(product);
+            const url = new URL(window.location.href);
+            url.searchParams.set('share', product.id);
+            if (linkId) {
+              url.searchParams.set('linkId', linkId);
+            }
+            window.history.pushState({}, '', url.toString());
+          }}
+        />
+      )}
+
+      {isNewOrderModalOpen && (
+        <NewOrderModal
+          initialProduct={prefilledOrderProduct}
+          onClose={() => setIsNewOrderModalOpen(false)}
+          onShowToast={showToast}
+        />
+      )}
+
+      {isNotificationsOpen && (
+        <NotificationsModal
+          role={currentRole === 'admin' ? 'admin' : 'seller'}
+          onClose={() => setIsNotificationsOpen(false)}
+        />
+      )}
+
+      {isGamificationOpen && (
+        <GamificationModal onClose={() => setIsGamificationOpen(false)} />
+      )}
+
+      {isDevToolsOpen && (
+        <DevToolsDrawer
+          onClose={() => setIsDevToolsOpen(false)}
+          onShowToast={showToast}
+        />
+      )}
+
+      {/* Floating Toast Alerts */}
+      <Toast toast={toast} onDismiss={() => setToast(null)} />
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <AuthProvider>
+        <OrderProvider>
+          <CategoryProvider>
+            <MobileDeviceFrame>
+              <AppContent />
+            </MobileDeviceFrame>
+          </CategoryProvider>
+        </OrderProvider>
+      </AuthProvider>
+    </LanguageProvider>
+  );
+}
