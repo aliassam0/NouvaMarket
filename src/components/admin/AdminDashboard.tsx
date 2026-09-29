@@ -65,6 +65,8 @@ import {
   ChevronRight,
   ChevronLeft,
   Menu,
+  Boxes,
+  BarChart3,
 } from 'lucide-react';
 import { AdminAiProviderSettings } from './AdminAiProviderSettings';
 import { ProductUrlImportModal } from '../common/ProductUrlImportModal';
@@ -134,6 +136,17 @@ import {
 import { NotificationsModal } from '../tabs/NotificationsModal';
 import { AdminConfirmersAuditTab } from './AdminConfirmersAuditTab';
 import { AdminVerticalSidebar } from './AdminVerticalSidebar';
+import {
+  getStoredInboundRequests,
+  receiveAndInspectInboundStock,
+} from '../../lib/inboundStockHelper';
+import { InboundStockRequest } from '../../types';
+import { PickingPackingModal } from '../warehouse/PickingPackingModal';
+import { CourierManifestModal } from '../warehouse/CourierManifestModal';
+import { CodReconciliationModal } from '../warehouse/CodReconciliationModal';
+import { ReturnsQCModal } from '../warehouse/ReturnsQCModal';
+import { CourierAnalyticsModal } from '../warehouse/CourierAnalyticsModal';
+import { OrderAuditTimeline } from '../common/OrderAuditTimeline';
 
 interface AdminDashboardProps {
   onShowToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
@@ -145,6 +158,7 @@ interface AdminDashboardProps {
 // ---------------------- TYPES & INITIAL DATA ----------------------
 
 type AdminTabKey =
+  | 'orders'
   | 'products'
   | 'approvals'
   | 'sellers'
@@ -233,9 +247,127 @@ export function AdminDashboard({
   onImpersonateSupplier,
   onSwitchToConfirmerDashboard,
 }: AdminDashboardProps) {
-  const { orders, confirmAndShipOrder, updateOrder } = useOrders();
+  const { orders, confirmAndShipOrder, updateOrder, updateOrderStatus, deleteOrder } = useOrders();
   const { switchUser } = useAuth();
   const [activeAdminTab, setActiveAdminTab] = useState<AdminTabKey>('products');
+
+  // Admin Orders Pipeline State (Full Authority)
+  const [adminOrderSearchTerm, setAdminOrderSearchTerm] = useState('');
+  const [adminOrderFilterStatus, setAdminOrderFilterStatus] = useState<
+    'ALL' | 'LINK_ORDER' | 'REVIEW' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'FAILED'
+  >('ALL');
+  const [adminOrderWilayaFilter, setAdminOrderWilayaFilter] = useState('ALL');
+
+  const adminLinkCount = useMemo(() => orders.filter((o) => o.status === 'LINK_ORDER').length, [orders]);
+  const adminReviewCount = useMemo(
+    () =>
+      orders.filter(
+        (o) =>
+          o.status === 'PENDING' ||
+          (!o.adminConfirmed &&
+            o.status !== 'LINK_ORDER' &&
+            o.status !== 'CONFIRMED' &&
+            o.status !== 'PROCESSING' &&
+            o.status !== 'SHIPPED' &&
+            o.status !== 'DELIVERED' &&
+            o.status !== 'FAILED' &&
+            o.status !== 'CANCELLED' &&
+            o.situation !== 'Confirmé' &&
+            o.situation !== 'EnPréparation')
+      ).length,
+    [orders]
+  );
+  const adminConfirmedCount = useMemo(
+    () =>
+      orders.filter(
+        (o) =>
+          (o.status === 'CONFIRMED' || o.situation === 'Confirmé') &&
+          o.status !== 'PROCESSING' &&
+          o.status !== 'SHIPPED' &&
+          o.status !== 'DELIVERED'
+      ).length,
+    [orders]
+  );
+  const adminProcessingCount = useMemo(
+    () =>
+      orders.filter(
+        (o) =>
+          (o.status === 'PROCESSING' || o.situation === 'EnPréparation') &&
+          o.status !== 'SHIPPED' &&
+          o.status !== 'DELIVERED'
+      ).length,
+    [orders]
+  );
+  const adminShippedCount = useMemo(() => orders.filter((o) => o.status === 'SHIPPED').length, [orders]);
+  const adminDeliveredCount = useMemo(() => orders.filter((o) => o.status === 'DELIVERED').length, [orders]);
+  const adminFailedCount = useMemo(
+    () => orders.filter((o) => o.status === 'FAILED' || o.status === 'CANCELLED' || o.situation === 'Retour').length,
+    [orders]
+  );
+
+  const filteredAdminOrders = useMemo(() => {
+    return orders.filter((o) => {
+      if (adminOrderSearchTerm.trim()) {
+        const term = adminOrderSearchTerm.toLowerCase();
+        const matches =
+          o.id.toLowerCase().includes(term) ||
+          o.customerName?.toLowerCase().includes(term) ||
+          o.phone?.includes(term) ||
+          o.wilaya?.toLowerCase().includes(term) ||
+          o.trackingCode?.toLowerCase().includes(term) ||
+          o.resellerName?.toLowerCase().includes(term) ||
+          o.resellerStoreName?.toLowerCase().includes(term) ||
+          o.assignedConfirmerName?.toLowerCase().includes(term);
+        if (!matches) return false;
+      }
+
+      if (adminOrderWilayaFilter !== 'ALL' && o.wilaya !== adminOrderWilayaFilter) {
+        return false;
+      }
+
+      if (adminOrderFilterStatus === 'ALL') return true;
+      if (adminOrderFilterStatus === 'LINK_ORDER') return o.status === 'LINK_ORDER';
+      if (adminOrderFilterStatus === 'REVIEW') {
+        return (
+          o.status === 'PENDING' ||
+          (!o.adminConfirmed &&
+            o.status !== 'LINK_ORDER' &&
+            o.status !== 'CONFIRMED' &&
+            o.status !== 'PROCESSING' &&
+            o.status !== 'SHIPPED' &&
+            o.status !== 'DELIVERED' &&
+            o.status !== 'FAILED' &&
+            o.status !== 'CANCELLED' &&
+            o.situation !== 'Confirmé' &&
+            o.situation !== 'EnPréparation')
+        );
+      }
+      if (adminOrderFilterStatus === 'CONFIRMED') {
+        return (
+          (o.status === 'CONFIRMED' || o.situation === 'Confirmé') &&
+          o.status !== 'PROCESSING' &&
+          o.status !== 'SHIPPED' &&
+          o.status !== 'DELIVERED'
+        );
+      }
+      if (adminOrderFilterStatus === 'PROCESSING') {
+        return (
+          (o.status === 'PROCESSING' || o.situation === 'EnPréparation' || (o.adminConfirmed && o.status !== 'SHIPPED' && o.status !== 'DELIVERED' && o.status !== 'FAILED')) &&
+          o.status !== 'SHIPPED' &&
+          o.status !== 'DELIVERED'
+        );
+      }
+      if (adminOrderFilterStatus === 'SHIPPED') return o.status === 'SHIPPED';
+      if (adminOrderFilterStatus === 'DELIVERED') return o.status === 'DELIVERED';
+      if (adminOrderFilterStatus === 'FAILED') return o.status === 'FAILED' || o.status === 'CANCELLED' || o.situation === 'Retour';
+      return true;
+    });
+  }, [orders, adminOrderSearchTerm, adminOrderFilterStatus, adminOrderWilayaFilter]);
+
+  const handleAdminChangeStatus = (orderId: string, newStatus: string) => {
+    updateOrderStatus(orderId, newStatus as any);
+    onShowToast(`⚡ تم تحديث حالة الطلبية #${orderId} إلى "${newStatus}" بنجاح!`, 'success');
+  };
 
   // Vertical Sidebar State
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
@@ -269,6 +401,7 @@ export function AdminDashboard({
 
   const getCurrentTabTitle = (tab: AdminTabKey) => {
     switch (tab) {
+      case 'orders': return 'إدارة ومزامنة الطلبيات الموحدة (التحكم الكامل)';
       case 'approvals': return 'طلبات الانضمام والاعتماد الفوري';
       case 'products': return 'كتالوج وإدارة المنتجات';
       case 'sellers': return 'شبكة البائعين والمسوقين';
@@ -290,6 +423,7 @@ export function AdminDashboard({
 
   const getCurrentTabSubtitle = (tab: AdminTabKey) => {
     switch (tab) {
+      case 'orders': return 'المزامنة الحية لجميع مراحل الطلبات: من الروابط والمراجعة إلى التجهيز والشحن والتسليم مع كامل الصلاحيات';
       case 'approvals': return 'مراجعة واعتماد طلبات تسجيل البائعين والموردين الجدد في الوقت الفعلي';
       case 'products': return 'تعديل الأسعار والكميات والمخزون الحي والصور واستيراد المنتجات';
       case 'sellers': return 'إدارة شبكة المسوقين، رتبهم، معلومات الدفع وتعديل كلمات المرور';
@@ -511,15 +645,34 @@ export function AdminDashboard({
     onShowToast('✔ تم تحديث بيانات الدخول بنجاح! سيتم إلزام الحساب باستعمال كلمة المرور والبريد الأخيرين للدخول.', 'success');
     setAdminPasswordResetUser(null);
   };
-  
+
   // Settlement Form Modal State
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
   const [selectedSupplierForSettlement, setSelectedSupplierForSettlement] = useState<SupplierProfile | null>(null);
   const [settlementAmount, setSettlementAmount] = useState(10000);
   const [settlementMethod, setSettlementMethod] = useState<'CCP' | 'BARIDIMOB' | 'BANK' | 'CASH'>('CCP');
   const [settlementNote, setSettlementNote] = useState('');
+  
+  // Inbound Stock Deliveries to Central Warehouse State in Admin HQ
+  const [adminInboundRequests, setAdminInboundRequests] = useState<InboundStockRequest[]>(() => getStoredInboundRequests());
+  const [adminInboundFilter, setAdminInboundFilter] = useState<'ALL' | 'IN_TRANSIT' | 'RECEIVED'>('ALL');
+  const [isAdminPickingModalOpen, setIsAdminPickingModalOpen] = useState(false);
+  const [isAdminManifestModalOpen, setIsAdminManifestModalOpen] = useState(false);
+  const [isAdminCodReconcileModalOpen, setIsAdminCodReconcileModalOpen] = useState(false);
+  const [isAdminReturnsQCModalOpen, setIsAdminReturnsQCModalOpen] = useState(false);
+  const [isAdminCourierAnalyticsModalOpen, setIsAdminCourierAnalyticsModalOpen] = useState(false);
+  const [selectedTimelineOrder, setSelectedTimelineOrder] = useState<Order | null>(null);
+
+  useEffect(() => {
+    const handleInboundUpdate = () => {
+      setAdminInboundRequests(getStoredInboundRequests());
+    };
+    window.addEventListener('nouva_inbound_stock_updated', handleInboundUpdate);
+    return () => window.removeEventListener('nouva_inbound_stock_updated', handleInboundUpdate);
+  }, []);
 
   const handleUpdateSupplierStatus = (supplierId: string, status: 'APPROVED' | 'REJECTED' | 'SUSPENDED') => {
+
     const list = getStoredSuppliers();
     const idx = list.findIndex((s) => s.id === supplierId);
     if (idx !== -1) {
@@ -587,10 +740,15 @@ export function AdminDashboard({
       resellerFeePercent: Number(feeSettings.resellerFeePercent) || 0,
       defaultSupplierFeePercent: Number(feeSettings.supplierFeePercent) || 5,
       defaultResellerCommissionPercent: Number(feeSettings.resellerFeePercent) || 0,
+      pickAndPackFeeDzd: Number(feeSettings.pickAndPackFeeDzd ?? 100),
+      confirmerFeeDzd: Number(feeSettings.confirmerFeeDzd ?? 100),
     };
     saveStoredMarketplaceFees(normalized);
     setFeeSettings(normalized);
-    onShowToast(`✔ تم حفظ نسب العمولات: عمولة المورد ${normalized.supplierFeePercent}%، وعمولة المسوق ${normalized.resellerFeePercent}% بنجاح!`, 'success');
+    onShowToast(
+      `✔ تم حفظ إعدادات الرسوم: عمولة المورد ${normalized.supplierFeePercent}%، عمولة المسوق ${normalized.resellerFeePercent}%، رسوم التغليف ${normalized.pickAndPackFeeDzd} دج، وأتعاب المؤكد ${normalized.confirmerFeeDzd} دج/طرد بنجاح!`,
+      'success'
+    );
   };
 
   const handleCreateSettlementSubmit = (e: React.FormEvent) => {
@@ -876,9 +1034,9 @@ export function AdminDashboard({
     initialBalanceDzd: 0,
   });
 
-  // 4. Wallet & Withdrawals & Admin Treasury State
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(getStoredWithdrawals);
   const [withdrawalFilter, setWithdrawalFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
+  const [withdrawalRoleFilter, setWithdrawalRoleFilter] = useState<'ALL' | 'SELLER' | 'CONFIRMER' | 'PACKER' | 'SUPPLIER'>('ALL');
   const [rejectModalWithdrawalId, setRejectModalWithdrawalId] = useState<string | null>(null);
   const [rejectionReasonText, setRejectionReasonText] = useState('');
   const [adminWalletSubTab, setAdminWalletSubTab] = useState<'SELLER_WITHDRAWALS' | 'SUPPLIER_SETTLEMENTS'>('SELLER_WITHDRAWALS');
@@ -1747,6 +1905,7 @@ export function AdminDashboard({
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
         counts={{
           totalPendingApprovals,
+          ordersCount: orders.length,
           productsCount: products.length,
           sellersCount: sellers.length,
           pendingSellersCount: pendingSellers.length,
@@ -1911,8 +2070,276 @@ export function AdminDashboard({
         roleName="الأدمن والإدارة"
       />
 
-      {/* ===================== PENDING APPROVALS CENTRAL HUB ===================== */}
-            {/* ===================== TAB: APPROVALS (PENDING APPROVALS CENTRAL HUB) ===================== */}
+      {/* ===================== TAB: ORDERS (CENTRAL ORDERS PIPELINE & FULL AUTHORITY) ===================== */}
+      {activeAdminTab === 'orders' && (
+        <div className="space-y-4 animate-fadeIn">
+          {/* Header Banner */}
+          <div className="p-4 bg-gradient-to-r from-violet-600/10 via-purple-600/10 to-indigo-600/10 border border-violet-200 dark:border-violet-900 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-violet-600 text-white shadow-xs">
+                <Package className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-black text-sm sm:text-base text-slate-900 dark:text-white">
+                    إدارة ومزامنة الطلبيات الموحدة (التحكم الكامل للأدمن)
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-black flex items-center gap-1 border border-emerald-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    مباشر ولحظي
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                  تحكم شامل في جميع مراحل الطلبات: من الروابط والمراجعة، والتأكيد الهاتفي، إلى التجهيز والشحن والتسليم مع كامل الصلاحيات الإدارية.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-700 text-xs font-bold text-violet-800 dark:text-violet-300 flex items-center gap-1.5 shadow-2xs">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>صلاحية كاملة (Full Control)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Pipeline Horizontal Status Tabs (8 Tabs) */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {[
+              { id: 'ALL', labelAr: 'الكل', count: orders.length, color: 'bg-slate-100 text-slate-800' },
+              { id: 'LINK_ORDER', labelAr: '🔗 طلب من الرابط', count: adminLinkCount, color: 'bg-amber-100 text-amber-900 font-black' },
+              { id: 'REVIEW', labelAr: '🔍 قيد المراجعة', count: adminReviewCount, color: 'bg-amber-100 text-amber-800' },
+              { id: 'CONFIRMED', labelAr: '📞 تم التأكيد', count: adminConfirmedCount, color: 'bg-blue-100 text-blue-800' },
+              { id: 'PROCESSING', labelAr: '📦 قيد التحضير', count: adminProcessingCount, color: 'bg-purple-100 text-purple-800' },
+              { id: 'SHIPPED', labelAr: '🚚 قيد التوصيل', count: adminShippedCount, color: 'bg-indigo-100 text-indigo-800' },
+              { id: 'DELIVERED', labelAr: '🎉 تم التسليم', count: adminDeliveredCount, color: 'bg-emerald-100 text-emerald-800' },
+              { id: 'FAILED', labelAr: '❌ فشل التسليم / مرتجع', count: adminFailedCount, color: 'bg-rose-100 text-rose-800' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setAdminOrderFilterStatus(tab.id as any)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-2 cursor-pointer shadow-2xs ${
+                  adminOrderFilterStatus === tab.id
+                    ? 'bg-violet-600 text-white shadow-xs scale-102 ring-2 ring-violet-400/40'
+                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                }`}
+              >
+                <span>{tab.labelAr}</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                    adminOrderFilterStatus === tab.id
+                      ? 'bg-white/20 text-white'
+                      : tab.color
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Search & Wilaya Filter Bar */}
+          <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+            <div className="flex-1 min-w-[240px] relative">
+              <Search className="w-4 h-4 text-slate-400 absolute start-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={adminOrderSearchTerm}
+                onChange={(e) => setAdminOrderSearchTerm(e.target.value)}
+                placeholder="بحث برقم الطلبية، اسم الزبون، الهاتف، كود التتبع، أو اسم المسوق..."
+                className="w-full ps-9 pe-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium placeholder-slate-400 focus:outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500">الولاية:</span>
+              <select
+                value={adminOrderWilayaFilter}
+                onChange={(e) => setAdminOrderWilayaFilter(e.target.value)}
+                className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-violet-500 cursor-pointer"
+              >
+                <option value="ALL">جميع الولايات (58 ولاية)</option>
+                {Array.from(new Set(orders.map((o) => o.wilaya).filter(Boolean))).map((w) => (
+                  <option key={w} value={w}>
+                    {w}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Orders List */}
+          {filteredAdminOrders.length === 0 ? (
+            <div className="p-12 text-center text-slate-400 text-xs bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2">
+              <Package className="w-8 h-8 text-slate-300 mx-auto" />
+              <p>لا توجد طلبات تطابق هذه التصفية حالياً.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredAdminOrders.map((order, idx) => {
+                const orderDate = order.createdAt ? new Date(order.createdAt).toLocaleDateString('ar-DZ') : '-';
+                const totalQty = order.items.reduce((acc, it) => acc + (it.quantity || 1), 0);
+
+                return (
+                  <div
+                    key={`${order.id || 'adm-ord'}-${idx}`}
+                    className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3 transition hover:border-violet-300 dark:hover:border-violet-800"
+                  >
+                    {/* Header: ID, Date, Quick Status Changer, Timeline Button */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-black text-sm text-slate-900 dark:text-white">
+                          #{order.id}
+                        </span>
+
+                        {/* Direct Status Switcher (Full Admin Authority) */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-slate-400 font-bold">الحالة:</span>
+                          <select
+                            value={order.status}
+                            onChange={(e) => handleAdminChangeStatus(order.id, e.target.value)}
+                            className="px-2.5 py-1 rounded-lg border-2 border-violet-400 dark:border-violet-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-black text-xs cursor-pointer focus:ring-2 focus:ring-violet-500 shadow-xs"
+                          >
+                            <option value="LINK_ORDER">🔗 طلب من الرابط</option>
+                            <option value="PENDING">🔍 قيد المراجعة</option>
+                            <option value="CONFIRMED">📞 تم التأكيد</option>
+                            <option value="PROCESSING">📦 قيد التحضير</option>
+                            <option value="SHIPPED">🚚 قيد التوصيل</option>
+                            <option value="DELIVERED">🎉 تم التسليم</option>
+                            <option value="CANCELLED">❌ ملغاة</option>
+                            <option value="FAILED">⚠️ فشل التسليم</option>
+                          </select>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTimelineOrder(order)}
+                          className="px-2 py-0.5 rounded-md bg-violet-50 hover:bg-violet-100 dark:bg-violet-950/60 text-violet-800 dark:text-violet-300 border border-violet-200 dark:border-violet-800 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
+                          title="عرض المسار اللحظي والمزامنة عبر كافة الداشبوردات"
+                        >
+                          <Clock className="w-3 h-3 text-violet-600 dark:text-violet-400" />
+                          <span>المسار اللحظي ⚡</span>
+                        </button>
+                      </div>
+
+                      <div className="text-end font-mono text-xs">
+                        <span className="text-[10px] text-slate-400 block">تاريخ الإنشاء:</span>
+                        <span className="font-bold text-slate-600 dark:text-slate-300 text-[11px]">
+                          {orderDate}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Customer & Address Details */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">الزبون:</span>
+                        <span className="font-bold text-slate-900 dark:text-white block">
+                          {order.customerName}
+                        </span>
+                        <a
+                          href={`tel:${order.phone}`}
+                          className="font-mono text-violet-600 dark:text-violet-400 hover:underline font-bold text-[11px] inline-flex items-center gap-1 mt-0.5"
+                          title="اتصال هاتفي مباشر"
+                        >
+                          <Smartphone className="w-3 h-3" />
+                          {order.phone}
+                        </a>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">العنوان والوجهة:</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200 block">
+                          {order.wilaya} {order.commune ? `• ${order.commune}` : ''}
+                        </span>
+                        <span className="text-[11px] text-slate-500 block truncate">
+                          {order.address || 'بدون تفاصيل عنوان'}
+                        </span>
+                      </div>
+
+                      <div className="sm:text-end">
+                        <span className="text-[10px] text-slate-400 block">المسوق وفريق التأكيد:</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200 block">
+                          {order.resellerName || order.resellerStoreName || 'مسوق المنصة'}
+                        </span>
+                        <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium block">
+                          {order.assignedConfirmerName ? `المؤكد: ${order.assignedConfirmerName}` : 'لم يُعيّن مؤكد'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Products List */}
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl space-y-1.5 text-xs">
+                      <span className="text-[10px] text-slate-400 font-bold block mb-1">
+                        المنتجات والكميات ({totalQty} قطع):
+                      </span>
+                      {order.items.map((item, itemIdx) => (
+                        <div key={itemIdx} className="flex justify-between items-center font-bold">
+                          <span className="text-slate-800 dark:text-slate-200">
+                            • {item.productName}{' '}
+                            <span className="text-purple-500 font-medium text-[11px]">
+                              ({item.variantSize || 'قياسي'} / {item.variantColor || 'افتراضي'})
+                            </span>
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono bg-white dark:bg-slate-900 px-2 py-0.5 rounded border text-[11px]">
+                              × {item.quantity}
+                            </span>
+                            <span className="font-mono text-slate-700 dark:text-slate-300 text-xs font-bold">
+                              {((item.sellingPrice || 0) * (item.quantity || 1)).toLocaleString()} دج
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Financial Summary & Courier Tracking */}
+                    <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/70 flex flex-wrap items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-1 font-bold text-slate-800 dark:text-slate-200">
+                          <span>المبلغ الإجمالي:</span>
+                          <span className="font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">
+                            {(order.totalAmount || 0).toLocaleString()} دج
+                          </span>
+                        </div>
+
+                        {order.trackingCode && (
+                          <div className="flex items-center gap-1 font-bold">
+                            <Truck className="w-3.5 h-3.5 text-indigo-500" />
+                            <span className="text-[11px] text-slate-500">التتبع:</span>
+                            <span className="font-mono text-xs font-black text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800">
+                              {order.trackingCode}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`هل أنت متأكد من حذف الطلبية #${order.id} نهائياً؟`)) {
+                              deleteOrder(order.id);
+                              onShowToast(`🗑️ تم حذف الطلبية #${order.id} بنجاح`, 'info');
+                            }
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 font-bold text-xs flex items-center gap-1 transition cursor-pointer"
+                          title="حذف الطلبية بصلاحية الأدمن"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>حذف</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===================== TAB: APPROVALS (PENDING APPROVALS CENTRAL HUB) ===================== */}
       {activeAdminTab === 'approvals' && (
         <div id="pending-approvals-hub" className="rounded-2xl border transition-all duration-300 overflow-hidden shadow-md bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800">
         <div className={`p-4 ${
@@ -3303,9 +3730,9 @@ export function AdminDashboard({
                   <div>
                     <h4 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
                       <Users className="w-4 h-4 text-purple-600" />
-                      <span>قائمة طلبات سحب أرباح البائعين والمسوّقين (Seller Payout Requests)</span>
+                      <span>قائمة طلبات سحب الأرباح والمستحقات (البائعين، مؤكدي الطلبيات، وعمال المستودع)</span>
                     </h4>
-                    <p className="text-xs text-slate-500 font-medium">مراجعة وصرف أو رفض طلبات السحب المستلمة من لوحة البائع</p>
+                    <p className="text-xs text-slate-500 font-medium">مراجعة وتحويل المستحقات والأتعاب لحسابات المستفيدين (BaridiMob / CCP / نقداً) وتوثيق أرقام وصولات التحويل</p>
                   </div>
 
                   {/* Filter Pills & Reset Action */}
@@ -3344,158 +3771,222 @@ export function AdminDashboard({
                   </div>
                 </div>
 
-                {withdrawals.filter((w) => withdrawalFilter === 'ALL' || w.status === withdrawalFilter).length === 0 ? (
-                  <div className="p-8 text-center rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 text-xs font-bold">
-                    لا توجد طلبات سحب مطابقة لهذا الفلتر حالياً.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {withdrawals
-                      .filter((w) => withdrawalFilter === 'ALL' || w.status === withdrawalFilter)
-                      .map((w) => (
-                        <div
-                          key={w.id}
-                          className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3 text-xs hover:border-purple-300 dark:hover:border-purple-800 transition"
-                        >
-                          <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-purple-600 dark:text-purple-400 font-black">{w.id}</span>
-                              <button
-                                onClick={() => {
-                                  const sellerObj = sellers.find(
-                                    (s) => s.fullName === w.sellerName || s.storeName === w.storeName
-                                  ) || {
-                                    id: w.sellerId || 'u-seller-' + w.id,
-                                    fullName: w.sellerName,
-                                    storeName: w.storeName,
-                                    phone: w.phone || '0550000000',
-                                    wilaya: '16 - الجزائر',
-                                    rank: 'BRONZE',
-                                    rankAr: 'المستوى البرونزي',
-                                    rankFr: 'Niveau Bronze',
-                                    kycStatus: 'APPROVED',
-                                    avatarUrl:
-                                      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250',
-                                    totalOrdersCount: 10,
-                                    deliveredOrdersCount: 8,
-                                    totalEarnedDzd: w.amountDzd,
-                                    joinDate: '2026-01-01',
-                                  };
-                                  handleEnterSellerDashboard(sellerObj);
-                                }}
-                                className="text-slate-900 dark:text-white font-extrabold hover:text-purple-600 dark:hover:text-purple-400 cursor-pointer flex items-center gap-1 transition"
-                                title="اضغط للدخول إلى لوحة هذا البائع"
-                              >
-                                <span>{w.sellerName} ({w.storeName})</span>
-                                <Store className="w-3.5 h-3.5 text-violet-500" />
-                              </button>
-                            </div>
+                {/* Role Tabs for Withdrawals */}
+                <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 text-xs font-bold">
+                  <span className="text-[11px] text-slate-400 font-black px-2">تصنيف المستفيد:</span>
+                  {[
+                    { id: 'ALL' as const, label: `الكل (${withdrawals.length})` },
+                    { id: 'SELLER' as const, label: `🛒 البائعين (${withdrawals.filter((w) => !w.userType || w.userType === 'SELLER').length})` },
+                    { id: 'CONFIRMER' as const, label: `🎧 مؤكدو الطلبيات (${withdrawals.filter((w) => w.userType === 'CONFIRMER').length})` },
+                    { id: 'PACKER' as const, label: `📦 عمال المستودع (${withdrawals.filter((w) => w.userType === 'PACKER').length})` },
+                    { id: 'SUPPLIER' as const, label: `🏭 الموردين (${withdrawals.filter((w) => w.userType === 'SUPPLIER').length})` },
+                  ].map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => setWithdrawalRoleFilter(r.id)}
+                      className={`px-3 py-1.5 rounded-xl transition cursor-pointer text-xs ${
+                        withdrawalRoleFilter === r.id
+                          ? 'bg-purple-600 text-white shadow-xs font-black'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
 
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleZeroSingleWithdrawal(w.id)}
-                                disabled={w.amountDzd === 0}
-                                className={`px-2.5 py-1 rounded-xl text-[10px] font-black flex items-center gap-1 transition cursor-pointer ${
-                                  w.amountDzd === 0
-                                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-60'
-                                    : 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 hover:shadow-xs'
-                                }`}
-                                title="تصفير مبلغ هذا الطلب ليصبح 0 دج"
-                              >
-                                <RotateCcw className="w-3 h-3" />
-                                <span>تصفير المبلغ</span>
-                              </button>
+                {(() => {
+                  const filteredList = withdrawals.filter((w) => {
+                    if (withdrawalFilter !== 'ALL' && w.status !== withdrawalFilter) return false;
+                    if (withdrawalRoleFilter !== 'ALL') {
+                      const actualRole = w.userType || 'SELLER';
+                      if (actualRole !== withdrawalRoleFilter) return false;
+                    }
+                    return true;
+                  });
 
-                              <button
-                                onClick={() => handleDeleteSingleWithdrawal(w.id)}
-                                className="px-2.5 py-1 rounded-xl text-[10px] font-black flex items-center gap-1 transition cursor-pointer bg-slate-50 dark:bg-slate-800/60 text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-700 hover:bg-rose-100 hover:border-rose-300"
-                                title="حذف طلب السحب نهائياً من النظام"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                                <span>حذف</span>
-                              </button>
+                  if (filteredList.length === 0) {
+                    return (
+                      <div className="p-8 text-center rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 text-xs font-bold">
+                        لا توجد طلبات سحب مطابقة لهذا الفلتر حالياً.
+                      </div>
+                    );
+                  }
 
-                              <span
-                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
-                                  w.status === 'APPROVED'
-                                    ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
-                                    : w.status === 'PENDING'
-                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                                    : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                                }`}
-                              >
-                                {w.status === 'APPROVED' ? '✔ تم الصرف والتحويل' : w.status === 'PENDING' ? '⏳ بانتظار الصرف' : '✖ مرفوض ومسترجع'}
-                              </span>
-                            </div>
-                          </div>
+                  return (
+                    <div className="space-y-3">
+                      {filteredList.map((w) => {
+                        const isConfirmer = w.userType === 'CONFIRMER';
+                        const isPacker = w.userType === 'PACKER';
+                        const isSupplier = w.userType === 'SUPPLIER';
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl">
-                            <div>
-                              <span className="text-[10px] text-slate-400 block font-bold">المبلغ المطلوب:</span>
-                              <span className="font-black text-purple-600 dark:text-purple-400 text-sm font-mono">
-                                <MoneyText amount={w.amountDzd} />
-                              </span>
-                              <span className="text-[10px] text-slate-500 block mt-0.5">وسيلة السحب: <strong className="text-slate-800 dark:text-slate-200">{w.method}</strong></span>
-                            </div>
+                        return (
+                          <div
+                            key={w.id}
+                            className={`p-4 rounded-2xl bg-white dark:bg-slate-900 border shadow-xs space-y-3 text-xs transition ${
+                              isConfirmer
+                                ? 'border-blue-200 dark:border-blue-900/60 hover:border-blue-400'
+                                : isPacker
+                                ? 'border-amber-200 dark:border-amber-900/60 hover:border-amber-400'
+                                : isSupplier
+                                ? 'border-emerald-200 dark:border-emerald-900/60 hover:border-emerald-400'
+                                : 'border-slate-200/80 dark:border-slate-800 hover:border-purple-300 dark:hover:border-purple-800'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono text-purple-600 dark:text-purple-400 font-black">{w.id}</span>
+                                
+                                {/* Role Badge */}
+                                {isConfirmer ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 text-[10px] font-black flex items-center gap-1">
+                                    <PhoneCall className="w-3 h-3" />
+                                    <span>مؤكد طلبات هاتفية</span>
+                                  </span>
+                                ) : isPacker ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 text-[10px] font-black flex items-center gap-1">
+                                    <Boxes className="w-3 h-3" />
+                                    <span>عامل ومغلف المستودع</span>
+                                  </span>
+                                ) : isSupplier ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] font-black flex items-center gap-1">
+                                    <Building className="w-3 h-3" />
+                                    <span>مورد جملة</span>
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 text-[10px] font-black flex items-center gap-1">
+                                    <Store className="w-3 h-3" />
+                                    <span>بائع / مسوق</span>
+                                  </span>
+                                )}
 
-                            <div>
-                              <span className="text-[10px] text-slate-400 block font-bold">بيانات وتفاصيل الحساب:</span>
-                              <span className="font-mono font-bold text-slate-800 dark:text-slate-200 block text-xs">{w.accountDetails}</span>
-                              <span className="text-[10px] text-slate-400 block mt-0.5">الهاتف: {w.phone}</span>
-                            </div>
-
-                            <div>
-                              <span className="text-[10px] text-slate-400 block font-bold">تاريخ الطلب:</span>
-                              <span className="font-mono text-slate-700 dark:text-slate-300 text-xs block">{w.requestDate}</span>
-                              {w.proofReference && (
-                                <span className="text-[10px] text-purple-600 dark:text-purple-400 font-mono block mt-0.5">
-                                  رقم الإثبات: <strong>{w.proofReference}</strong>
+                                <span className="text-slate-900 dark:text-white font-extrabold flex items-center gap-1">
+                                  <span>{w.sellerName}</span>
+                                  {w.storeName && !isConfirmer && !isPacker && (
+                                    <span className="text-slate-400 text-[11px] font-normal">({w.storeName})</span>
+                                  )}
                                 </span>
-                              )}
-                              {w.rejectionReason && (
-                                <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium block mt-0.5">
-                                  سبب الرفض: <strong>{w.rejectionReason}</strong>
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {w.status === 'PENDING' && (
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                              <div className="w-full sm:w-auto flex items-center gap-2">
-                                <span className="text-[11px] text-slate-500 font-bold shrink-0">رقم إثبات التحويل (اختياري):</span>
-                                <input
-                                  type="text"
-                                  placeholder="مثال: CCP-TRANS-9812"
-                                  value={proofRefInput[w.id] || ''}
-                                  onChange={(e) => setProofRefInput({ ...proofRefInput, [w.id]: e.target.value })}
-                                  className="px-3 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono w-full sm:w-48"
-                                />
                               </div>
 
-                              <div className="flex justify-end gap-2 w-full sm:w-auto">
+                              <div className="flex items-center gap-2">
                                 <button
-                                  onClick={() => handleApproveWithdrawal(w.id)}
-                                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs cursor-pointer shadow-xs transition flex items-center gap-1.5"
+                                  onClick={() => handleZeroSingleWithdrawal(w.id)}
+                                  disabled={w.amountDzd === 0}
+                                  className={`px-2.5 py-1 rounded-xl text-[10px] font-black flex items-center gap-1 transition cursor-pointer ${
+                                    w.amountDzd === 0
+                                      ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-60'
+                                      : 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 hover:shadow-xs'
+                                  }`}
+                                  title="تصفير مبلغ هذا الطلب ليصبح 0 دج"
                                 >
-                                  <Check className="w-4 h-4" />
-                                  <span>✔ موافقة وصرف الرصيد</span>
+                                  <RotateCcw className="w-3 h-3" />
+                                  <span>تصفير المبلغ</span>
                                 </button>
 
                                 <button
-                                  onClick={() => setRejectModalWithdrawalId(w.id)}
-                                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs cursor-pointer shadow-xs transition flex items-center gap-1.5"
+                                  onClick={() => handleDeleteSingleWithdrawal(w.id)}
+                                  className="px-2.5 py-1 rounded-xl text-[10px] font-black flex items-center gap-1 transition cursor-pointer bg-slate-50 dark:bg-slate-800/60 text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-700 hover:bg-rose-100 hover:border-rose-300"
+                                  title="حذف طلب السحب نهائياً من النظام"
                                 >
-                                  <X className="w-4 h-4" />
-                                  <span>✖ رفض وإرجاع الرصيد</span>
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>حذف</span>
                                 </button>
+
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                                    w.status === 'APPROVED'
+                                      ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                                      : w.status === 'PENDING'
+                                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                      : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                                  }`}
+                                >
+                                  {w.status === 'APPROVED' ? '✔ تم الصرف والتحويل' : w.status === 'PENDING' ? '⏳ بانتظار الصرف' : '✖ مرفوض ومسترجع'}
+                                </span>
                               </div>
                             </div>
-                          )}
-                        </div>
-                      ))}
-                  </div>
-                )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl">
+                              <div>
+                                <span className="text-[10px] text-slate-400 block font-bold">المبلغ المطلوب:</span>
+                                <span className="font-black text-purple-600 dark:text-purple-400 text-sm font-mono">
+                                  <MoneyText amount={w.amountDzd} />
+                                </span>
+                                <span className="text-[10px] text-slate-500 block mt-0.5">
+                                  وسيلة السحب: <strong className="text-slate-800 dark:text-slate-200">{w.method === 'BARIDIMOB' ? '📱 BaridiMob' : w.method === 'CCP' ? '📮 حساب CCP' : w.method === 'CASH' ? '💵 نقداً باليد' : '🏛️ تحويل بنكي'}</strong>
+                                </span>
+                                {isConfirmer && (
+                                  <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 text-[10px] font-bold border border-blue-200 dark:border-blue-900/40">
+                                    🏛️ أتعاب تأكيد طلبات مسلّمة (على عاتق الإدارة 100%)
+                                  </span>
+                                )}
+                                {isPacker && (
+                                  <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 text-[10px] font-bold border border-amber-200 dark:border-amber-900/40">
+                                    📦 أتعاب تغليف طرود مسلّمة (على عاتق الإدارة 100%)
+                                  </span>
+                                )}
+                              </div>
+
+                              <div>
+                                <span className="text-[10px] text-slate-400 block font-bold">بيانات وتفاصيل الحساب:</span>
+                                <span className="font-mono font-bold text-slate-800 dark:text-slate-200 block text-xs">{w.accountDetails}</span>
+                                <span className="text-[10px] text-slate-400 block mt-0.5">الهاتف: <span className="font-mono text-slate-700 dark:text-slate-300">{w.phone}</span></span>
+                              </div>
+
+                              <div>
+                                <span className="text-[10px] text-slate-400 block font-bold">تاريخ الطلب:</span>
+                                <span className="font-mono text-slate-700 dark:text-slate-300 text-xs block">{w.requestDate}</span>
+                                {w.proofReference && (
+                                  <span className="text-[10px] text-purple-600 dark:text-purple-400 font-mono block mt-0.5">
+                                    رقم الإثبات / الوصل: <strong>{w.proofReference}</strong>
+                                  </span>
+                                )}
+                                {w.rejectionReason && (
+                                  <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium block mt-0.5">
+                                    سبب الرفض: <strong>{w.rejectionReason}</strong>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {w.status === 'PENDING' && (
+                              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <div className="w-full sm:w-auto flex items-center gap-2">
+                                  <span className="text-[11px] text-slate-500 font-bold shrink-0">رقم إثبات التحويل (وصل BaridiMob/CCP):</span>
+                                  <input
+                                    type="text"
+                                    placeholder="مثال: CCP-TRANS-9812 أو BaridiMob Tx"
+                                    value={proofRefInput[w.id] || ''}
+                                    onChange={(e) => setProofRefInput({ ...proofRefInput, [w.id]: e.target.value })}
+                                    className="px-3 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono w-full sm:w-60"
+                                  />
+                                </div>
+
+                                <div className="flex justify-end gap-2 w-full sm:w-auto">
+                                  <button
+                                    onClick={() => handleApproveWithdrawal(w.id)}
+                                    className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs cursor-pointer shadow-xs transition flex items-center gap-1.5"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                    <span>✔ تأكيد التحويل والصرف</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => setRejectModalWithdrawalId(w.id)}
+                                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs cursor-pointer shadow-xs transition flex items-center gap-1.5"
+                                  >
+                                    <X className="w-4 h-4" />
+                                    <span>✖ رفض وإرجاع الرصيد</span>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -3914,64 +4405,287 @@ export function AdminDashboard({
         </div>
       )}
 
-      {/* ---------------- 5. EDIT INVENTORY & CLEAR LOCATIONS (مسح المخزون والاماكن) ---------------- */}
+      {/* ---------------- 5. CENTRAL PLATFORM WAREHOUSE & INVENTORY MANAGEMENT ---------------- */}
       {activeAdminTab === 'inventory' && (
-        <div className="space-y-3">
-          <h3 className="text-xs font-extrabold text-slate-800 dark:text-white uppercase">
-            مسح المخزون، إخلاء أرفف المستودعات، والتحكم بالأماكن
-          </h3>
-
-          <div className="space-y-3">
-            {products.map((p, pIdx) => (
-              <div
-                key={`${p.id}-${pIdx}`}
-                className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3 text-xs"
-              >
-                <div className="flex justify-between items-center font-bold">
-                  <span className="text-slate-900 dark:text-white">{p.nameAr}</span>
-                  <span className="text-purple-600 dark:text-purple-400">
-                    مخزون: {p.variants.reduce((acc, v) => acc + v.stockCount, 0)} قطعة
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-400">موقع المنتج بالرف:</span>
-                  <input
-                    type="text"
-                    value={inventoryLocation[p.id] || 'المستودع الرئيسي - رف A1'}
-                    onChange={(e) =>
-                      setInventoryLocation({ ...inventoryLocation, [p.id]: e.target.value })
-                    }
-                    className="flex-1 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-mono text-[11px] border border-slate-200 dark:border-slate-700"
-                  />
-                  <button
-                    onClick={() => onShowToast('تم تحديث موقع الرف بنجاح!')}
-                    className="px-3 py-1.5 rounded-xl bg-purple-600 text-white font-bold text-[10px]"
-                  >
-                    حفظ الرف
-                  </button>
-                  <button
-                    onClick={() => handleClearBinLocation(p.id)}
-                    className="px-3 py-1.5 rounded-xl bg-amber-600 text-white font-bold text-[10px]"
-                  >
-                    مسح المكان والرف
-                  </button>
-                </div>
-
-                <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <button
-                    onClick={() => handleClearProductStock(p.id)}
-                    className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px] flex items-center gap-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>مسح / تصفير مخزون المنتج بالكامل</span>
-                  </button>
-                </div>
+        <div className="space-y-5">
+          {/* Header Banner */}
+          <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/30 rounded-3xl text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-2xl shrink-0 shadow-md shadow-indigo-600/30">
+                <WarehouseIcon className="w-5 h-5" />
               </div>
-            ))}
+              <div>
+                <h3 className="font-black text-base text-white">مستودع المنصة</h3>
+                <p className="text-slate-300 text-xs mt-0.5">
+                  إدارة المخزون واستقبال شحنات التوريد من الموردين وتغذية شبكة المسوقين.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <button
+                onClick={() => setIsAdminReturnsQCModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-rose-600/20"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>فحص جودة المرتجعات (QC)</span>
+              </button>
+
+              <button
+                onClick={() => setIsAdminCourierAnalyticsModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-blue-600/20"
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>معدلات التوصيل بالولايات</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  onShowToast('✔ تم تحديث ومزامنة حالة المستودع والشحنات الواردة!', 'success');
+                  setAdminInboundRequests(getStoredInboundRequests());
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-slate-700 shadow-sm"
+                title="تحديث البيانات اللحظية للمستودع"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-indigo-400" />
+                <span>تحديث</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Metrics Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-1">
+              <span className="text-[11px] text-slate-500 font-bold block">إجمالي المنتجات بالمستودع</span>
+              <span className="text-xl font-black text-slate-900 dark:text-white font-mono">{products.length} صنف</span>
+            </div>
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-1">
+              <span className="text-[11px] text-slate-500 font-bold block">إجمالي القطع المتاحة حالياً</span>
+              <span className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono">
+                {products.reduce((acc, p) => acc + p.variants.reduce((sum, v) => sum + (Number(v.stockCount) || 0), 0), 0)} قطعة
+              </span>
+            </div>
+            <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 shadow-xs space-y-1">
+              <span className="text-[11px] text-amber-800 dark:text-amber-300 font-bold block">شحنات توريد في الطريق للمستودع</span>
+              <span className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">
+                {adminInboundRequests.filter((r) => r.status === 'IN_TRANSIT').length} شحنة
+              </span>
+            </div>
+            <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 shadow-xs space-y-1">
+              <span className="text-[11px] text-emerald-800 dark:text-emerald-300 font-bold block">شحنات مستلمة ومفحوصة</span>
+              <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                {adminInboundRequests.filter((r) => r.status === 'RECEIVED').length} شحنة
+              </span>
+            </div>
+          </div>
+
+          {/* SECTION 1: INBOUND STOCK DELIVERIES AUDIT (استقبال شحنات الموردين وتأكيد فحصها) */}
+          <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div>
+                <h4 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <Boxes className="w-4 h-4 text-emerald-600" />
+                  <span>سجل وتأكيد شحنات التوريد من الموردين (Inbound Shipments Receiving)</span>
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  تأكيد وصول كراتين السلع لمستودع المنصة وفحصها لتغذية المخزون الحي تلقائياً دون كتابة يدوية.
+                </p>
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold">
+                <button
+                  onClick={() => setAdminInboundFilter('ALL')}
+                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                    adminInboundFilter === 'ALL'
+                      ? 'bg-purple-600 text-white font-black shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  الكل ({adminInboundRequests.length})
+                </button>
+                <button
+                  onClick={() => setAdminInboundFilter('IN_TRANSIT')}
+                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                    adminInboundFilter === 'IN_TRANSIT'
+                      ? 'bg-amber-600 text-white font-black shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  في الطريق ({adminInboundRequests.filter((r) => r.status === 'IN_TRANSIT').length})
+                </button>
+                <button
+                  onClick={() => setAdminInboundFilter('RECEIVED')}
+                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                    adminInboundFilter === 'RECEIVED'
+                      ? 'bg-emerald-600 text-white font-black shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  مستلمة ({adminInboundRequests.filter((r) => r.status === 'RECEIVED').length})
+                </button>
+              </div>
+            </div>
+
+            {/* Inbound List */}
+            <div className="space-y-3">
+              {adminInboundRequests
+                .filter((r) => adminInboundFilter === 'ALL' || r.status === adminInboundFilter)
+                .map((req) => {
+                  const isRec = req.status === 'RECEIVED';
+                  return (
+                    <div
+                      key={req.id}
+                      className={`p-4 rounded-2xl border transition shadow-xs space-y-3 ${
+                        isRec
+                          ? 'bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-200/90 dark:border-emerald-900/40'
+                          : 'bg-white dark:bg-slate-900 border-amber-200/90 dark:border-amber-900/40'
+                      }`}
+                    >
+                      <div className="flex flex-wrap justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2.5 gap-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-slate-900 dark:text-white">#{req.id}</span>
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
+                              isRec
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300'
+                                : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 animate-pulse'
+                            }`}
+                          >
+                            {isRec ? '✔ تم الاستلام وتغذية المخزون الحي' : '🚚 قيد الوصول للمستودع'}
+                          </span>
+                          <span className="text-[11px] text-slate-600 dark:text-slate-300 font-bold">
+                            المورد: {req.supplierName} ({req.supplierPhone || ''})
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 font-mono">
+                          <span className="font-black text-purple-600 dark:text-purple-400">
+                            قيمة الجملة: <MoneyText amount={req.totalWholesaleValueDzd} />
+                          </span>
+                          <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-bold">
+                            {req.totalUnits} قطعة
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Items */}
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl space-y-1.5 text-xs">
+                        {req.items.map((it, idx) => (
+                          <div key={idx} className="flex justify-between items-center font-bold">
+                            <span>
+                              • {it.productName} ({it.variantSize || 'قياسي'} / {it.variantColor || 'عادي'})
+                            </span>
+                            <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                              {it.quantityReceived ?? it.quantitySent} قطعة
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-wrap justify-between items-center gap-2 text-[11px] text-slate-500 pt-1">
+                        <div>
+                          <span>وسيلة الشحن: <strong>{req.carrierName || 'شاحنة خاصة'}</strong></span>
+                          {req.trackingNumber && <span className="ms-3 font-mono">رقم التتبع: <strong>{req.trackingNumber}</strong></span>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {!isRec ? (
+                            <button
+                              onClick={() => {
+                                const verified = req.items.map((it) => ({
+                                  productId: it.productId,
+                                  variantId: it.variantId,
+                                  quantityReceived: it.quantitySent,
+                                }));
+                                const ok = receiveAndInspectInboundStock(req.id, verified);
+                                if (ok) {
+                                  setAdminInboundRequests((prev) => prev.filter((item) => item.id !== req.id));
+                                  setProducts(getStoredProducts());
+                                  onShowToast(
+                                    `✔ تم تأكيد استلام وفحص شحنة المورد (${req.supplierName}) وإضافة ${req.totalUnits} قطعة للمخزون الحي!`,
+                                    'success'
+                                  );
+                                }
+                              }}
+                              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center gap-1.5 shadow-sm cursor-pointer transition"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>تم إيداع الشحنة في رفوف المستودع والمخزون متاح للمسوقين فوراً</span>
+                            </button>
+                          ) : (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 text-xs">
+                              <CheckCircle2 className="w-4 h-4" />
+                              <span>تم إيداع الشحنة في رفوف المستودع والمخزون متاح للمسوقين فوراً</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+
+          {/* SECTION 2: BIN LOCATIONS & SHELVES IN CENTRAL WAREHOUSE */}
+          <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+            <div>
+              <h4 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <WarehouseIcon className="w-4 h-4 text-purple-600" />
+                <span>إدارة أرفف ومواقع تخزين المنتجات بالمستودع المركزي</span>
+              </h4>
+              <p className="text-xs text-slate-500 mt-0.5">
+                تحديد كود الرف والممر (Bin / Shelf Location) لتسهيل التقاط وتغليف الطرود بسرعة عند تجهيز الطلبيات.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {products.map((p, pIdx) => (
+                <div
+                  key={`${p.id}-${pIdx}`}
+                  className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3 text-xs"
+                >
+                  <div className="flex justify-between items-center font-bold">
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-900 dark:text-white">{p.nameAr}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                        {p.supplierName || 'مستودع المنصة'}
+                      </span>
+                    </div>
+                    <span className="text-purple-600 dark:text-purple-400 font-mono font-black">
+                      مخزون حي: {p.variants.reduce((acc, v) => acc + (Number(v.stockCount) || 0), 0)} قطعة
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] text-slate-400">موقع المنتج بالرف:</span>
+                    <input
+                      type="text"
+                      value={inventoryLocation[p.id] || 'مستودع العاصمة - رف A1'}
+                      onChange={(e) =>
+                        setInventoryLocation({ ...inventoryLocation, [p.id]: e.target.value })
+                      }
+                      className="flex-1 min-w-[200px] px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-mono text-[11px] border border-slate-200 dark:border-slate-700"
+                    />
+                    <button
+                      onClick={() => onShowToast('✔ تم حفظ وتحديث كود الرف بنجاح!')}
+                      className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-[10px] cursor-pointer transition shadow-2xs"
+                    >
+                      حفظ موقع الرف
+                    </button>
+                    <button
+                      onClick={() => handleClearBinLocation(p.id)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-700 dark:text-slate-300 font-bold text-[10px] cursor-pointer transition"
+                    >
+                      مسح الرف
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
+
 
       {/* ---------------- 6. CATEGORIES MANAGEMENT (إدارة الفئات والتصنيفات) ---------------- */}
       {activeAdminTab === 'categories' && (
@@ -4735,9 +5449,9 @@ export function AdminDashboard({
               <div>
                 <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
                   <Percent className="w-4 h-4 text-purple-600" />
-                  <span>إعدادات عمولات المنصة (نسبة المورد ونسبة المسوق)</span>
+                  <span>إعدادات عمولات المنصة (نسبة المورد، نسبة المسوق، ورسوم التغليف والتجهيز)</span>
                 </h3>
-                <p className="text-xs text-slate-500">التحكم في نسبة عمولة المنصة من المورد، والنسبة المقتطعة من أرباح المسوق</p>
+                <p className="text-xs text-slate-500">التحكم في نسبة عمولة المنصة من المورد، والنسبة المقتطعة من أرباح المسوق، ورسوم تغليف وتجهيز الطرد (أجر عامل المستودع)</p>
               </div>
 
               <button
@@ -4745,16 +5459,16 @@ export function AdminDashboard({
                 className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer self-start sm:self-auto"
               >
                 <Check className="w-4 h-4" />
-                <span>حفظ نسب العمولات</span>
+                <span>حفظ إعدادات الرسوم والعمولات</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 text-xs font-bold">
               {/* Supplier Fee Control */}
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-slate-800 dark:text-slate-200 font-black block">
-                    1. عمولة المنصة من المورد (Nouva Supplier Fee %):
+                    1. عمولة المنصة من المورد (Supplier Fee %):
                   </label>
                   <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-black">
                     افتراضياً 5%
@@ -4818,7 +5532,7 @@ export function AdminDashboard({
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-slate-800 dark:text-slate-200 font-black block">
-                    2. عمولة المنصة المقتطعة من المسوق (Nouva Reseller Fee %):
+                    2. عمولة المنصة من المسوق (Reseller Fee %):
                   </label>
                   <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-black">
                     تحكم حر 0 - 50%
@@ -4877,54 +5591,202 @@ export function AdminDashboard({
                   </p>
                 </div>
               </div>
+
+              {/* Warehouse Packaging & Picking Fee Control */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-800 dark:text-slate-200 font-black block">
+                    3. أتعاب التغليف والتجهيز (عامل المستودع):
+                  </label>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-black">
+                    على عاتق الإدارة
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="2000"
+                    step="10"
+                    value={feeSettings.pickAndPackFeeDzd ?? 100}
+                    onChange={(e) =>
+                      setFeeSettings({
+                        ...feeSettings,
+                        pickAndPackFeeDzd: Number(e.target.value),
+                      })
+                    }
+                    className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono text-sm text-amber-600 dark:text-amber-400 font-black focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-[11px]">دج / طرد</span>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex items-center gap-1.5 pt-1">
+                  <span className="text-[10px] text-slate-400 font-bold">مبالغ:</span>
+                  {[0, 50, 100, 150, 200].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() =>
+                        setFeeSettings({
+                          ...feeSettings,
+                          pickAndPackFeeDzd: amt,
+                        })
+                      }
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition cursor-pointer ${
+                        (feeSettings.pickAndPackFeeDzd ?? 100) === amt
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100'
+                      }`}
+                    >
+                      {amt === 0 ? '0' : `${amt} دج`}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 text-[10px] text-amber-800 dark:text-amber-300 space-y-1">
+                  <p className="font-extrabold">💡 تغطية الإدارة للتغليف:</p>
+                  <p className="text-slate-600 dark:text-slate-400">
+                    تُحسب على كل طرد مُسلّم ({feeSettings.pickAndPackFeeDzd ?? 100} دج). تُصرف كأجر لعامل المستودع أو كلفة مواد التغليف، وتتحملها المنصة بالكامل دون خصم من المورد أو المسوق.
+                  </p>
+                </div>
+              </div>
+
+              {/* Confirmation Agent Fee Control */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-800 dark:text-slate-200 font-black block">
+                    4. أتعاب مؤكد الطلبيات (فريق التأكيد):
+                  </label>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-black">
+                    على عاتق الإدارة
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="2000"
+                    step="10"
+                    value={feeSettings.confirmerFeeDzd ?? 100}
+                    onChange={(e) =>
+                      setFeeSettings({
+                        ...feeSettings,
+                        confirmerFeeDzd: Number(e.target.value),
+                      })
+                    }
+                    className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono text-sm text-blue-600 dark:text-blue-400 font-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-[11px]">دج / طرد</span>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex items-center gap-1.5 pt-1">
+                  <span className="text-[10px] text-slate-400 font-bold">مبالغ:</span>
+                  {[0, 50, 80, 100, 150].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() =>
+                        setFeeSettings({
+                          ...feeSettings,
+                          confirmerFeeDzd: amt,
+                        })
+                      }
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition cursor-pointer ${
+                        (feeSettings.confirmerFeeDzd ?? 100) === amt
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100'
+                      }`}
+                    >
+                      {amt === 0 ? '0' : `${amt} دج`}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 text-[10px] text-blue-800 dark:text-blue-300 space-y-1">
+                  <p className="font-extrabold">💡 تغطية الإدارة لأتعاب التأكيد:</p>
+                  <p className="text-slate-600 dark:text-slate-400">
+                    تُحسب على كل طرد أكده المؤكد وتم تسليمه ({feeSettings.confirmerFeeDzd ?? 100} دج). تُصرف كحافز إنتاجي للمؤكد من إيرادات المنصة دون اقتطاع من المسوق أو المورد.
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* LIVE SIMULATION CARD */}
-            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-900/10 via-slate-900/20 to-emerald-900/10 border border-purple-500/20 dark:border-slate-800 text-xs">
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-900/10 via-slate-900/20 to-blue-900/10 border border-purple-500/20 dark:border-slate-800 text-xs">
               <div className="flex items-center justify-between mb-2">
                 <span className="font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                   <DollarSign className="w-3.5 h-3.5 text-purple-600" />
-                  <span>محاكاة توزيع الأرباح لطلبية نموذجية (سعر النيت 3,000 دج وسعر البيع 4,500 دج):</span>
+                  <span>محاكاة الدورة المالية المتكاملة للطلبية المسلّمة (النيت 3,000 دج والبيع 4,500 دج):</span>
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono">حساب تلقائي حي</span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold">
+                  التغليف والتأكيد على عاتق الإدارة 100%
+                </span>
               </div>
 
               {(() => {
                 const netSupplier = 3000;
                 const supFee = feeSettings.supplierFeePercent ?? 5;
                 const resFee = feeSettings.resellerFeePercent ?? 0;
+                const packingFee = feeSettings.pickAndPackFeeDzd ?? 100;
+                const confirmerFee = feeSettings.confirmerFeeDzd ?? 100;
+                
                 const platformFromSupplier = Math.round((netSupplier * supFee) / 100);
                 const wholesale = netSupplier + platformFromSupplier;
                 const retailSelling = 4500;
                 const grossResellerProfit = Math.max(0, retailSelling - wholesale);
                 const platformFromReseller = Math.round((grossResellerProfit * resFee) / 100);
                 const netResellerProfit = Math.max(0, grossResellerProfit - platformFromReseller);
-                const totalPlatformRevenue = platformFromSupplier + platformFromReseller;
+                
+                const grossPlatformRevenue = platformFromSupplier + platformFromReseller;
+                const totalOperatingCosts = packingFee + confirmerFee;
+                const netPlatformProfit = grossPlatformRevenue - totalOperatingCosts;
 
                 return (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                    <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1.5">
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
                       <span className="text-[10px] text-slate-400 block font-bold">سعر الجملة للمسوق</span>
                       <span className="text-xs font-black text-purple-600 dark:text-purple-400 font-mono">{wholesale} دج</span>
                       <span className="text-[9px] text-slate-400 block mt-0.5">(صافي المورد {netSupplier} دج)</span>
                     </div>
 
-                    <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
-                      <span className="text-[10px] text-slate-400 block font-bold">عمولة المنصة من المورد</span>
-                      <span className="text-xs font-black text-purple-600 dark:text-purple-400 font-mono">+{platformFromSupplier} دج</span>
-                      <span className="text-[9px] text-slate-400 block mt-0.5">({supFee}% من النيت)</span>
+                    <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-center">
+                      <span className="text-[10px] text-emerald-700 dark:text-emerald-300 block font-bold">صافي ربح المسوق</span>
+                      <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 font-mono">{netResellerProfit} دج</span>
+                      <span className="text-[9px] text-emerald-600/80 block mt-0.5">كاملاً دون خصم تغليف/تأكيد</span>
                     </div>
 
-                    <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
-                      <span className="text-[10px] text-slate-400 block font-bold">صافي ربح المسوق</span>
-                      <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono">{netResellerProfit} دج</span>
-                      <span className="text-[9px] text-slate-400 block mt-0.5">(من أصل {grossResellerProfit} دج)</span>
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
+                      <span className="text-[10px] text-purple-600 dark:text-purple-300 block font-bold">إجمالي عمولة المنصة</span>
+                      <span className="text-xs font-black text-purple-600 dark:text-purple-400 font-mono">+{grossPlatformRevenue} دج</span>
+                      <span className="text-[9px] text-slate-400 block mt-0.5">({supFee}% من النيت + {resFee}% مسوق)</span>
                     </div>
 
-                    <div className="p-2 rounded-xl bg-purple-600/10 dark:bg-purple-900/30 border border-purple-500/30 text-center">
-                      <span className="text-[10px] text-purple-700 dark:text-purple-300 block font-black">إجمالي دخل المنصة</span>
-                      <span className="text-xs font-black text-purple-700 dark:text-purple-300 font-mono">{totalPlatformRevenue} دج</span>
-                      <span className="text-[9px] text-purple-500 dark:text-purple-400 block mt-0.5">({platformFromSupplier} + {platformFromReseller} دج)</span>
+                    <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 text-center">
+                      <span className="text-[10px] text-amber-700 dark:text-amber-300 block font-bold">أتعاب عامل التغليف</span>
+                      <span className="text-xs font-black text-amber-700 dark:text-amber-400 font-mono">-{packingFee} دج</span>
+                      <span className="text-[9px] text-amber-600/70 block mt-0.5">تتحملها الإدارة لعامل المستودع</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-300 dark:border-blue-800 text-center">
+                      <span className="text-[10px] text-blue-700 dark:text-blue-300 block font-bold">أتعاب مؤكد الطلبية</span>
+                      <span className="text-xs font-black text-blue-700 dark:text-blue-400 font-mono">-{confirmerFee} دج</span>
+                      <span className="text-[9px] text-blue-600/70 block mt-0.5">تتحملها الإدارة لمؤكد المكالمات</span>
+                    </div>
+
+                    <div className={`p-2.5 rounded-xl border text-center ${
+                      netPlatformProfit >= 0
+                        ? 'bg-purple-600/10 dark:bg-purple-900/30 border-purple-500/40 text-purple-800 dark:text-purple-200'
+                        : 'bg-rose-50 dark:bg-rose-950/30 border-rose-400 text-rose-700'
+                    }`}>
+                      <span className="text-[10px] block font-black">صافي ربح الإدارة</span>
+                      <span className="text-xs font-black font-mono">
+                        {netPlatformProfit >= 0 ? `+${netPlatformProfit}` : netPlatformProfit} دج
+                      </span>
+                      <span className="text-[9px] opacity-75 block mt-0.5">
+                        بعد صرف التغليف والتأكيد
+                      </span>
                     </div>
                   </div>
                 );
@@ -6712,6 +7574,116 @@ export function AdminDashboard({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* PHASE 2: CENTRAL FULFILLMENT PICKING & PACKING MODAL */}
+      {isAdminPickingModalOpen && (
+        <PickingPackingModal
+          orders={orders.filter(
+            (o) =>
+              (o.adminConfirmed || o.status === 'PROCESSING' || o.status === 'CONFIRMED' || o.situation === 'EnPréparation') &&
+              o.status !== 'SHIPPED' &&
+              o.status !== 'DELIVERED' &&
+              o.status !== 'CANCELLED'
+          )}
+          products={products}
+          onClose={() => setIsAdminPickingModalOpen(false)}
+          onUpdateOrderStatus={(orderId, status) => {
+            updateOrder(orderId, { status });
+          }}
+          onShowToast={onShowToast}
+        />
+      )}
+
+      {/* PHASE 2: COURIER HANDOVER MANIFEST MODAL */}
+      {isAdminManifestModalOpen && (
+        <CourierManifestModal
+          orders={orders.filter(
+            (o) =>
+              (o.adminConfirmed || o.status === 'PROCESSING' || o.status === 'CONFIRMED' || o.situation === 'EnPréparation') &&
+              o.status !== 'SHIPPED' &&
+              o.status !== 'DELIVERED' &&
+              o.status !== 'CANCELLED'
+          )}
+          onClose={() => setIsAdminManifestModalOpen(false)}
+          onShowToast={onShowToast}
+          onMarkOrdersShipped={(orderIds) => {
+            orderIds.forEach((id) => updateOrder(id, { status: 'SHIPPED' }));
+          }}
+        />
+      )}
+
+      {/* PHASE 3: COD CASH RECONCILIATION MODAL */}
+      {isAdminCodReconcileModalOpen && (
+        <CodReconciliationModal
+          orders={orders}
+          onClose={() => setIsAdminCodReconcileModalOpen(false)}
+          onShowToast={onShowToast}
+          onOrdersUpdated={(updatedOrders) => {
+            updatedOrders.forEach((uo) => updateOrder(uo.id, uo));
+          }}
+        />
+      )}
+
+      {/* PHASE 3: RETURNS QC & DAMAGE CLAIMS MODAL */}
+      {isAdminReturnsQCModalOpen && (
+        <ReturnsQCModal
+          returnedOrders={orders.filter(
+            (o) =>
+              !o.returnedToWarehouse &&
+              o.situation !== 'RetourReçu' &&
+              (o.status === 'FAILED' || o.status === 'CANCELLED' || o.situation === 'Retour')
+          )}
+          products={products}
+          onClose={() => setIsAdminReturnsQCModalOpen(false)}
+          onShowToast={onShowToast}
+          onOrderRestocked={(orderId) => {
+            updateOrder(orderId, { returnedToWarehouse: true, situation: 'RetourReçu' });
+            setProducts(getStoredProducts());
+          }}
+        />
+      )}
+
+      {/* PHASE 3: COURIER ANALYTICS & WILAYA PERFORMANCE MODAL */}
+      {isAdminCourierAnalyticsModalOpen && (
+        <CourierAnalyticsModal
+          orders={orders}
+          onClose={() => setIsAdminCourierAnalyticsModalOpen(false)}
+        />
+      )}
+
+      {/* LIVE AUDIT TRAIL & TIMELINE MODAL */}
+      {selectedTimelineOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-base text-slate-900 dark:text-white">
+                  سجل التزامن والمسار اللحظي للطلب (Admin Audit)
+                </span>
+                <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 font-extrabold">
+                  #{selectedTimelineOrder.id}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedTimelineOrder(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 font-bold flex items-center justify-center cursor-pointer transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <OrderAuditTimeline order={selectedTimelineOrder} />
+
+            <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => setSelectedTimelineOrder(null)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer transition"
+              >
+                إغلاق
+              </button>
+            </div>
           </div>
         </div>
       )}

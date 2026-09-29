@@ -11,8 +11,9 @@ import { UnifiedOrderStatusBadge } from '../ui/UnifiedOrderStatusBadge';
 import { ShipmentTrackingTool } from '../common/ShipmentTrackingTool';
 import { ShippingRatesModal } from '../common/ShippingRatesModal';
 import { pullOrdersFromStores } from '../../lib/externalStoreService';
+import { OrderAuditTimeline } from '../common/OrderAuditTimeline';
 
-function CodStepsProgress({ order }: { order: Order }) {
+function CodStepsProgress({ order, onViewTimeline }: { order: Order; onViewTimeline?: (order: Order) => void }) {
   const isLinkOrder = order.status === 'LINK_ORDER';
   const isConfirmed = order.adminConfirmed || order.status === 'CONFIRMED';
   const isFailedConfirmation = (order.status === 'CANCELLED' || !!order.failureReason) && !isConfirmed && !isLinkOrder;
@@ -53,25 +54,41 @@ function CodStepsProgress({ order }: { order: Order }) {
           <Zap className="w-3.5 h-3.5 text-amber-500" />
           <span>حالة الطلب:</span>
         </span>
-        <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
-          isLinkOrder
-            ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 border border-amber-300 font-extrabold'
-            : isFailedConfirmation
-            ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-300'
-            : isReturned
-            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-            : isDelivered
-            ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
-            : isShipped
-            ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
-            : isPreparing
-            ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
-            : isConfirmed
-            ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-300'
-            : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-        }`}>
-          {resellerStatusLabel}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
+            isLinkOrder
+              ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 border border-amber-300 font-extrabold'
+              : isFailedConfirmation
+              ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-300'
+              : isReturned
+              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+              : isDelivered
+              ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+              : isShipped
+              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+              : isPreparing
+              ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
+              : isConfirmed
+              ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-300'
+              : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+          }`}>
+            {resellerStatusLabel}
+          </span>
+          {onViewTimeline && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewTimeline(order);
+              }}
+              className="text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-100 dark:bg-violet-950/80 hover:bg-violet-200 border border-violet-200 dark:border-violet-800 px-2 py-0.5 rounded-md flex items-center gap-1 transition cursor-pointer"
+              title="عرض سجل التدقيق والمزامنة اللحظية للطلب عبر كل الداشبوردات"
+            >
+              <Clock className="w-3 h-3 text-violet-600 dark:text-violet-400" />
+              <span>المسار اللحظي ⚡</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {isFailedConfirmation && (
@@ -139,6 +156,7 @@ export function CommandesTab() {
   const { t, language } = useLanguage();
 
   const [selectedOrderTracking, setSelectedOrderTracking] = useState<Order | null>(null);
+  const [selectedTimelineOrder, setSelectedTimelineOrder] = useState<Order | null>(null);
   const [selectedApiDetails, setSelectedApiDetails] = useState<Order | null>(null);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [searchPhone, setSearchPhone] = useState('');
@@ -640,7 +658,7 @@ export function CommandesTab() {
               </div>
 
               {/* COD Steps Progress Stepper (البائع) */}
-              <CodStepsProgress order={order} />
+              <CodStepsProgress order={order} onViewTimeline={setSelectedTimelineOrder} />
 
               {order.status === 'LINK_ORDER' && (
                 <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 space-y-2 text-xs">
@@ -1534,6 +1552,41 @@ GET /Api_v1/Colis/Date_last_status/2025-01-01`}
               <button
                 onClick={() => setShowWebhookModal(false)}
                 className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Live Order Audit Trail & Timeline Modal */}
+      {selectedTimelineOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-base text-slate-900 dark:text-white">
+                  سجل التزامن والمسار اللحظي للطلب
+                </span>
+                <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 font-extrabold">
+                  #{selectedTimelineOrder.id}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedTimelineOrder(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 font-bold flex items-center justify-center cursor-pointer transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <OrderAuditTimeline order={selectedTimelineOrder} />
+
+            <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => setSelectedTimelineOrder(null)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer transition"
               >
                 إغلاق
               </button>

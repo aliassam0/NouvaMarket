@@ -100,6 +100,9 @@ export function WalletTab({ onShowToast }: WalletTabProps) {
   const processingProfit = inProcessingOrders.reduce((sum, o) => sum + getOrderProfit(o), 0);
   const inTransitProfit = inTransitOrders.reduce((sum, o) => sum + getOrderProfit(o), 0);
 
+  const deliveredOrders = resellerOrders.filter((o) => o.status === 'DELIVERED');
+  const deliveredProfit = deliveredOrders.reduce((sum, o) => sum + getOrderProfit(o), 0);
+
   const [availableBalance, setAvailableBalance] = useState<number>(() => getStoredWalletBalance(user?.id, 0));
   const [pendingBalance, setPendingBalance] = useState<number>(estimatedPendingProfit);
 
@@ -380,74 +383,141 @@ export function WalletTab({ onShowToast }: WalletTabProps) {
         </button>
       </div>
 
-      {/* Small Summary Card: Estimated Pending Profit based on delivery queue status */}
-      <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-amber-400/40 dark:border-amber-500/30 shadow-xs space-y-3 relative overflow-hidden">
-        {/* Subtle background glow */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/5 dark:bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
-
-        <div className="flex items-center justify-between gap-2">
+      {/* Visual Liquidity Matrix: Delivered & Ready vs In-Transit with Carrier */}
+      <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3.5 relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-400 border border-amber-300 dark:border-amber-800/60 flex items-center justify-center shrink-0">
-              <Hourglass className="w-4 h-4 animate-pulse" />
+            <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center justify-center shrink-0">
+              <TrendingUp className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
-                  الأرباح المعلقة المتوقعة
-                </h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 font-mono">
-                  طابور التوصيل: {deliveryQueueOrders.length} طلب
+              <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <span>تفصيل دورة الأرباح (المحررة vs قيد التوزيع)</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                  تدفق السيولة ⚡
                 </span>
-              </div>
+              </h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                أرباح قيد التحصيل بناءً على حالة الطرود الحالية مع شركات التوصيل
+                مقارنة تفصيلية دقيقة: أرباح الطرود المسلّمة الجاهزة للسحب مقابل أرباح الطرود مع الناقل
               </p>
             </div>
           </div>
 
-          <div className="text-left shrink-0">
-            <span className="text-[10px] font-bold text-slate-400 block">المبلغ المتوقع</span>
-            <div className="text-base sm:text-lg font-black text-amber-600 dark:text-amber-400 font-mono">
-              +<MoneyText amount={estimatedPendingProfit} />
-            </div>
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-50 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 self-start sm:self-auto">
+            <span>إجمالي طرود الدورة:</span>
+            <span className="font-mono text-slate-900 dark:text-white font-black">{deliveredOrders.length + deliveryQueueOrders.length} طرد</span>
           </div>
         </div>
 
-        {/* Detailed Breakdown: In-Preparation vs Out-For-Delivery */}
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          {/* In-Preparation / Warehouse Queue */}
-          <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/60 flex flex-col justify-between">
-            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">
-              <span className="flex items-center gap-1">
-                <Package className="w-3.5 h-3.5 text-sky-500" />
-                <span>قيد التجهيز بالمستودع</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {/* Pillar 1: أرباح الطرود المسلّمة (جاهزة للسحب فوراً) */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border-2 border-emerald-500/40 dark:border-emerald-500/20 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-black text-emerald-900 dark:text-emerald-200 block">
+                    أرباح طرود سُلّمت (جاهزة للسحب)
+                  </span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                    محررة 100% بحسابك ✅
+                  </span>
+                </div>
+              </div>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                {deliveredOrders.length} طرد مسلّم
               </span>
-              <span className="font-mono text-sky-600 dark:text-sky-400">{inProcessingOrders.length}</span>
             </div>
-            <div className="text-xs font-black text-sky-600 dark:text-sky-400 font-mono">
-              +<MoneyText amount={processingProfit} />
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">الرصيد المحرر القابل للسحب:</span>
+                <div className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                  <MoneyText amount={availableBalance} />
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (availableBalance <= 0) {
+                    onShowToast('رصيدك المتاح للسحب هو 0 دج.');
+                    return;
+                  }
+                  setWithdrawAmount(availableBalance);
+                  setIsWithdrawModalOpen(true);
+                }}
+                disabled={availableBalance <= 0}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                  availableBalance > 0
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                <span>سحب الآن</span>
+                <ArrowDownRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-emerald-500/15 text-[10px] text-slate-500 dark:text-slate-400 space-y-1">
+              <div className="flex justify-between">
+                <span>إجمالي الأرباح المسلّمة تاريخياً:</span>
+                <span className="font-mono font-bold text-slate-800 dark:text-slate-200"><MoneyText amount={deliveredProfit} /></span>
+              </div>
+              <p className="text-emerald-700/90 dark:text-emerald-300/90 font-medium">
+                تم تحصيلها نقدياً عند التسليم (COD) ومطابقتها آلياً، جاهزة للتحويل لحساب CCP أو BaridiMob.
+              </p>
             </div>
           </div>
 
-          {/* Out for Delivery / In-Transit with Courier */}
-          <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/60 flex flex-col justify-between">
-            <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">
-              <span className="flex items-center gap-1">
-                <Truck className="w-3.5 h-3.5 text-emerald-500" />
-                <span>قيد التوزيع (مع الشاحن)</span>
+          {/* Pillar 2: أرباح الطرود التي خرجت مع الناقل وقيد التوزيع (In-Transit) */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-transparent border-2 border-blue-500/40 dark:border-blue-500/20 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                  <Truck className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-black text-blue-900 dark:text-blue-200 block">
+                    أرباح مع الناقل (In-Transit)
+                  </span>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+                    قيد التوزيع الميداني 🛵
+                  </span>
+                </div>
+              </div>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800">
+                {inTransitOrders.length} طرد مع الناقل
               </span>
-              <span className="font-mono text-emerald-600 dark:text-emerald-400">{inTransitOrders.length}</span>
             </div>
-            <div className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono">
-              +<MoneyText amount={inTransitProfit} />
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">الأرباح المتوقعة في الطريق:</span>
+                <div className="text-2xl font-black font-mono text-blue-600 dark:text-blue-400">
+                  +<MoneyText amount={inTransitProfit} />
+                </div>
+              </div>
+              {inProcessingOrders.length > 0 && (
+                <div className="text-left">
+                  <span className="text-[10px] text-slate-400 block font-medium">قيد التجهيز بالمستودع:</span>
+                  <span className="text-xs font-black font-mono text-slate-700 dark:text-slate-300">
+                    +{processingProfit.toLocaleString()} دج ({inProcessingOrders.length})
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-blue-500/15 text-[10px] text-slate-500 dark:text-slate-400 space-y-1">
+              <div className="flex justify-between">
+                <span>إجمالي طابور التوصيل ({deliveryQueueOrders.length} طلب):</span>
+                <span className="font-mono font-bold text-amber-600 dark:text-amber-400">+<MoneyText amount={estimatedPendingProfit} /></span>
+              </div>
+              <p className="text-blue-700/90 dark:text-blue-300/90 font-medium">
+                أموال تحت التحصيل الميداني، تضاف تلقائياً لرصيدك المتاح للسحب لحظة تسجيل السائق استلام المبلغ.
+              </p>
             </div>
           </div>
-        </div>
-
-        {/* Reassurance text */}
-        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 pt-0.5">
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-          <span>تُضاف الأرباح تلقائياً إلى رصيدك المتاح للسحب فور استلام الزبون وتأكيد شركة التوصيل (COD).</span>
         </div>
       </div>
 

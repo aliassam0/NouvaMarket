@@ -25,6 +25,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Order, SystemUser } from '../../types';
+import { getStoredMarketplaceFees } from '../../lib/supplierHelper';
 
 interface AdminConfirmersAuditTabProps {
   orders: Order[];
@@ -96,6 +97,10 @@ export function AdminConfirmersAuditTab({
         0
       );
 
+      const feeSettings = getStoredMarketplaceFees();
+      const confirmerFee = feeSettings.confirmerFeeDzd ?? 100;
+      const earnedFeesDzd = delivered.length * confirmerFee;
+
       return {
         user,
         totalConfirmed: userConfirmedOrders.length,
@@ -107,6 +112,8 @@ export function AdminConfirmersAuditTab({
         successRate,
         deliveredSalesDzd,
         totalCallsCount,
+        earnedFeesDzd,
+        confirmerFee,
         ordersList: userConfirmedOrders,
       };
     });
@@ -126,7 +133,10 @@ export function AdminConfirmersAuditTab({
       totalDeliveredSalesAll += c.deliveredSalesDzd;
     });
 
-    const closed = totalDeliveredAll;
+    const feeSettings = getStoredMarketplaceFees();
+    const confirmerFee = feeSettings.confirmerFeeDzd ?? 100;
+    const totalEarnedFeesAll = totalDeliveredAll * confirmerFee;
+
     const avgDeliveryRate =
       totalConfirmedAll > 0
         ? Math.round((totalDeliveredAll / (totalDeliveredAll + (totalConfirmedAll - totalDeliveredAll - totalInTransitAll || 1))) * 100)
@@ -143,6 +153,8 @@ export function AdminConfirmersAuditTab({
       totalDeliveredAll,
       totalInTransitAll,
       totalDeliveredSalesAll,
+      totalEarnedFeesAll,
+      confirmerFee,
       avgDeliveryRate: Math.min(100, Math.max(0, avgDeliveryRate)),
       topPerformerName: topPerformer?.user?.fullName || 'لا يوجد بعد',
     };
@@ -189,7 +201,7 @@ export function AdminConfirmersAuditTab({
       </div>
 
       {/* 2. Team Overview KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
           <span className="text-xs text-slate-500 font-bold">فريق المؤكدين</span>
           <div className="mt-2 flex items-baseline justify-between">
@@ -261,6 +273,21 @@ export function AdminConfirmersAuditTab({
             </span>
           </div>
         </div>
+
+        <div className="p-3.5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 shadow-xs flex flex-col justify-between col-span-2 sm:col-span-1">
+          <span className="text-xs text-blue-700 dark:text-blue-300 font-bold">مستحقات التأكيد (على عاتق الإدارة)</span>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-base sm:text-lg font-black text-blue-700 dark:text-blue-300 font-mono">
+              {teamMetrics.totalEarnedFeesAll.toLocaleString()}
+            </span>
+            <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+              دج
+            </span>
+          </div>
+          <span className="text-[10px] text-blue-600/80 dark:text-blue-400/80 mt-1 block">
+            {teamMetrics.totalDeliveredAll} مسلّم × {teamMetrics.confirmerFee} دج
+          </span>
+        </div>
       </div>
 
       {/* 3. Search Bar */}
@@ -290,6 +317,7 @@ export function AdminConfirmersAuditTab({
                 <th className="p-3.5 text-center">فشل / ملغاة</th>
                 <th className="p-3.5 text-center">نسبة نجاح التسليم</th>
                 <th className="p-3.5 text-center">قيمة المبيعات المسلّمة</th>
+                <th className="p-3.5 text-center">أتعاب المؤكد (على عاتق الإدارة)</th>
                 <th className="p-3.5 text-center">إجراءات وتدقيق</th>
               </tr>
             </thead>
@@ -390,6 +418,18 @@ export function AdminConfirmersAuditTab({
                     {/* Delivered Sales DZD */}
                     <td className="p-3.5 text-center font-mono font-black text-slate-900 dark:text-white">
                       {item.deliveredSalesDzd.toLocaleString()} دج
+                    </td>
+
+                    {/* Confirmer Earned Fees (Platform Guaranteed) */}
+                    <td className="p-3.5 text-center">
+                      <div className="inline-flex flex-col items-center">
+                        <span className="font-mono font-black text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800">
+                          {item.earnedFeesDzd.toLocaleString()} دج
+                        </span>
+                        <span className="text-[9px] text-slate-400 mt-0.5">
+                          {item.delivered} مسلّم × {item.confirmerFee} دج
+                        </span>
+                      </div>
                     </td>
 
                     {/* Actions */}

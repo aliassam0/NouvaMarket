@@ -7,9 +7,11 @@ import {
   ChevronDown,
   Check,
   Sparkles,
+  Warehouse as WarehouseIcon,
+  Package,
 } from 'lucide-react';
 
-export type DashboardRole = 'reseller' | 'warehouse' | 'confirmer' | 'admin';
+export type DashboardRole = 'reseller' | 'warehouse' | 'platform_warehouse' | 'confirmer' | 'admin';
 
 interface DashboardConfig {
   id: DashboardRole;
@@ -29,7 +31,7 @@ const DASHBOARDS: DashboardConfig[] = [
     id: 'reseller',
     label: 'لوحة المسوّق',
     shortLabel: 'المسوّق',
-    tagline: 'الكتالوج، المتاجر والأرباح',
+    tagline: 'الكتالوج، المتاجر والعمولات',
     icon: ShoppingBag,
     accentColor: 'purple',
     activeBg: 'bg-purple-600 text-white shadow-md shadow-purple-500/20',
@@ -39,15 +41,27 @@ const DASHBOARDS: DashboardConfig[] = [
   },
   {
     id: 'warehouse',
-    label: 'لوحة المورّد',
+    label: 'بوابة المورّد',
     shortLabel: 'المورّد',
-    tagline: 'المستودع، المخزون والتسويات',
-    icon: Boxes,
+    tagline: 'إضافة السلع، شحنات التوريد والأرباح',
+    icon: Package,
     accentColor: 'amber',
     activeBg: 'bg-amber-600 text-white shadow-md shadow-amber-500/20',
     activeText: 'text-amber-600 dark:text-amber-400',
     activeBorder: 'border-amber-200 dark:border-amber-800',
     badgeBg: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
+  },
+  {
+    id: 'platform_warehouse',
+    label: 'مستودع المنصة',
+    shortLabel: 'مستودع المنصة',
+    tagline: 'التجهيز، التغليف، الباركود وتسليم الشحن',
+    icon: WarehouseIcon,
+    accentColor: 'violet',
+    activeBg: 'bg-violet-600 text-white shadow-md shadow-violet-500/20',
+    activeText: 'text-violet-600 dark:text-violet-400',
+    activeBorder: 'border-violet-200 dark:border-violet-800',
+    badgeBg: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300',
   },
   {
     id: 'confirmer',

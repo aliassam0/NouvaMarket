@@ -448,6 +448,27 @@ export async function syncOrderStatus(
           wilaya: (updatedOrder as any).wilayaName || updatedOrder.wilayaCode,
         });
       }
+
+      // Notify warehouse of COD collection and wholesale dues release
+      const orderWholesale = updatedOrder.items?.reduce((acc, item) => {
+        const cost = item.wholesalePrice || (item.sellingPrice ? Math.max(0, item.sellingPrice - (item.profit || 0)) : 0);
+        return acc + cost * (item.quantity || 1);
+      }, 0) || 0;
+
+      if (orderWholesale > 0) {
+        addWarehouseNotification({
+          titleAr: 'تحصيل كاش COD ومستحقات مبيعات الجملة 💵',
+          bodyAr: `تم تسليم الطلبية #${updatedOrder.id} للزبون (${updatedOrder.customerName}) بنجاح وإضافة ${orderWholesale.toLocaleString()} دج لرصيدك المتاح للسحب.`,
+          type: 'wallet',
+        });
+      }
+
+      // Notify admin of full COD reconciliation
+      addAdminNotification({
+        titleAr: 'مطابقة كاش COD مكتملة 💰',
+        bodyAr: `تم تحصيل مبلغ ${((updatedOrder.totalAmount || 0) + (updatedOrder.shippingFee || 0)).toLocaleString()} دج للطلبية #${updatedOrder.id} وتوزيع المستحقات بدقة.`,
+        type: 'order',
+      });
     }
 
 

@@ -25,6 +25,9 @@ import {
   Camera,
   Check,
   X,
+  Users,
+  Lock,
+  ShieldCheck,
 } from 'lucide-react';
 import { Product, ProductVariant, AgeGroup, Gender, UpsellOffer } from '../../types';
 import { useCategories } from '../../context/CategoryContext';
@@ -43,6 +46,8 @@ interface ProductEditModalProps {
   categories?: Array<{ id: string; nameAr: string; icon: string }>;
   onShowToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   userRole?: 'admin' | 'warehouse' | 'reseller';
+  isPlatformWarehouse?: boolean;
+  currentSupplier?: { id: string; name: string; wilaya?: string };
 }
 
 export function ProductEditModal({
@@ -54,6 +59,8 @@ export function ProductEditModal({
   categories: categoriesProp,
   onShowToast,
   userRole = 'admin',
+  isPlatformWarehouse,
+  currentSupplier,
 }: ProductEditModalProps) {
   const { categories: ctxCategories } = useCategories();
   const categories = categoriesProp || ctxCategories;
@@ -71,8 +78,14 @@ export function ProductEditModal({
   const initialNet = editingProduct.supplierNetPrice ||
     (editingProduct.wholesalePrice ? Math.round(editingProduct.wholesalePrice / (1 + activeFeePercent / 100)) : 3000);
 
+  const isSpecificSupplier = !isPlatformWarehouse && userRole !== 'admin';
+  const fixedSupplierName = currentSupplier?.name || editingProduct.supplierName || 'حساب المورد المعتمد';
+  const fixedSupplierId = currentSupplier?.id || editingProduct.supplierId || 'sup-custom';
+  const fixedSupplierWilaya = currentSupplier?.wilaya;
+
   const suppliersList = getStoredSuppliers();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>(() => {
+    if (isSpecificSupplier && fixedSupplierId) return fixedSupplierId;
     if (editingProduct.supplierId) return editingProduct.supplierId;
     if (editingProduct.supplierName) {
       const found = suppliersList.find(
@@ -84,16 +97,33 @@ export function ProductEditModal({
   });
 
   const [productData, setProductData] = useState<Product>(() => {
+    let base = editingProduct;
     if (editingProduct.colorImages && editingProduct.variants) {
       const updatedVariants = editingProduct.variants.map((v) => ({
         ...v,
         image: v.image || (v.color ? editingProduct.colorImages?.[v.color.trim()] : undefined),
       }));
-      return { ...editingProduct, variants: updatedVariants };
+      base = { ...editingProduct, variants: updatedVariants };
     }
-    return editingProduct;
+    if (isSpecificSupplier) {
+      return {
+        ...base,
+        supplierId: fixedSupplierId,
+        supplierName: fixedSupplierName,
+      };
+    }
+    return base;
   });
   const [supplierNetPrice, setSupplierNetPrice] = useState<number>(initialNet);
+  const [allowAffiliate, setAllowAffiliate] = useState<boolean>(() => {
+    if (editingProduct.allowAffiliate !== undefined) {
+      return editingProduct.allowAffiliate;
+    }
+    if (editingProduct.isSupplierExclusive !== undefined) {
+      return !editingProduct.isSupplierExclusive;
+    }
+    return true;
+  });
   const [isGeneratingAiDesc, setIsGeneratingAiDesc] = useState(false);
   const [isGeneratingAiName, setIsGeneratingAiName] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -470,6 +500,8 @@ export function ProductEditModal({
       approvalStatus: userRole === 'admin'
         ? (productData.approvalStatus || 'APPROVED')
         : (isAddingNewProduct ? 'PENDING' : (productData.approvalStatus || 'PENDING')),
+      allowAffiliate,
+      isSupplierExclusive: !allowAffiliate,
     };
 
     onSaveProduct(updatedProduct);
@@ -808,30 +840,55 @@ export function ProductEditModal({
                   <Building className="w-3.5 h-3.5 text-purple-400" />
                   <span>المورد (Supplier):</span>
                 </span>
-                <span className="text-[8px] text-purple-300 font-normal">مطلوب</span>
+                <span className="text-[8px] text-purple-300 font-normal">
+                  {isSpecificSupplier ? '🔒 مثبت باسم حسابك' : 'مطلوب'}
+                </span>
               </label>
-              <select
-                value={selectedSupplierId}
-                onChange={(e) => {
-                  const supId = e.target.value;
-                  setSelectedSupplierId(supId);
-                  const matched = suppliersList.find((s) => s.id === supId);
-                  if (matched) {
-                    setProductData((prev) => ({
-                      ...prev,
-                      supplierId: matched.id,
-                      supplierName: matched.companyName || matched.fullName,
-                    }));
-                  }
-                }}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-purple-500/70 text-white font-bold cursor-pointer focus:border-purple-400 transition"
-              >
-                {suppliersList.map((sup) => (
-                  <option key={sup.id} value={sup.id}>
-                    🏭 {sup.companyName || sup.fullName} ({sup.wilaya})
-                  </option>
-                ))}
-              </select>
+
+              {isSpecificSupplier ? (
+                <div className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-purple-500/50 flex items-center justify-between gap-2 shadow-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-base shrink-0">🏭</span>
+                    <div className="min-w-0">
+                      <span className="font-black text-xs text-white truncate block">
+                        {fixedSupplierName}
+                      </span>
+                      {fixedSupplierWilaya && (
+                        <span className="text-[10px] text-purple-300 font-semibold block truncate">
+                          ولاية المستودع: {fixedSupplierWilaya}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-black border border-purple-500/40 flex items-center gap-1 shrink-0">
+                    <Lock className="w-3 h-3 text-purple-400" />
+                    <span>مورد معتمد</span>
+                  </span>
+                </div>
+              ) : (
+                <select
+                  value={selectedSupplierId}
+                  onChange={(e) => {
+                    const supId = e.target.value;
+                    setSelectedSupplierId(supId);
+                    const matched = suppliersList.find((s) => s.id === supId);
+                    if (matched) {
+                      setProductData((prev) => ({
+                        ...prev,
+                        supplierId: matched.id,
+                        supplierName: matched.companyName || matched.fullName,
+                      }));
+                    }
+                  }}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-purple-500/70 text-white font-bold cursor-pointer focus:border-purple-400 transition"
+                >
+                  {suppliersList.map((sup) => (
+                    <option key={sup.id} value={sup.id}>
+                      🏭 {sup.companyName || sup.fullName} ({sup.wilaya})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
@@ -1147,6 +1204,91 @@ export function ProductEditModal({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* AFFILIATE BUSINESS MODEL & DISTRIBUTION CHOICES */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border border-purple-500/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-purple-400" />
+                <div>
+                  <h4 className="text-xs font-black text-white">
+                    نموذج التوزيع ومبيعات الأفلييت (Business Model):
+                  </h4>
+                  <p className="text-[10px] text-slate-400">
+                    حدد طريقة بيع هذا المنتج: هل يتاح للمسوقين في الأفلييت أم تبيعه وحدك حصرياً؟
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {/* Option 1: Affiliate Enabled */}
+              <div
+                onClick={() => setAllowAffiliate(true)}
+                className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                  allowAffiliate
+                    ? 'bg-purple-950/50 border-purple-500 ring-2 ring-purple-500/40'
+                    : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 opacity-70'
+                }`}
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-purple-300 flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-purple-400" />
+                      <span>1. إتاحة لجميع البائعين في الأفلييت</span>
+                    </span>
+                    {allowAffiliate && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
+                  </div>
+                  <p className="text-[10px] text-slate-300 leading-relaxed">
+                    يظهر المنتج في كتالوج المسوقين العام لبيعه بالعمولة وجلب مبيعات مضاعفة لك، مع ضمان سعرك الصافي.
+                  </p>
+                </div>
+                <div className="pt-2 mt-2 border-t border-purple-900/40 flex items-center justify-between">
+                  <span className="text-[9px] font-black text-emerald-400">
+                    ✔ معروض للمسوقين بالكتالوج
+                  </span>
+                  <span className="text-[9px] text-slate-400">أرباح مضاعفة</span>
+                </div>
+              </div>
+
+              {/* Option 2: Exclusive to Supplier */}
+              <div
+                onClick={() => setAllowAffiliate(false)}
+                className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                  !allowAffiliate
+                    ? 'bg-amber-950/50 border-amber-500 ring-2 ring-amber-500/40'
+                    : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 opacity-70'
+                }`}
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>2. بيعه وحدي فقط (منتج حصري للمورد)</span>
+                    </span>
+                    {!allowAffiliate && <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />}
+                  </div>
+                  <p className="text-[10px] text-slate-300 leading-relaxed">
+                    لا يظهر المنتج للمسوقين في الأفلييت نهائياً. تبيعه وحدك حصرياً عبر روابطك وطلبياتك المباشرة لزبائنك.
+                  </p>
+                </div>
+                <div className="pt-2 mt-2 border-t border-amber-900/40 flex items-center justify-between">
+                  <span className="text-[9px] font-black text-amber-400">
+                    🔒 مخفي عن البائعين (حصري لك)
+                  </span>
+                  <span className="text-[9px] text-slate-400">حصرية تامة</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Platform Fulfillment Commitment Banner */}
+            <div className="p-2.5 rounded-xl bg-violet-950/40 border border-violet-800/40 flex items-center gap-2.5 text-[10px] text-violet-200">
+              <ShieldCheck className="w-4 h-4 text-violet-400 shrink-0" />
+              <span>
+                💡 <strong>ضمان المنصة والإدارة:</strong> التغليف، وقيد المراجعة (التأكيد الهاتفي مع الزبون)، والشحن والتوصيل مع الشركات كلها <strong>على حساب وعاتق الإدارة</strong> تماماً مثل البائع في كلا الخيارين!
+              </span>
             </div>
           </div>
 

@@ -35,10 +35,19 @@ const AI_CONFIG_FILE = path.join(process.cwd(), "ai-config.json");
 let aiConfig: ServerAiConfig = {
   provider: "gemini",
   geminiApiKey: "",
-  geminiModel: "gemini-3.6-flash",
+  geminiModel: "gemini-2.5-flash",
   temperature: 0.3,
   isEnabled: true,
 };
+
+function getValidGeminiModel(model?: string): string {
+  if (!model) return "gemini-2.5-flash";
+  const m = model.trim();
+  if (m === "gemini-3.8-flash" || m === "gemini-3.6-flash" || m === "gemini-1.5-flash" || !m) {
+    return "gemini-2.5-flash";
+  }
+  return m;
+}
 
 // Try loading persisted config from file
 try {
@@ -46,6 +55,7 @@ try {
     const raw = fs.readFileSync(AI_CONFIG_FILE, "utf-8");
     const parsed = JSON.parse(raw);
     aiConfig = { ...aiConfig, ...parsed };
+    aiConfig.geminiModel = getValidGeminiModel(aiConfig.geminiModel);
   }
 } catch (e) {
   console.warn("Could not read ai-config.json:", e);
@@ -79,9 +89,6 @@ function getGeminiClient(customKey?: string): GoogleGenAI | null {
     },
   });
 }
-
-// OpenRouter API client helper (Backup)
-const OPENROUTER_DEFAULT_KEY = "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";
 
 function processOpenRouterMessages(
   messages: Array<{ role: string; content: string | Array<any>; reasoning_details?: any }>,
@@ -137,12 +144,43 @@ async function callOpenRouter(
   model = "google/gemini-2.5-flash",
   options?: { reasoning?: { enabled: boolean }; stream?: boolean }
 ): Promise<any> {
-  const apiKey = process.env.OPENROUTER_API_KEY || OPENROUTER_DEFAULT_KEY;
-  if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY environment variable is missing.");
+  const customKey = process.env.OPENROUTER_API_KEY?.trim();
+
+  // If no user-configured OpenRouter key, fallback directly to Native Gemini to avoid 401 errors
+  if (!customKey) {
+    const ai = getGeminiClient();
+    if (ai) {
+      try {
+        const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+        const promptText =
+          typeof lastUserMsg?.content === "string"
+            ? lastUserMsg.content
+            : Array.isArray(lastUserMsg?.content)
+            ? lastUserMsg.content.map((c: any) => c.text || "").join(" ")
+            : JSON.stringify(messages);
+
+        const geminiRes = await ai.models.generateContent({
+          model: getValidGeminiModel(aiConfig.geminiModel),
+          contents: promptText,
+          config: {
+            temperature: aiConfig.temperature ?? 0.3,
+          },
+        });
+        return {
+          role: "assistant",
+          content: geminiRes.text || "",
+        };
+      } catch (geminiFallbackErr: any) {
+        console.warn("Direct Gemini fallback in callOpenRouter failed:", geminiFallbackErr.message);
+      }
+    }
+    return {
+      role: "assistant",
+      content: "",
+    };
   }
 
-  const { processedMessages, hasImages, targetModel } = processOpenRouterMessages(messages, model);
+  const { processedMessages, targetModel } = processOpenRouterMessages(messages, model);
 
   const makeApiCall = async (mModel: string, mMsgs: any[]) => {
     const reqBody: any = {
@@ -162,7 +200,7 @@ async function callOpenRouter(
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        Authorization: `Bearer ${customKey}`,
         "HTTP-Referer": process.env.APP_URL || "http://nouvamarket.com",
         "X-Title": "Nouva Market",
         "Content-Type": "application/json",
@@ -188,11 +226,41 @@ async function callOpenRouter(
     return data.choices?.[0]?.message;
   } catch (err: any) {
     console.warn(`OpenRouter call (${targetModel}) failed:`, err.message);
-    throw err;
+    // Graceful fallback to Gemini on failure
+    const ai = getGeminiClient();
+    if (ai) {
+      try {
+        const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+        const promptText =
+          typeof lastUserMsg?.content === "string"
+            ? lastUserMsg.content
+            : Array.isArray(lastUserMsg?.content)
+            ? lastUserMsg.content.map((c: any) => c.text || "").join(" ")
+            : JSON.stringify(messages);
+
+        const geminiRes = await ai.models.generateContent({
+          model: getValidGeminiModel(aiConfig.geminiModel),
+          contents: promptText,
+          config: {
+            temperature: aiConfig.temperature ?? 0.3,
+          },
+        });
+        return {
+          role: "assistant",
+          content: geminiRes.text || "",
+        };
+      } catch (geminiFallbackErr: any) {
+        console.warn("Gemini fallback after OpenRouter failure:", geminiFallbackErr.message);
+      }
+    }
+    return {
+      role: "assistant",
+      content: "",
+    };
   }
 }
 
-// Unified Multimodal AI Generator (Native Gemini API with OpenRouter fallback)
+// Unified Multimodal AI Generator (Native Gemini API with graceful fallback)
 async function generateMultimodalAI(
   prompt: string,
   images: string[] = [],
@@ -203,96 +271,106 @@ async function generateMultimodalAI(
     return "";
   }
 
-  // 1. Try Native Google Gemini API with @google/genai if Gemini is provider or available
-  const activeModel = aiConfig.geminiModel || "gemini-3.8-flash";
+  // 1. Try Native Google Gemini API with @google/genai
   const ai = getGeminiClient();
+  const candidateModels = [
+    getValidGeminiModel(aiConfig.geminiModel),
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+  ].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
 
-  if (aiConfig.provider === "gemini" && ai) {
-    try {
-      const contents: any[] = [];
+  if (ai) {
+    for (const targetModel of candidateModels) {
+      try {
+        const contents: any[] = [];
 
-      for (const img of images.slice(0, 4)) {
-        if (typeof img !== "string" || !img.trim()) continue;
-        const clean = img.trim();
+        for (const img of images.slice(0, 4)) {
+          if (typeof img !== "string" || !img.trim()) continue;
+          const clean = img.trim();
 
-        if (clean.startsWith("data:image/")) {
-          const match = clean.match(/^data:([^;]+);base64,(.+)$/);
-          if (match) {
-            contents.push({
-              inlineData: {
-                mimeType: match[1],
-                data: match[2],
-              },
-            });
-          }
-        } else if (clean.startsWith("http://") || clean.startsWith("https://")) {
-          try {
-            const resp = await fetch(clean, { signal: AbortSignal.timeout(5000) });
-            if (resp.ok) {
-              const mime = resp.headers.get("content-type") || "image/jpeg";
-              const buf = await resp.arrayBuffer();
-              const b64 = Buffer.from(buf).toString("base64");
+          if (clean.startsWith("data:image/")) {
+            const match = clean.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) {
               contents.push({
                 inlineData: {
-                  mimeType: mime.split(";")[0],
-                  data: b64,
+                  mimeType: match[1],
+                  data: match[2],
                 },
               });
             }
-          } catch (fetchErr) {
-            console.warn("Could not fetch remote image for Gemini:", fetchErr);
+          } else if (clean.startsWith("http://") || clean.startsWith("https://")) {
+            try {
+              const resp = await fetch(clean, { signal: AbortSignal.timeout(5000) });
+              if (resp.ok) {
+                const mime = resp.headers.get("content-type") || "image/jpeg";
+                const buf = await resp.arrayBuffer();
+                const b64 = Buffer.from(buf).toString("base64");
+                contents.push({
+                  inlineData: {
+                    mimeType: mime.split(";")[0],
+                    data: b64,
+                  },
+                });
+              }
+            } catch (fetchErr) {
+              console.warn("Could not fetch remote image for Gemini:", fetchErr);
+            }
           }
         }
+
+        contents.push({ text: prompt });
+
+        const response = await ai.models.generateContent({
+          model: targetModel,
+          contents,
+          config: {
+            systemInstruction,
+            temperature: aiConfig.temperature ?? 0.3,
+          },
+        });
+
+        const text = response.text?.trim();
+        if (text) {
+          return text;
+        }
+      } catch (geminiErr: any) {
+        console.warn(`Native GoogleGenAI call failed with ${targetModel}:`, geminiErr.message);
       }
+    }
+  }
 
-      contents.push({ text: prompt });
+  // 2. OpenRouter Multimodal Fallback (Only if valid OPENROUTER_API_KEY is supplied)
+  if (process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.trim()) {
+    try {
+      const userMessageContent: any[] = [];
+      for (const imgStr of images.slice(0, 4)) {
+        if (typeof imgStr === "string" && imgStr.trim().length > 0) {
+          userMessageContent.push({
+            type: "image_url",
+            image_url: { url: imgStr.trim() },
+          });
+        }
+      }
+      userMessageContent.push({ type: "text", text: prompt });
 
-      const response = await ai.models.generateContent({
-        model: activeModel,
-        contents,
-        config: {
-          systemInstruction,
-          temperature: aiConfig.temperature ?? 0.3,
-        },
+      const messages: any[] = [];
+      if (systemInstruction) {
+        messages.push({ role: "system", content: systemInstruction });
+      }
+      messages.push({
+        role: "user",
+        content: userMessageContent.length > 1 ? userMessageContent : prompt,
       });
 
-      const text = response.text?.trim();
-      if (text) {
-        return text;
-      }
-    } catch (geminiErr: any) {
-      console.warn("Native GoogleGenAI call failed, attempting fallback:", geminiErr.message);
+      const resMsg = await callOpenRouter(messages, "google/gemini-2.5-flash");
+      return resMsg?.content?.trim() || "";
+    } catch (openRouterErr: any) {
+      console.warn("OpenRouter fallback failed:", openRouterErr.message);
+      return "";
     }
   }
 
-  // 2. OpenRouter Multimodal Fallback
-  try {
-    const userMessageContent: any[] = [];
-    for (const imgStr of images.slice(0, 4)) {
-      if (typeof imgStr === "string" && imgStr.trim().length > 0) {
-        userMessageContent.push({
-          type: "image_url",
-          image_url: { url: imgStr.trim() },
-        });
-      }
-    }
-    userMessageContent.push({ type: "text", text: prompt });
-
-    const messages: any[] = [];
-    if (systemInstruction) {
-      messages.push({ role: "system", content: systemInstruction });
-    }
-    messages.push({
-      role: "user",
-      content: userMessageContent.length > 1 ? userMessageContent : prompt,
-    });
-
-    const resMsg = await callOpenRouter(messages, "google/gemini-2.5-flash");
-    return resMsg?.content?.trim() || "";
-  } catch (openRouterErr: any) {
-    console.error("OpenRouter fallback failed:", openRouterErr.message);
-    return "";
-  }
+  return "";
 }
 
 // Memory & Disk databases for server state
@@ -4305,7 +4383,7 @@ ${htmlContent.substring(0, 7000).replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)
       if (aiConfig.provider === "gemini" && geminiAi && aiConfig.isEnabled) {
         try {
           const geminiRes = await geminiAi.models.generateContent({
-            model: aiConfig.geminiModel || "gemini-3.8-flash",
+            model: getValidGeminiModel(aiConfig.geminiModel),
             contents: prompt,
             config: {
               responseMimeType: "application/json",
@@ -4318,15 +4396,19 @@ ${htmlContent.substring(0, 7000).replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)
         }
       }
 
-      // 2. OpenRouter fallback if Gemini did not return text
+      // 2. Fallback to OpenRouter or backup Gemini model
       if (!rawText) {
-        const aiPromise = callOpenRouter([{ role: "user", content: prompt }]);
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("AI extraction request timed out")), 10000)
-        );
+        try {
+          const aiPromise = callOpenRouter([{ role: "user", content: prompt }]);
+          const timeoutPromise = new Promise<any>((resolve) =>
+            setTimeout(() => resolve({ content: "" }), 8000)
+          );
 
-        const resMsg = await Promise.race([aiPromise, timeoutPromise]);
-        rawText = resMsg?.content || "";
+          const resMsg = await Promise.race([aiPromise, timeoutPromise]);
+          rawText = resMsg?.content || "";
+        } catch (callErr: any) {
+          console.warn("AI extraction fallback exception:", callErr.message);
+        }
       }
 
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -4528,22 +4610,22 @@ app.get("/api/admin/ai/config", (req, res) => {
     temperature: aiConfig.temperature ?? 0.3,
     supportedModels: [
       {
-        id: "gemini-3.6-flash",
-        name: "Gemini 3.6 Flash (الرسمي المعتمد - موصى به)",
+        id: "gemini-2.5-flash",
+        name: "Gemini 2.5 Flash (الرسمي المعتمد - موصى به)",
         speed: "فائق السرعة",
         quality: "عالية جداً",
         description: "النموذج الرسمي الموصى به لإنشاء نصوص الإعلانات، أوصاف المنتجات AIDA، والتعرف البصري على الصور.",
       },
       {
-        id: "gemini-3.5-flash-lite",
-        name: "Gemini 3.5 Flash Lite (فائق السرعة واقتصادي)",
+        id: "gemini-2.5-flash-lite",
+        name: "Gemini 2.5 Flash Lite (فائق السرعة واقتصادي)",
         speed: "فائق السرعة (أقل من ثانية)",
         quality: "جيدة جداً",
         description: "نموذج خفيف وسريع جداً مخصص للاستجابات اللحظية وتوليد الأسماء.",
       },
       {
-        id: "gemini-3.1-pro-preview",
-        name: "Gemini 3.1 Pro Preview (الأقوى تحليلياً)",
+        id: "gemini-2.5-pro",
+        name: "Gemini 2.5 Pro (الأقوى تحليلياً والتفكير المتعمق)",
         speed: "متوسط",
         quality: "الأعلى ذكاءً",
         description: "نموذج التفكير المتقدم لأدق المهام التحليلية وصياغة المحتوى المتعمق.",
@@ -4715,13 +4797,19 @@ app.post("/api/ai/chat/completions", async (req, res) => {
       res.setHeader("Connection", "keep-alive");
 
       const response = await callOpenRouter(messages, model, { reasoning, stream: true });
-      if (response.body) {
+      if (response && response.body && typeof (response.body as any).getReader === "function") {
         const reader = (response.body as any).getReader();
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           res.write(value);
         }
+      } else {
+        // SSE compatibility format for non-streaming or fallback responses
+        const text = response?.content || "";
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: null }] })}\n\n`);
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\n`);
+        res.write("data: [DONE]\n\n");
       }
       return res.end();
     } else {

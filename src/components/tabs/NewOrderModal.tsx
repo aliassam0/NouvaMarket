@@ -15,9 +15,21 @@ interface NewOrderModalProps {
   initialProduct?: Product | null;
   onClose: () => void;
   onShowToast: (msg: string) => void;
+  availableProducts?: Product[];
+  isSupplierMode?: boolean;
+  supplierId?: string;
+  supplierName?: string;
 }
 
-export function NewOrderModal({ initialProduct, onClose, onShowToast }: NewOrderModalProps) {
+export function NewOrderModal({
+  initialProduct,
+  onClose,
+  onShowToast,
+  availableProducts,
+  isSupplierMode = false,
+  supplierId,
+  supplierName,
+}: NewOrderModalProps) {
   const { createOrder, getWhatsAppReceiptText } = useOrders();
   const { t, language } = useLanguage();
 
@@ -160,6 +172,10 @@ export function NewOrderModal({ initialProduct, onClose, onShowToast }: NewOrder
         variantSize: activeTier.itemVariants?.[0]?.size || selectedVariant.size,
         variantColor: activeTier.itemVariants?.[0]?.color || selectedVariant.color,
         quantity: activeTier.quantity,
+        supplierId: selectedProduct.supplierId || supplierId || '',
+        supplierName: selectedProduct.supplierName || supplierName || '',
+        supplierEmail: selectedProduct.supplierEmail || '',
+        supplierNetPrice: selectedProduct.supplierNetPrice,
         wholesalePrice: selectedProduct.wholesalePrice,
         sellingPrice: Math.round(activeTier.totalPrice / activeTier.quantity),
         profit: Math.round(activeTier.netProfit / activeTier.quantity),
@@ -174,6 +190,10 @@ export function NewOrderModal({ initialProduct, onClose, onShowToast }: NewOrder
         variantSize: selectedVariant.size,
         variantColor: selectedVariant.color,
         quantity,
+        supplierId: selectedProduct.supplierId || supplierId || '',
+        supplierName: selectedProduct.supplierName || supplierName || '',
+        supplierEmail: selectedProduct.supplierEmail || '',
+        supplierNetPrice: selectedProduct.supplierNetPrice,
         wholesalePrice: selectedProduct.wholesalePrice,
         sellingPrice,
         profit: itemProfitSingle,
@@ -195,7 +215,15 @@ export function NewOrderModal({ initialProduct, onClose, onShowToast }: NewOrder
       refArticle: refArticle || `REF-${selectedProduct.id}`,
       noteFournisseur,
       idExterne,
-      source,
+      source: isSupplierMode ? 'SUPPLIER_DIRECT' : (source || 'Facebook'),
+      supplierId: supplierId || selectedProduct.supplierId || '',
+      supplierName: supplierName || selectedProduct.supplierName || '',
+      supplierEmail: selectedProduct.supplierEmail || '',
+      resellerId: isSupplierMode ? (supplierId || selectedProduct.supplierId || '') : undefined,
+      resellerName: isSupplierMode ? (supplierName || selectedProduct.supplierName || '') : undefined,
+      status: 'PENDING_SYNC',
+      statusAr: '🔍 قيد المراجعة (في انتظار التأكيد)',
+      situation: 'En révision',
       items: [
         mainOrderItem,
         ...selectedUpsells.map((u) => ({
@@ -205,6 +233,9 @@ export function NewOrderModal({ initialProduct, onClose, onShowToast }: NewOrder
           variantSize: 'موحد',
           variantColor: 'افتراضي',
           quantity: 1,
+          supplierId: selectedProduct.supplierId || supplierId || '',
+          supplierName: selectedProduct.supplierName || supplierName || '',
+          supplierEmail: selectedProduct.supplierEmail || '',
           wholesalePrice: u.wholesalePrice,
           sellingPrice: u.price,
           profit: Number(u.profit) || Math.max(0, u.price - u.wholesalePrice),
@@ -268,6 +299,47 @@ export function NewOrderModal({ initialProduct, onClose, onShowToast }: NewOrder
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                 {t('order.step1')}
               </h3>
+
+              {/* Supplier Reassurance Banner */}
+              {isSupplierMode && (
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-violet-600/10 via-purple-600/10 to-indigo-600/10 border border-purple-500/30 flex items-center gap-2.5 text-xs text-purple-900 dark:text-purple-200">
+                  <ShieldCheck className="w-5 h-5 text-purple-600 shrink-0" />
+                  <div>
+                    <span className="font-extrabold block">مبيعات مباشرة للمورد:</span>
+                    <span className="text-[11px] text-slate-600 dark:text-slate-300">
+                      التغليف وقيد المراجعة والتأكيد مع الزبون والتوصيل مع الشركات كلها <strong>على حساب الإدارة</strong> تماماً مثل البائع!
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Product Switcher if multiple products available */}
+              {availableProducts && availableProducts.length > 1 && (
+                <div>
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    اختر المنتج المطلوب بيعه:
+                  </label>
+                  <select
+                    value={selectedProduct.id}
+                    onChange={(e) => {
+                      const prod = availableProducts.find((p) => p.id === e.target.value);
+                      if (prod) {
+                        setSelectedProduct(prod);
+                        setSelectedVariant(prod.variants[0] || { id: 'v1', size: 'Standard', color: 'Original', colorHex: '#000', stockCount: 0 });
+                        setSellingPrice(prod.suggestedSellingPrice || prod.wholesalePrice + 1000);
+                        setRefArticle(`REF-${prod.id.toUpperCase()}`);
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    {availableProducts.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nameAr} - الجملة: {p.wholesalePrice} دج {p.allowAffiliate === false ? '(🔒 حصري لك)' : '(🟢 أفلييت)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Product Card */}
               <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex gap-3 items-center">

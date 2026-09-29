@@ -43,6 +43,10 @@ import {
   Zap,
   Lock,
   ShieldAlert,
+  Wallet,
+  CreditCard,
+  ArrowDownToLine,
+  Plus,
 } from 'lucide-react';
 import { useOrders } from '../../context/OrderContext';
 import { useAuth } from '../../context/AuthContext';
@@ -50,6 +54,13 @@ import { Order, OrderStatus } from '../../types';
 import { ALGERIA_WILAYAS } from '../../data/algeriaLocations';
 import { fetchDriverInfoFromCourierApi } from '../../lib/deliveryApiManager';
 import { DateFilterBar, DateFilterMode, matchesDateFilter } from '../common/DateFilterBar';
+import { OrderAuditTimeline } from '../common/OrderAuditTimeline';
+import { getStoredMarketplaceFees } from '../../lib/supplierHelper';
+import {
+  createWithdrawalRequest,
+  getStoredWithdrawals,
+  WithdrawalRequest,
+} from '../../lib/withdrawalHelper';
 
 interface ConfirmerDashboardProps {
   onShowToast: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -118,10 +129,10 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
   const [coordStatus, setCoordStatus] = useState<any>('out_for_delivery');
   const [coordNotes, setCoordNotes] = useState('');
   const [isSavingCoord, setIsSavingCoord] = useState(false);
-  const [showCoordinationGuide, setShowCoordinationGuide] = useState(false);
 
   // Edit Customer Info Modal
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [selectedTimelineOrder, setSelectedTimelineOrder] = useState<Order | null>(null);
   const [editCustomerName, setEditCustomerName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editPhone2, setEditPhone2] = useState('');
@@ -212,6 +223,11 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
       return true;
     });
 
+    const feeSettings = getStoredMarketplaceFees();
+    const confirmerFeePerOrder = feeSettings.confirmerFeeDzd ?? 100;
+    const totalEarnedConfirmerFees = myDelivered.length * confirmerFeePerOrder;
+    const todayEarnedConfirmerFees = myDeliveredToday.length * confirmerFeePerOrder;
+
     return {
       myConfirmedCount: myConfirmedOrders.length,
       myConfirmedTodayCount: myConfirmedToday.length,
@@ -222,8 +238,98 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
       deliverySuccessRate,
       deliveredVolumeDzd,
       globalPendingCount: accessiblePendingOrders.length,
+      totalEarnedConfirmerFees,
+      todayEarnedConfirmerFees,
+      confirmerFeePerOrder,
     };
   }, [orders, agentId, agentName, user?.role]);
+
+  // Confirmer Withdrawals / Payouts Management
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(getStoredWithdrawals);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState<number>(0);
+  const [withdrawMethod, setWithdrawMethod] = useState<'BARIDIMOB' | 'CCP' | 'CASH'>('BARIDIMOB');
+  const [withdrawAccountDetails, setWithdrawAccountDetails] = useState('');
+  const [withdrawPhone, setWithdrawPhone] = useState(user?.phone || '');
+  const [withdrawNotes, setWithdrawNotes] = useState('');
+
+  React.useEffect(() => {
+    const handleSync = () => setWithdrawals(getStoredWithdrawals());
+    window.addEventListener('nouva_withdrawals_updated', handleSync);
+    return () => window.removeEventListener('nouva_withdrawals_updated', handleSync);
+  }, []);
+
+  const myWithdrawals = useMemo(() => {
+    return withdrawals.filter(
+      (w) =>
+        w.userType === 'CONFIRMER' &&
+        (w.sellerId === agentId || w.sellerName === agentName)
+    );
+  }, [withdrawals, agentId, agentName]);
+
+  const paidWithdrawalsDzd = useMemo(() => {
+    return myWithdrawals
+      .filter((w) => w.status === 'APPROVED')
+      .reduce((sum, w) => sum + (w.amountDzd || 0), 0);
+  }, [myWithdrawals]);
+
+  const pendingWithdrawalsDzd = useMemo(() => {
+    return myWithdrawals
+      .filter((w) => w.status === 'PENDING')
+      .reduce((sum, w) => sum + (w.amountDzd || 0), 0);
+  }, [myWithdrawals]);
+
+  const availableToWithdrawDzd = useMemo(() => {
+    const total = stats.totalEarnedConfirmerFees;
+    return Math.max(0, total - (paidWithdrawalsDzd + pendingWithdrawalsDzd));
+  }, [stats.totalEarnedConfirmerFees, paidWithdrawalsDzd, pendingWithdrawalsDzd]);
+
+  const handleRequestPayout = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!withdrawAmount || withdrawAmount <= 0) {
+      onShowToast('يرجى إدخال مبلغ صحيح للسحب', 'error');
+      return;
+    }
+    if (withdrawAmount > availableToWithdrawDzd) {
+      onShowToast(
+        `المبلغ المطلوب (${withdrawAmount.toLocaleString()} دج) أكبر من رصيدك المتاح (${availableToWithdrawDzd.toLocaleString()} دج)!`,
+        'error'
+      );
+      return;
+    }
+    if (withdrawMethod !== 'CASH' && !withdrawAccountDetails.trim()) {
+      onShowToast(
+        withdrawMethod === 'BARIDIMOB'
+          ? 'يرجى إدخال رقم هاتف BaridiMob أو الـ RIP'
+          : 'يرجى إدخال رقم حساب CCP والمفتاح Clé',
+        'error'
+      );
+      return;
+    }
+
+    const details =
+      withdrawMethod === 'CASH'
+        ? `استلام نقدي باليد في المستودع/المقر (${withdrawPhone || user?.phone || 'بدون هاتف'})${withdrawNotes ? ` - ملاحظة: ${withdrawNotes}` : ''}`
+        : `${withdrawAccountDetails.trim()}${withdrawNotes ? ` - ملاحظة: ${withdrawNotes}` : ''}`;
+
+    createWithdrawalRequest({
+      sellerId: agentId,
+      sellerName: agentName,
+      storeName: 'فريق تأكيد الطلبيات',
+      phone: withdrawPhone || user?.phone || '',
+      amountDzd: withdrawAmount,
+      method: withdrawMethod,
+      accountDetails: details,
+      userType: 'CONFIRMER',
+    });
+
+    setWithdrawals(getStoredWithdrawals());
+    setIsWithdrawModalOpen(false);
+    setWithdrawAmount(0);
+    setWithdrawAccountDetails('');
+    setWithdrawNotes('');
+    onShowToast(`✔ تم إرسال طلب سحب أتعاب التأكيد بمبلغ ${withdrawAmount.toLocaleString()} دج بنجاح إلى الإدارة!`, 'success');
+  };
 
   // Filtered orders list based on active tab and search
   const filteredOrders = useMemo(() => {
@@ -787,62 +893,10 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
 
   return (
     <div className="flex-1 bg-slate-50 dark:bg-slate-950 p-3 sm:p-5 overflow-y-auto space-y-4">
-      {/* 1.1 COURIER & BUYER COORDINATION GUIDE BANNER */}
-      <div className="p-4 rounded-3xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 border border-blue-500/30 text-white shadow-lg space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300">
-              <Navigation className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-black flex items-center gap-2">
-                <span>تنسيق الاتصال بين رقم الموزع (Livreur) ورقم المشتري</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold border border-blue-400/30">
-                  دليل عمل المؤكد 🛵
-                </span>
-              </h3>
-              <p className="text-xs text-blue-200/80 mt-0.5">
-                نظام الربط والتنسيق المباشر بين الموزع السائق والزبون لرفع نسبة التسليم الناجح وتفادي المرتجعات.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowCoordinationGuide((prev) => !prev)}
-            className="px-3.5 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 border border-blue-400/30 text-xs font-bold flex items-center gap-1.5 self-start sm:self-auto transition cursor-pointer"
-          >
-            <ChevronDown className={`w-4 h-4 transition-transform ${showCoordinationGuide ? 'rotate-180' : ''}`} />
-            <span>{showCoordinationGuide ? 'إخفاء الدليل' : 'كيف ينسق المؤكد؟ (عرض الخطوات) 💡'}</span>
-          </button>
-        </div>
 
-        {showCoordinationGuide && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-blue-500/20 text-xs animate-in fade-in duration-200">
-            <div className="p-3 rounded-2xl bg-black/30 border border-blue-500/20 space-y-1.5">
-              <div className="font-black text-blue-300 flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-blue-500/30 flex items-center justify-center text-[11px]">1</span>
-                <span>جلب بيانات الموزع تلقائياً عبر API شركة التوصيل ⚡:</span>
-              </div>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                عند خروج الشحنة للتوزيع، يضغط المؤكد على الطلبية ليسحب النظام آلياً من API شركة التوصيل (Yalidine, Procolis, ZR Express...): اسم الموزع الميداني، رقم هاتفه المباشر، ومركز التوزيع.
-              </p>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-black/30 border border-blue-500/20 space-y-1.5">
-              <div className="font-black text-blue-300 flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-blue-500/30 flex items-center justify-center text-[11px]">2</span>
-                <span>إشعار المشتري برقم الموزع وتأمين الاستلام 🛍️:</span>
-              </div>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                بالضغط على <strong>"إرسال رقم الموزع للزبون عبر واتساب"</strong>، يتلقى المشتري رسالة رسمية باسم الموزع، ورقم هاتفه، والمبلغ الواجب تحضيره نقداً، مع تنبيهه بإبقاء هاتفه مفتوحاً لسرعة الاستلام.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* 2. CONFIRMER PERSONAL KPI CARDS ("لكل مؤكد احصائياته في الداشبورد الخاص به") */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         {/* Metric 1: My Confirmed Total */}
         <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
@@ -936,6 +990,46 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
             <span className="text-[10px] text-slate-400 font-bold">
               دج
             </span>
+          </div>
+        </div>
+
+        {/* Metric 7: Confirmer Earned Fees (Platform Guaranteed) */}
+        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-50/90 to-indigo-50/90 dark:from-blue-950/40 dark:to-indigo-950/40 border-2 border-blue-300 dark:border-blue-800 shadow-xs flex flex-col justify-between col-span-2 sm:col-span-1">
+          <div>
+            <div className="flex items-center justify-between text-blue-700 dark:text-blue-300 text-xs font-bold">
+              <span>أتعابي المكتسبة (المسلّمة)</span>
+              <Award className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="mt-1.5 flex items-baseline justify-between">
+              <span className="text-base sm:text-lg font-black text-blue-700 dark:text-blue-300 font-mono">
+                {stats.totalEarnedConfirmerFees.toLocaleString()}
+              </span>
+              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+                دج
+              </span>
+            </div>
+            <div className="text-[9px] text-blue-600/80 dark:text-blue-400/80 mt-0.5 flex items-center justify-between">
+              <span>{stats.myDeliveredCount} مسلّم × {stats.confirmerFeePerOrder} دج</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">على عاتق الإدارة</span>
+            </div>
+          </div>
+
+          <div className="pt-2 mt-2 border-t border-blue-200/70 dark:border-blue-800/60 flex items-center justify-between gap-1.5">
+            <div className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
+              <span>المتاح: </span>
+              <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-black">{availableToWithdrawDzd.toLocaleString()} دج</strong>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setWithdrawAmount(availableToWithdrawDzd);
+                setIsWithdrawModalOpen(true);
+              }}
+              className="px-2 py-0.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-black text-[10px] flex items-center gap-1 shadow-xs cursor-pointer transition"
+            >
+              <Wallet className="w-3 h-3" />
+              <span>طلب سحب</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1159,6 +1253,15 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
                           <Calendar className="w-3.5 h-3.5" />
                           {new Date(order.createdAt).toLocaleDateString('ar-DZ')}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTimelineOrder(order)}
+                          className="px-2 py-0.5 rounded-lg bg-violet-50 hover:bg-violet-100 dark:bg-violet-950/60 text-violet-800 dark:text-violet-300 border border-violet-200 dark:border-violet-800 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
+                          title="عرض سجل التدقيق والمزامنة اللحظية عبر كافة الداشبوردات"
+                        >
+                          <Clock className="w-3 h-3 text-violet-600 dark:text-violet-400" />
+                          <span>المسار اللحظي ⚡</span>
+                        </button>
 
                         {/* Confirmer Lock / Exclusivity Badge */}
                         {order.assignedConfirmerId ? (
@@ -1775,7 +1878,322 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
                   قيمة الطلبيات المسلّمة فعلياً
                 </span>
               </div>
+
+              {/* Financial Wallet & Dues Breakdown */}
+              <div className="p-5 rounded-3xl bg-gradient-to-br from-blue-50/60 via-indigo-50/40 to-purple-50/50 dark:from-slate-900 dark:via-blue-950/20 dark:to-slate-900 border-2 border-blue-300/80 dark:border-blue-900/50 shadow-md space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-blue-200/70 dark:border-blue-900/40 pb-3">
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <Wallet className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>المحفظة المالية ومستحقات التأكيد (مضمونة على عاتق الإدارة 100%)</span>
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      كل طلبية تؤكدها وتُسلّم للزبون تكسبك {stats.confirmerFeePerOrder} دج كحافز إنتاجي. يمكنك سحب مستحقاتك في أي وقت لحسابك عبر BaridiMob أو CCP أو نقداً.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWithdrawAmount(availableToWithdrawDzd);
+                      setIsWithdrawModalOpen(true);
+                    }}
+                    disabled={availableToWithdrawDzd <= 0}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 shadow-md transition ${
+                      availableToWithdrawDzd > 0
+                        ? 'bg-blue-600 hover:bg-blue-500 text-white cursor-pointer active:scale-95 shadow-blue-600/20'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    <ArrowDownToLine className="w-4 h-4" />
+                    <span>طلب سحب الأتعاب ({availableToWithdrawDzd.toLocaleString()} دج)</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
+                    <span className="text-[10px] text-slate-400 font-bold block">إجمالي الأتعاب المكتسبة</span>
+                    <strong className="text-blue-600 dark:text-blue-400 font-black font-mono text-base block mt-0.5">
+                      {stats.totalEarnedConfirmerFees.toLocaleString()} دج
+                    </strong>
+                    <span className="text-[9px] text-slate-400 block mt-0.5">({stats.myDeliveredCount} طرد مسلّم)</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
+                    <span className="text-[10px] text-slate-400 font-bold block">المبالغ المصروفة والمحولة</span>
+                    <strong className="text-emerald-600 dark:text-emerald-400 font-black font-mono text-base block mt-0.5">
+                      {paidWithdrawalsDzd.toLocaleString()} دج
+                    </strong>
+                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 block mt-0.5 font-bold">تم تحويلها لحسابك</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
+                    <span className="text-[10px] text-slate-400 font-bold block">طلبات قيد المراجعة</span>
+                    <strong className="text-amber-600 dark:text-amber-400 font-black font-mono text-base block mt-0.5">
+                      {pendingWithdrawalsDzd.toLocaleString()} دج
+                    </strong>
+                    <span className="text-[9px] text-amber-600 dark:text-amber-400 block mt-0.5 font-bold">بانتظار تحويل الإدارة</span>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-400 dark:border-emerald-700 text-center">
+                    <span className="text-[10px] text-emerald-800 dark:text-emerald-300 font-black block">الرصيد المتاح للسحب الآن</span>
+                    <strong className="text-emerald-700 dark:text-emerald-300 font-black font-mono text-lg block mt-0.5">
+                      {availableToWithdrawDzd.toLocaleString()} دج
+                    </strong>
+                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 block mt-0.5 font-bold">جاهز للتحويل الفوري</span>
+                  </div>
+                </div>
+
+                {/* Confirmer Withdrawals History */}
+                <div className="pt-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <History className="w-3.5 h-3.5 text-blue-600" />
+                      <span>سجل طلبات السحب والتحويلات الخاصة بك ({myWithdrawals.length})</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">تحديث لحظي</span>
+                  </div>
+
+                  {myWithdrawals.length === 0 ? (
+                    <div className="p-6 text-center rounded-2xl bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-400 text-xs font-bold">
+                      لا توجد طلبات سحب سابقة. يمكنك تقديم أول طلب سحب عندما يصبح لديك رصيد متاح من الطلبيات المسلّمة!
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {myWithdrawals.map((w) => (
+                        <div
+                          key={w.id}
+                          className="p-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs shadow-xs"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono font-black text-blue-600 dark:text-blue-400">{w.id}</span>
+                              <span className="text-slate-400">•</span>
+                              <span className="font-mono text-slate-500 text-[11px]">{w.requestDate}</span>
+                              <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-bold">
+                                {w.method === 'BARIDIMOB' ? '📱 BaridiMob' : w.method === 'CCP' ? '📮 حساب CCP' : '💵 نقداً باليد'}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-600 dark:text-slate-300">
+                              تفاصيل الحساب: <strong className="font-mono text-slate-900 dark:text-white font-bold">{w.accountDetails}</strong>
+                            </div>
+                            {w.proofReference && (
+                              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>وصل إثبات التحويل من الإدارة: {w.proofReference}</span>
+                              </div>
+                            )}
+                            {w.rejectionReason && (
+                              <div className="text-[10px] text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3 text-rose-600" />
+                                <span>سبب الرفض: {w.rejectionReason}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 self-end sm:self-center">
+                            <span className="font-black font-mono text-base text-slate-900 dark:text-white">
+                              {w.amountDzd.toLocaleString()} دج
+                            </span>
+                            <span
+                              className={`px-3 py-1 rounded-full text-[10px] font-black ${
+                                w.status === 'APPROVED'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300'
+                                  : w.status === 'PENDING'
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300'
+                                  : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300'
+                              }`}
+                            >
+                              {w.status === 'APPROVED' ? '✔ تم الصرف والتحويل' : w.status === 'PENDING' ? '⏳ قيد المراجعة لدى الإدارة' : '✖ مرفوض'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: REQUEST CONFIRMER PAYOUT */}
+      {isWithdrawModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-blue-100 dark:bg-blue-950 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                  <Wallet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                    طلب سحب أتعاب التأكيد
+                  </h3>
+                  <span className="text-[11px] text-slate-400">
+                    تحويل مباشر لحسابك الشخصي على عاتق إدارة المنصة
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsWithdrawModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Available Balance Banner */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-blue-500/30 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-blue-900 dark:text-blue-300 font-bold block">
+                  رصيدك المتاح للسحب حالياً:
+                </span>
+                <span className="text-xl font-black font-mono text-blue-700 dark:text-blue-400">
+                  {availableToWithdrawDzd.toLocaleString()} دج
+                </span>
+              </div>
+              <span className="text-[10px] px-2.5 py-1 rounded-full bg-blue-600 text-white font-black">
+                {stats.myDeliveredCount} طرد مسلّم
+              </span>
+            </div>
+
+            <form onSubmit={handleRequestPayout} className="space-y-3.5 text-xs font-bold">
+              {/* Amount Input */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-700 dark:text-slate-300 font-black">
+                    المبلغ المطلوب سحبه (دج) *
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawAmount(Math.round(availableToWithdrawDzd * 0.5))}
+                      className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] hover:bg-blue-100"
+                    >
+                      50%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawAmount(availableToWithdrawDzd)}
+                      className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-black hover:bg-blue-200"
+                    >
+                      كامل الرصيد (100%)
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="number"
+                  min="100"
+                  max={availableToWithdrawDzd}
+                  required
+                  value={withdrawAmount || ''}
+                  onChange={(e) => setWithdrawAmount(Number(e.target.value))}
+                  placeholder={`أدخل المبلغ (بين 100 و ${availableToWithdrawDzd.toLocaleString()} دج)`}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono font-black text-sm text-blue-600 dark:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Method Selection */}
+              <div className="space-y-1.5">
+                <label className="text-slate-700 dark:text-slate-300 font-black block">
+                  طريقة استلام الأتعاب *
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'BARIDIMOB' as const, label: '📱 BaridiMob', sub: 'فوري عبر الهاتف/RIP' },
+                    { id: 'CCP' as const, label: '📮 حساب CCP', sub: 'حوالة بريدية' },
+                    { id: 'CASH' as const, label: '💵 نقداً باليد', sub: 'في المستودع/المقر' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setWithdrawMethod(m.id)}
+                      className={`p-2.5 rounded-xl text-center border transition cursor-pointer ${
+                        withdrawMethod === m.id
+                          ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-black'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className="block text-xs">{m.label}</span>
+                      <span className="block text-[9px] text-slate-400 mt-0.5">{m.sub}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Account Details Input */}
+              {withdrawMethod !== 'CASH' && (
+                <div className="space-y-1.5">
+                  <label className="text-slate-700 dark:text-slate-300 font-black block">
+                    {withdrawMethod === 'BARIDIMOB'
+                      ? 'رقم الهاتف أو الـ RIP المسجل في بريدي موب (00799999...) *'
+                      : 'رقم الحساب البريدي CCP والمفتاح Clé *'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={withdrawAccountDetails}
+                    onChange={(e) => setWithdrawAccountDetails(e.target.value)}
+                    placeholder={
+                      withdrawMethod === 'BARIDIMOB'
+                        ? 'مثال: 00799999000123456789 أو 0550123456'
+                        : 'مثال: 0012345678 Clé 89'
+                    }
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+
+              {/* Phone Input */}
+              <div className="space-y-1.5">
+                <label className="text-slate-700 dark:text-slate-300 font-black block">
+                  رقم الهاتف للتواصل وتأكيد التحويل *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={withdrawPhone}
+                  onChange={(e) => setWithdrawPhone(e.target.value)}
+                  placeholder="0550123456"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-1.5">
+                <label className="text-slate-700 dark:text-slate-300 font-bold block">
+                  ملاحظات إضافية (اختياري)
+                </label>
+                <input
+                  type="text"
+                  value={withdrawNotes}
+                  onChange={(e) => setWithdrawNotes(e.target.value)}
+                  placeholder="أي ملاحظة تود إيصالها للإدارة..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsWithdrawModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={withdrawAmount <= 0 || withdrawAmount > availableToWithdrawDzd}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>تأكيد وإرسال طلب السحب</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -2266,6 +2684,41 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
                   <span>حفظ بيانات التنسيق</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Real-time Order Audit Trail & Multi-Dashboard Sync Modal */}
+      {selectedTimelineOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-base text-slate-900 dark:text-white">
+                  سجل التزامن والمسار اللحظي للطلب
+                </span>
+                <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300 font-extrabold">
+                  #{selectedTimelineOrder.trackingCode || selectedTimelineOrder.id}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedTimelineOrder(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 font-bold flex items-center justify-center cursor-pointer transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <OrderAuditTimeline order={selectedTimelineOrder} />
+
+            <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => setSelectedTimelineOrder(null)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer transition"
+              >
+                إغلاق
+              </button>
             </div>
           </div>
         </div>

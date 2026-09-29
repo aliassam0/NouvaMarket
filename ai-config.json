@@ -1,7 +1,7 @@
 {
   "provider": "gemini",
   "geminiApiKey": "",
-  "geminiModel": "gemini-3.6-flash",
+  "geminiModel": "gemini-2.5-flash",
   "temperature": 0.35,
   "isEnabled": true
 }

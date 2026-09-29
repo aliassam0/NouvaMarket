@@ -3,17 +3,19 @@ export type Language = 'ar' | 'fr';
 export type UserRank = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM';
 
 export interface UserProfile {
+
   id: string;
   fullName: string;
   storeName: string;
   phone: string;
   email?: string;
   password?: string;
-  role?: 'reseller' | 'admin' | 'warehouse' | 'confirmer';
+  role?: 'reseller' | 'admin' | 'warehouse' | 'confirmer' | 'platform_warehouse';
   wilaya: string;
   rank: UserRank;
   rankAr: string;
   rankFr: string;
+
   kycStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_SUBMITTED';
   approvalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED' | 'SUSPENDED';
   avatarUrl?: string;
@@ -76,6 +78,8 @@ export interface MarketplaceFeeSettings {
   defaultSupplierFeePercent?: number;
   defaultResellerCommissionPercent?: number;
   resellerMinProfitMargin: number;
+  pickAndPackFeeDzd?: number; // رسوم التجهيز والتغليف بمستودع المنصة المركزي (افتراضياً 100 دج لكل طرد ناجح)
+  confirmerFeeDzd?: number; // أتعاب مؤكد الطلبيات عن كل طرد ناجح ومسلّم على عاتق الإدارة (افتراضياً 100 دج)
   lastUpdated: string;
 }
 
@@ -188,7 +192,10 @@ export interface Product {
   isBestSeller?: boolean;
   minStockAlert?: number; // Minimum stock threshold before alert is triggered
   approvalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED';
-  rejectionReason?: string;
+  shelfLocation?: string; // موقع التخزين بالرف بالمستودع المركزي (e.g. رف A3 - ممر 2)
+  barcode?: string; // كود الباركود لسهولة المسح والتغليف
+  allowAffiliate?: boolean; // إتاحة المنتج لجميع المسوقين بالعمولة
+  isSupplierExclusive?: boolean; // منتج حصري للمورد
 }
 
 export type OrderStatus =
@@ -210,6 +217,7 @@ export interface OrderItem {
   quantity: number;
   supplierId?: string;
   supplierName?: string;
+  supplierEmail?: string;
   supplierNetPrice?: number;
   nouvaFeeAmount?: number;
   wholesalePrice: number;
@@ -275,7 +283,12 @@ export interface Order {
   externalCustomerNote?: string; // ملاحظات الزبون من المتجر الخارجي
   supplierId?: string;
   supplierEmail?: string;
+  supplierName?: string;
   returnedToWarehouse?: boolean;
+  reconciledWithCourier?: boolean;
+  courierRemittanceId?: string;
+  qcInspected?: boolean;
+  qcInspectionReportId?: string;
   commissionCredited?: boolean;
   trackingHistory?: any[];
   assignedConfirmerId?: string; // معرف المؤكد المكلف بالطلبية حصرياً لمنع الازدواجية
@@ -450,3 +463,121 @@ export interface ExternalOrderSyncResult {
   orders: Order[];
   errors: string[];
 }
+
+// ----------------------------------------------------
+// Platform Central Warehouse & Inbound Shipments
+// ----------------------------------------------------
+
+export interface InboundStockItem {
+  productId: string;
+  productName: string;
+  productImage?: string;
+  variantId?: string;
+  variantSize?: string;
+  variantColor?: string;
+  quantitySent: number;
+  quantityReceived?: number;
+  wholesalePrice: number;
+}
+
+export interface InboundStockRequest {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  supplierPhone?: string;
+  supplierEmail?: string;
+  trackingNumber?: string;
+  carrierName?: string;
+  status: 'PENDING_DISPATCH' | 'IN_TRANSIT' | 'RECEIVED' | 'INSPECTED' | 'REJECTED';
+  totalUnits: number;
+  totalWholesaleValueDzd: number;
+  items: InboundStockItem[];
+  notes?: string;
+  receivedNotes?: string;
+  createdAt: string;
+  receivedAt?: string;
+  warehouseLocation?: string; // e.g. مستودع العاصمة المركزي - رف A3
+}
+
+// ----------------------------------------------------
+// Courier Handover Manifest (بوردورو / مانيفست تسليم السائق)
+// ----------------------------------------------------
+
+export interface CourierManifestItem {
+  orderId: string;
+  trackingCode: string;
+  customerName: string;
+  phone: string;
+  wilaya: string;
+  commune: string;
+  itemsSummary: string;
+  codAmount: number;
+  deliveryType?: 'home' | 'desk' | 'office' | string;
+}
+
+export interface CourierManifest {
+  id: string;
+  manifestNumber: string;
+  courierId: string;
+  courierName: string;
+  driverName?: string;
+  driverPhone?: string;
+  vehiclePlate?: string;
+  totalParcels: number;
+  totalCodAmountDzd: number;
+  orders: CourierManifestItem[];
+  createdAt: string;
+  warehouseOfficerName?: string;
+  notes?: string;
+}
+
+// ----------------------------------------------------
+// Phase 3: COD Cash Reconciliation & Courier Remittance
+// ----------------------------------------------------
+
+export interface CodRemittanceBatch {
+  id: string;
+  batchNumber: string; // e.g. REM-YAL-20260926-01
+  courierId: string;
+  courierName: string;
+  paymentReference: string; // e.g. Virement CCP / Cheque / Cash receipt
+  paymentMethod: 'CCP' | 'BARIDIMOB' | 'BANK_TRANSFER' | 'CASH';
+  totalOrdersCount: number;
+  totalCodCollectedDzd: number;
+  courierShippingFeesDzd: number;
+  netPayoutDzd: number;
+  totalResellerProfitsDzd: number;
+  totalSupplierWholesaleDzd: number;
+  totalPlatformFeeDzd: number;
+  status: 'RECONCILED' | 'PENDING_AUDIT';
+  orderIds: string[];
+  reconciledAt: string;
+  reconciledBy?: string;
+  notes?: string;
+}
+
+// ----------------------------------------------------
+// Phase 3: Returns Quality Control (QC) & Damage Claim Report
+// ----------------------------------------------------
+
+export interface ReturnInspectionReport {
+  id: string;
+  orderId: string;
+  trackingCode: string;
+  customerName: string;
+  phone: string;
+  wilaya: string;
+  courierName: string;
+  packagingStatus: 'SEALED_INTACT' | 'OPENED_GOOD' | 'TORN_DAMAGED';
+  itemStatus: 'RESELLABLE' | 'DAMAGED_CARRIER' | 'WRONG_ITEM' | 'CUSTOMER_USED';
+  inspectorName: string;
+  restockedToShelf?: string;
+  itemsCount: number;
+  compensationClaimNeeded: boolean;
+  carrierClaimAmountDzd?: number;
+  claimStatus?: 'CLAIM_FILED' | 'COMPENSATED' | 'REJECTED' | 'NOT_APPLICABLE';
+  claimReference?: string;
+  notes?: string;
+  inspectedAt: string;
+}
+

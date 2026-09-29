@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Link as LinkIcon, Share2, ShoppingBag, Trash2, AlertTriangle, X, Layers, Plus } from 'lucide-react';
+import { Search, Link as LinkIcon, Share2, ShoppingBag, Trash2, AlertTriangle, X, Layers, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getStoredProducts } from '../../data/mockProducts';
 import { Product } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
@@ -26,6 +26,8 @@ export function MarketedProductsTab({
   const [searchTerm, setSearchTerm] = useState('');
   const [marketedProducts, setMarketedProducts] = useState<Product[]>([]);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const PRODUCTS_PER_PAGE = 20;
 
   useEffect(() => {
     const fetchMarketedProducts = () => {
@@ -40,6 +42,11 @@ export function MarketedProductsTab({
         const hasLinks = localStorage.getItem(linkKey) || localStorage.getItem(configKey);
 
         if (hasLinks) {
+          // If supplier made product exclusive to himself, do not show to resellers
+          if (product.allowAffiliate === false || product.isSupplierExclusive === true) {
+            return;
+          }
+
           // Check stock
           const totalStock = product.variants.reduce((acc, v) => acc + (v.stockCount || 0), 0);
 
@@ -94,6 +101,16 @@ export function MarketedProductsTab({
       p.categoryAr.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE) || 1;
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (safeCurrentPage - 1) * PRODUCTS_PER_PAGE;
+  const endIndex = Math.min(startIndex + PRODUCTS_PER_PAGE, filteredProducts.length);
+  const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
 
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950/40">
@@ -163,8 +180,9 @@ export function MarketedProductsTab({
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-3.5 pb-24">
-            {filteredProducts.map((product, pIdx) => {
+          <div className="space-y-4 pb-24">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-3.5">
+              {paginatedProducts.map((product, pIdx) => {
               const links = getProductShareLinks(
                 product.id,
                 product.suggestedSellingPrice || product.wholesalePrice + 1000
@@ -283,7 +301,87 @@ export function MarketedProductsTab({
               );
             })}
           </div>
-        )}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                {language === 'ar' ? (
+                  <>
+                    عرض <span className="font-bold text-slate-900 dark:text-white font-mono">{startIndex + 1}</span> -{' '}
+                    <span className="font-bold text-slate-900 dark:text-white font-mono">{endIndex}</span> من أصل{' '}
+                    <span className="font-bold text-slate-900 dark:text-white font-mono">{filteredProducts.length}</span> منتج (٢٠ منتج لكل صفحة)
+                  </>
+                ) : (
+                  <>
+                    Affichage de <span className="font-bold text-slate-900 dark:text-white font-mono">{startIndex + 1}</span> -{' '}
+                    <span className="font-bold text-slate-900 dark:text-white font-mono">{endIndex}</span> sur{' '}
+                    <span className="font-bold text-slate-900 dark:text-white font-mono">{filteredProducts.length}</span> produits (20 par page)
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safeCurrentPage <= 1}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition flex items-center gap-1 shadow-2xs"
+                >
+                  <ChevronRight className="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
+                  <span>{language === 'ar' ? 'السابق' : 'Précédent'}</span>
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
+                    if (
+                      pageNum === 1 ||
+                      pageNum === totalPages ||
+                      (pageNum >= safeCurrentPage - 1 && pageNum <= safeCurrentPage + 1)
+                    ) {
+                      const isActive = pageNum === safeCurrentPage;
+                      return (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`min-w-8 h-8 px-2 rounded-xl text-xs font-bold transition font-mono ${
+                            isActive
+                              ? 'bg-purple-600 text-white shadow-xs'
+                              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    } else if (
+                      pageNum === safeCurrentPage - 2 ||
+                      pageNum === safeCurrentPage + 2
+                    ) {
+                      return (
+                        <span key={pageNum} className="px-1 text-slate-400 text-xs font-bold">
+                          ...
+                        </span>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safeCurrentPage >= totalPages}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition flex items-center gap-1 shadow-2xs"
+                >
+                  <span>{language === 'ar' ? 'التالي' : 'Suivant'}</span>
+                  <ChevronLeft className="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       </div>
 
       {/* Confirmation Modal for Deleting Product from Links */}

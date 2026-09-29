@@ -1,4 +1,9 @@
-import { addSellerNotification, addAdminNotification } from './notificationHelper';
+import {
+  addSellerNotification,
+  addAdminNotification,
+  addConfirmerNotification,
+  addWarehouseNotification,
+} from './notificationHelper';
 import { getStoredWalletBalance, saveStoredWalletBalance, getStoredWalletTransactions, saveStoredWalletTransactions, WalletTransaction } from './walletHelper';
 
 export interface WithdrawalRequest {
@@ -14,7 +19,7 @@ export interface WithdrawalRequest {
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   rejectionReason?: string;
   proofReference?: string;
-  userType?: 'SELLER' | 'SUPPLIER';
+  userType?: 'SELLER' | 'SUPPLIER' | 'CONFIRMER' | 'PACKER';
 }
 
 const STORAGE_KEY_WITHDRAWALS = 'nouva_withdrawals_v2';
@@ -206,10 +211,11 @@ export function createWithdrawalRequest(data: {
   amountDzd: number;
   method: 'CCP' | 'BARIDIMOB' | 'BANK' | 'CASH';
   accountDetails: string;
-  userType?: 'SELLER' | 'SUPPLIER';
+  userType?: 'SELLER' | 'SUPPLIER' | 'CONFIRMER' | 'PACKER';
 }): WithdrawalRequest {
   const withdrawals = getStoredWithdrawals();
   const uniqueId = `${Date.now()}-${Math.floor(Math.random() * 90000 + 10000)}`;
+  const roleType = data.userType || 'SELLER';
   const newReq: WithdrawalRequest = {
     id: `WTH-${uniqueId}`,
     sellerId: data.sellerId,
@@ -221,16 +227,25 @@ export function createWithdrawalRequest(data: {
     accountDetails: data.accountDetails,
     requestDate: new Date().toISOString().replace('T', ' ').slice(0, 16),
     status: 'PENDING',
-    userType: data.userType || 'SELLER',
+    userType: roleType,
   };
 
   const updated = [newReq, ...withdrawals];
   saveStoredWithdrawals(updated);
 
+  const roleLabel =
+    roleType === 'CONFIRMER'
+      ? 'مؤكد الطلبيات'
+      : roleType === 'PACKER'
+      ? 'عامل ومغلف المستودع'
+      : roleType === 'SUPPLIER'
+      ? 'المورد'
+      : 'البائع';
+
   addAdminNotification({
     type: 'wallet',
-    titleAr: '💰 طلب سحب أرباح جديد بانتظار الموافقة',
-    bodyAr: `قدم البائع (${data.sellerName} - ${data.storeName}) طلب سحب بمبلغ ${data.amountDzd.toLocaleString()} دج عبر ${data.method}.`,
+    titleAr: `💰 طلب سحب أتعاب جديد (${roleLabel})`,
+    bodyAr: `قدم ${roleLabel} (${data.sellerName}${data.storeName ? ` - ${data.storeName}` : ''}) طلب سحب بمبلغ ${data.amountDzd.toLocaleString()} دج عبر ${data.method}.`,
   });
 
   return newReq;
@@ -256,21 +271,35 @@ export function approveWithdrawalRequest(id: string, proofReference?: string): b
 
   saveStoredWithdrawals(updated);
 
-  // Update transaction status in seller's wallet txs
-  const sellerTxs = getStoredWalletTransactions(targetReq.sellerId);
-  const updatedSellerTxs = sellerTxs.map((tx) => {
-    if (tx.type === 'withdrawal' && (tx.status === 'pending' || tx.description.includes(targetReq!.amountDzd.toString()))) {
-      return { ...tx, status: 'completed' as const };
-    }
-    return tx;
-  });
-  saveStoredWalletTransactions(updatedSellerTxs, targetReq.sellerId);
+  // If it's a seller, update transactions in seller wallet
+  if (!targetReq.userType || targetReq.userType === 'SELLER') {
+    const sellerTxs = getStoredWalletTransactions(targetReq.sellerId);
+    const updatedSellerTxs = sellerTxs.map((tx) => {
+      if (tx.type === 'withdrawal' && (tx.status === 'pending' || tx.description.includes(targetReq!.amountDzd.toString()))) {
+        return { ...tx, status: 'completed' as const };
+      }
+      return tx;
+    });
+    saveStoredWalletTransactions(updatedSellerTxs, targetReq.sellerId);
 
-  addSellerNotification({
-    type: 'wallet',
-    titleAr: '✔ تم صرف طلب السحب وتحويل الأرباح!',
-    bodyAr: `تمت الموافقة على طلب السحب رقم #${targetReq.id} بمبلغ ${targetReq.amountDzd.toLocaleString()} دج وتحويل الأرباح إلى حسابك (${targetReq.accountDetails}). رقم الإثبات: ${targetReq.proofReference}`,
-  });
+    addSellerNotification({
+      type: 'wallet',
+      titleAr: '✔ تم صرف طلب السحب وتحويل الأرباح!',
+      bodyAr: `تمت الموافقة على طلب السحب رقم #${targetReq.id} بمبلغ ${targetReq.amountDzd.toLocaleString()} دج وتحويل الأرباح إلى حسابك (${targetReq.accountDetails}). رقم الإثبات: ${targetReq.proofReference}`,
+    });
+  } else if (targetReq.userType === 'CONFIRMER') {
+    addConfirmerNotification({
+      type: 'wallet',
+      titleAr: '✔ تم صرف أتعاب التأكيد وتحويل المستحقات!',
+      bodyAr: `تمت الموافقة على طلب سحب أتعاب التأكيد #${targetReq.id} بمبلغ ${targetReq.amountDzd.toLocaleString()} دج وتحويلها إلى حسابك (${targetReq.accountDetails}). رقم إثبات التحويل: ${targetReq.proofReference}`,
+    });
+  } else if (targetReq.userType === 'PACKER') {
+    addWarehouseNotification({
+      type: 'wallet',
+      titleAr: '✔ تم صرف أتعاب التغليف والتجهيز لعامل المستودع!',
+      bodyAr: `تمت الموافقة على طلب سحب أتعاب التغليف والتجهيز #${targetReq.id} بمبلغ ${targetReq.amountDzd.toLocaleString()} دج وتحويلها لحسابك (${targetReq.accountDetails}). رقم إثبات التحويل: ${targetReq.proofReference}`,
+    });
+  }
 
   return true;
 }
@@ -295,28 +324,41 @@ export function rejectWithdrawalRequest(id: string, reason: string): boolean {
 
   saveStoredWithdrawals(updated);
 
-  // Refund the seller's wallet balance
-  const currentBalance = getStoredWalletBalance(targetReq.sellerId);
-  const newBalance = currentBalance + targetReq.amountDzd;
-  saveStoredWalletBalance(newBalance, targetReq.sellerId);
+  // If it's a seller, refund seller wallet balance
+  if (!targetReq.userType || targetReq.userType === 'SELLER') {
+    const currentBalance = getStoredWalletBalance(targetReq.sellerId);
+    const newBalance = currentBalance + targetReq.amountDzd;
+    saveStoredWalletBalance(newBalance, targetReq.sellerId);
 
-  // Add a credit refund transaction
-  const sellerTxs = getStoredWalletTransactions(targetReq.sellerId);
-  const refundTx: WalletTransaction = {
-    id: `tx-refund-${Date.now()}`,
-    type: 'credit',
-    amount: targetReq.amountDzd,
-    description: `استرجاع رصيد - تم رفض طلب السحب #${targetReq.id} (${reason})`,
-    status: 'completed',
-    date: new Date().toISOString(),
-  };
-  saveStoredWalletTransactions([refundTx, ...sellerTxs], targetReq.sellerId);
+    const sellerTxs = getStoredWalletTransactions(targetReq.sellerId);
+    const refundTx: WalletTransaction = {
+      id: `tx-refund-${Date.now()}`,
+      type: 'credit',
+      amount: targetReq.amountDzd,
+      description: `استرجاع رصيد - تم رفض طلب السحب #${targetReq.id} (${reason})`,
+      status: 'completed',
+      date: new Date().toISOString(),
+    };
+    saveStoredWalletTransactions([refundTx, ...sellerTxs], targetReq.sellerId);
 
-  addSellerNotification({
-    type: 'wallet',
-    titleAr: '✖ تم رفض طلب السحب وإعادة الرصيد لمحفظتك',
-    bodyAr: `تم رفض طلب السحب #${targetReq.id} بمبلغ ${targetReq.amountDzd.toLocaleString()} دج. السبب: (${reason}). تم إرجاع المبلغ كاملاً إلى محفظتك المتاحة.`,
-  });
+    addSellerNotification({
+      type: 'wallet',
+      titleAr: '✖ تم رفض طلب السحب وإعادة الرصيد لمحفظتك',
+      bodyAr: `تم رفض طلب السحب #${targetReq.id} بمبلغ ${targetReq.amountDzd.toLocaleString()} دج. السبب: (${reason}). تم إرجاع المبلغ كاملاً إلى محفظتك المتاحة.`,
+    });
+  } else if (targetReq.userType === 'CONFIRMER') {
+    addConfirmerNotification({
+      type: 'wallet',
+      titleAr: '✖ تم رفض طلب سحب أتعاب التأكيد',
+      bodyAr: `تم رفض طلب سحب أتعاب التأكيد #${targetReq.id} بمبلغ ${targetReq.amountDzd.toLocaleString()} دج. السبب: (${reason}). تم إرجاع المبلغ كاملاً إلى رصيدك المتاح.`,
+    });
+  } else if (targetReq.userType === 'PACKER') {
+    addWarehouseNotification({
+      type: 'wallet',
+      titleAr: '✖ تم رفض طلب سحب أتعاب التغليف والتجهيز',
+      bodyAr: `تم رفض طلب سحب أتعاب التغليف والتجهيز #${targetReq.id} بمبلغ ${targetReq.amountDzd.toLocaleString()} دج. السبب: (${reason}). تم إرجاع المبلغ كاملاً إلى رصيدك المتاح.`,
+    });
+  }
 
   return true;
 }

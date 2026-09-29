@@ -74,6 +74,8 @@ export const DEFAULT_FEES: MarketplaceFeeSettings = {
   defaultSupplierFeePercent: 5,
   defaultResellerCommissionPercent: 0,
   resellerMinProfitMargin: 0,
+  pickAndPackFeeDzd: 100, // 100 DZD per fulfilled parcel
+  confirmerFeeDzd: 100, // 100 DZD per delivered parcel to confirmation agent
   lastUpdated: new Date().toISOString().split('T')[0],
 };
 
@@ -806,6 +808,8 @@ export function getStoredMarketplaceFees(): MarketplaceFeeSettings {
       defaultSupplierFeePercent: Number(supplierFee) || 5,
       defaultResellerCommissionPercent: Number(resellerFee) || 0,
       resellerMinProfitMargin: parsed.resellerMinProfitMargin || 0,
+      pickAndPackFeeDzd: Number(parsed.pickAndPackFeeDzd ?? 100),
+      confirmerFeeDzd: Number(parsed.confirmerFeeDzd ?? 100),
       lastUpdated: parsed.lastUpdated || new Date().toISOString().split('T')[0],
     };
     return normalized;
@@ -824,6 +828,8 @@ export function saveStoredMarketplaceFees(fees: MarketplaceFeeSettings): void {
       resellerFeePercent: resellerFee,
       defaultSupplierFeePercent: supplierFee,
       defaultResellerCommissionPercent: resellerFee,
+      pickAndPackFeeDzd: Number(fees.pickAndPackFeeDzd ?? 100),
+      confirmerFeeDzd: Number(fees.confirmerFeeDzd ?? 100),
       lastUpdated: new Date().toISOString().split('T')[0],
     };
     localStorage.setItem(STORAGE_KEY_FEES, JSON.stringify(payload));

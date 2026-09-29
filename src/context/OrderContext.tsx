@@ -51,6 +51,7 @@ interface OrderContextType {
   resubmitOrder: (orderId: string, updatedFields: Partial<Order>) => Promise<{ success: boolean; order?: Order }>;
   confirmReturnInWarehouse: (orderId: string) => void;
   updateOrder: (orderId: string, updatedFields: Partial<Order>) => Promise<{ success: boolean; order?: Order; error?: string; message?: string }>;
+  updateOrdersBatch: (orderIds: string[], updatedFields: Partial<Order>) => Promise<{ success: boolean; count: number }>;
   updateOrderStatus: (orderId: string, newStatus: OrderStatus) => void;
   setTrackingCode: (orderId: string, trackingCode: string) => void;
   confirmAdminOrder: (orderId: string) => void;
@@ -1038,6 +1039,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             statusFr,
             situation,
             deliveredAt,
+            commissionCredited: targetStatus === 'DELIVERED' ? true : o.commissionCredited,
             trackingFollowedBy: o.trackingFollowedBy || agentId,
             trackingFollowedByName: o.trackingFollowedByName || agentName,
             confirmationNote: note ? `${o.confirmationNote ? o.confirmationNote + ' | ' : ''}${note}` : o.confirmationNote,
@@ -1146,6 +1148,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             statusFr,
             situation,
             deliveredAt,
+            commissionCredited: targetStatus === 'DELIVERED' ? true : o.commissionCredited,
             trackingFollowedBy: o.trackingFollowedBy || agent?.id,
             trackingFollowedByName: o.trackingFollowedByName || agent?.fullName,
             driverName: data.driverName !== undefined ? data.driverName : o.driverName,
@@ -1177,14 +1180,35 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateOrder = async (orderId: string, updatedFields: Partial<Order>) => {
-    // Lock guard check
+    // Lock guard check (customer address / pricing edits locked after admin confirmation, BUT courier / shipping / logistics updates are always allowed)
+    const isCourierOrLogisticsUpdate = Object.keys(updatedFields).every((k) =>
+      ['courierPartnerId', 'deliveryCompanyName', 'bordereauUrl', 'trackingCode', 'deliveryCompanySent', 'status', 'situation', 'updatedAt'].includes(k)
+    );
+
     const currentOrder = orders.find((o) => o.id === orderId);
-    if (currentOrder?.adminConfirmed || currentOrder?.isLockedForEdit || currentOrder?.situation === 'EnTraitement') {
+    if (!isCourierOrLogisticsUpdate && (currentOrder?.adminConfirmed || currentOrder?.isLockedForEdit || currentOrder?.situation === 'EnTraitement')) {
       return {
         success: false,
         error: 'لا يمكن تعديل هذه الطلبية لأنها مؤكدة من قبل الأدمن ومقفلة للتعديل',
       };
     }
+
+    // Immediate optimistic state update for instantaneous zero-latency UI response
+    const tracking = updatedFields.trackingCode || currentOrder?.trackingCode || "TC" + orderId.replace("ORD-", "") + "LHJ";
+    const optimisticOrder: Order = {
+      ...((currentOrder || { id: orderId }) as Order),
+      ...updatedFields,
+      bordereauUrl: updatedFields.bordereauUrl || (currentOrder?.trackingCode ? `/api/delivery/label/${orderId}?tracking=${tracking}&v=${Date.now()}` : currentOrder?.bordereauUrl),
+    };
+
+    setOrders((prev) => {
+      const updatedList = prev.map((o) => (o.id === orderId ? optimisticOrder : o));
+      saveStoredOrders(updatedList);
+      try {
+        window.dispatchEvent(new CustomEvent('orders_updated'));
+      } catch (e) {}
+      return updatedList;
+    });
 
     try {
       // 1. Call server API
@@ -1200,9 +1224,6 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       }
 
       // 2. Also trigger Delivery API PUT /Api_v1/Colis/:tracking if tracking code exists
-      const currentOrder = orders.find((o) => o.id === orderId);
-      const tracking = currentOrder?.trackingCode || "TC" + orderId.replace("ORD-", "") + "LHJ";
-
       try {
         await fetch(`/Api_v1/Colis/${tracking}`, {
           method: 'PUT',
@@ -1230,51 +1251,75 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         console.warn('Delivery API direct update sync notice:', deliveryErr);
       }
 
-      // Update local state
-      const refreshedOrder: Order = data.order || {
-        ...(currentOrder as Order),
-        ...updatedFields,
-        bordereauUrl: `/api/delivery/label/${orderId}?tracking=${tracking}&v=${Date.now()}`,
-      };
-
-      setOrders((prev) => {
-        const updatedList = prev.map((o) => (o.id === orderId ? refreshedOrder : o));
-        saveStoredOrders(updatedList);
-        return updatedList;
-      });
+      // Final sync with server-returned order
+      if (data.order) {
+        const refreshedOrder: Order = {
+          ...optimisticOrder,
+          ...data.order,
+        };
+        setOrders((prev) => {
+          const updatedList = prev.map((o) => (o.id === orderId ? refreshedOrder : o));
+          saveStoredOrders(updatedList);
+          return updatedList;
+        });
+      }
 
       return {
         success: true,
-        order: refreshedOrder,
+        order: optimisticOrder,
         message: 'تم تحديث معلومات الطلبية وتوليد ملصق شحن جديد ببيانات صحيحة!',
       };
     } catch (err: any) {
       console.error('Error updating order:', err);
-      // Fallback local update
-      let fallbackOrder: Order | undefined;
-      setOrders((prev) => {
-        const updatedList = prev.map((o) => {
-          if (o.id === orderId) {
-            const tracking = o.trackingCode || "TC" + orderId.replace("ORD-", "") + "LHJ";
-            fallbackOrder = {
-              ...o,
-              ...updatedFields,
-              bordereauUrl: `/api/delivery/label/${orderId}?tracking=${tracking}&v=${Date.now()}`,
-            };
-            return fallbackOrder;
-          }
-          return o;
-        });
-        saveStoredOrders(updatedList);
-        return updatedList;
-      });
-
       return {
         success: true,
-        order: fallbackOrder,
-        message: 'تم تحديث معلومات الطلبية محلية وتوليد ملصق جديد!',
+        order: optimisticOrder,
+        message: 'تم تحديث معلومات الطلبية محلياً بنجاح!',
       };
     }
+  };
+
+  // Batch update orders simultaneously across UI and server
+  const updateOrdersBatch = async (orderIds: string[], updatedFields: Partial<Order>) => {
+    if (!orderIds || orderIds.length === 0) return { success: true, count: 0 };
+
+    const targetSet = new Set(orderIds);
+    const updatedOrdersList: Order[] = [];
+
+    // 1. Instantaneous synchronous update of local state immediately for 100% synchronized UI
+    setOrders((prev) => {
+      const updatedList = prev.map((o) => {
+        if (targetSet.has(o.id)) {
+          const tracking = updatedFields.trackingCode || o.trackingCode || "TC" + o.id.replace("ORD-", "") + "LHJ";
+          const updated = {
+            ...o,
+            ...updatedFields,
+            bordereauUrl: updatedFields.bordereauUrl || (o.trackingCode ? `/api/delivery/label/${o.id}?tracking=${tracking}&v=${Date.now()}` : o.bordereauUrl),
+          };
+          updatedOrdersList.push(updated);
+          return updated;
+        }
+        return o;
+      });
+      saveStoredOrders(updatedList);
+      try {
+        window.dispatchEvent(new CustomEvent('orders_updated'));
+      } catch (e) {}
+      return updatedList;
+    });
+
+    // 2. Sync to server in background
+    try {
+      await fetch('/api/reseller/orders/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: updatedOrdersList }),
+      });
+    } catch (e) {
+      console.warn('Batch sync server update notice:', e);
+    }
+
+    return { success: true, count: orderIds.length };
   };
 
   const markReadyToShip = async (trackingCodes: string[]) => {
@@ -1958,6 +2003,7 @@ ${itemsList}
         resubmitOrder,
         confirmReturnInWarehouse,
         updateOrder,
+        updateOrdersBatch,
         updateOrderStatus,
         setTrackingCode,
         confirmAdminOrder,

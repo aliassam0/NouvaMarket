@@ -142,10 +142,13 @@ function AppContent() {
       showToast('تم الانتقال إلى: واجهة المؤكد (Confirmer Desk)', 'info');
     } else if (newRole === 'warehouse') {
       if (user?.role === 'admin' && !impersonatedSupplierName) {
-        setImpersonatedSupplierName('مستودع نوفا ماركت المركزي');
+        setImpersonatedSupplierName('مورد الأجهزة والإلكترونيات');
       }
       setCurrentRole('warehouse');
-      showToast('تم الانتقال إلى: لوحة المورّد والمستودع (Supplier Hub)', 'info');
+      showToast('تم الانتقال إلى: بوابة المورّد', 'info');
+    } else if (newRole === 'platform_warehouse') {
+      setCurrentRole('platform_warehouse');
+      showToast('تم الانتقال إلى: مستودع المنصة', 'info');
     } else if (newRole === 'reseller') {
       setCurrentRole('reseller');
       setActiveTab('accueil');
@@ -470,6 +473,10 @@ function AppContent() {
           <ConfirmerDashboard onShowToast={showToast} />
         )}
 
+        {currentRole === 'platform_warehouse' && (
+          <WarehouseDashboard onShowToast={showToast} isPlatformWarehouse={true} />
+        )}
+
         {currentRole === 'warehouse' && (
           user?.approvalStatus !== 'APPROVED' && !impersonatedSupplierName ? (
             <PendingSellerScreen
@@ -477,7 +484,7 @@ function AppContent() {
               onGoToLanding={() => setViewMode('landing')}
             />
           ) : (
-            <WarehouseDashboard onShowToast={showToast} />
+            <WarehouseDashboard onShowToast={showToast} isPlatformWarehouse={false} />
           )
         )}
 

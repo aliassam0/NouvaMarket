@@ -44,6 +44,7 @@ import {
 
 export type AdminTabKey =
   | 'products'
+  | 'orders'
   | 'approvals'
   | 'sellers'
   | 'wallet'
@@ -68,6 +69,7 @@ interface AdminVerticalSidebarProps {
   onCloseMobile: () => void;
   counts: {
     totalPendingApprovals: number;
+    ordersCount?: number;
     productsCount: number;
     sellersCount: number;
     pendingSellersCount: number;
@@ -103,6 +105,14 @@ export function AdminVerticalSidebar({
     {
       groupTitle: 'الرئيسية والاعتماد',
       items: [
+        {
+          id: 'orders' as AdminTabKey,
+          label: 'إدارة ومزامنة الطلبيات الموحدة',
+          shortLabel: 'الطلبيات المركزية',
+          icon: Package,
+          badge: counts.ordersCount ? `${counts.ordersCount} طلب` : undefined,
+          badgeColor: 'bg-violet-100 text-violet-800 border border-violet-200 font-bold',
+        },
         {
           id: 'approvals' as AdminTabKey,
           label: 'طلبات الانضمام والاعتماد',
@@ -171,12 +181,13 @@ export function AdminVerticalSidebar({
         },
         {
           id: 'inventory' as AdminTabKey,
-          label: 'المخزون وتنبيهات النفاذ',
-          shortLabel: 'المخزون',
+          label: 'المستودع المركزي وشحنات التوريد',
+          shortLabel: 'المستودع',
           icon: WarehouseIcon,
-          badge: counts.lowStockCount > 0 ? `${counts.lowStockCount} تنبيه` : undefined,
-          badgeColor: 'bg-rose-100 text-rose-800 border border-rose-300 font-black animate-pulse',
+          badge: counts.lowStockCount > 0 ? `${counts.lowStockCount} تنبيه` : 'Fulfillment',
+          badgeColor: counts.lowStockCount > 0 ? 'bg-rose-100 text-rose-800 border border-rose-300 font-black animate-pulse' : 'bg-indigo-100 text-indigo-800 border border-indigo-200 font-bold',
         },
+
         {
           id: 'categories' as AdminTabKey,
           label: 'فئات وتصنيفات المنتجات',

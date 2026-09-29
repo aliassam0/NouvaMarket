@@ -30,6 +30,7 @@ import {
   User,
   Wallet,
   ArrowLeft,
+  ArrowUpRight,
   Building2,
   TrendingUp,
   CreditCard,
@@ -52,6 +53,10 @@ import {
   EyeOff,
   Radio,
   Menu,
+  Boxes,
+  ArrowDownToLine,
+  Banknote,
+  History,
 } from 'lucide-react';
 import { WarehouseVerticalSidebar } from './WarehouseVerticalSidebar';
 import { useOrders } from '../../context/OrderContext';
@@ -73,6 +78,11 @@ import {
   updateSupplierPassword,
   updateSupplierProfile,
 } from '../../lib/supplierHelper';
+import {
+  getStoredWithdrawals,
+  createWithdrawalRequest,
+  WithdrawalRequest,
+} from '../../lib/withdrawalHelper';
 import { Order, OrderStatus, Product, SupplierProfile, SupplierSettlement } from '../../types';
 import { MoneyText } from '../ui/MoneyText';
 import { ProductEditModal } from '../common/ProductEditModal';
@@ -81,22 +91,42 @@ import { LowStockBanner, LowStockModal, getLowStockProducts } from '../common/Lo
 import { addSellerNotification, addWarehouseNotification, addAdminNotification, getUnreadNotificationsCount } from '../../lib/notificationHelper';
 import { NotificationsModal } from '../tabs/NotificationsModal';
 import { DeliverySyncMonitor } from './DeliverySyncMonitor';
+import {
+  InboundStockRequest,
+  InboundStockItem,
+} from '../../types';
+import {
+  getStoredInboundRequests,
+  saveStoredInboundRequests,
+  createInboundStockRequest,
+  receiveAndInspectInboundStock,
+} from '../../lib/inboundStockHelper';
+import { PickingPackingModal } from './PickingPackingModal';
+import { CourierManifestModal } from './CourierManifestModal';
+import { CodReconciliationModal } from './CodReconciliationModal';
+import { ReturnsQCModal } from './ReturnsQCModal';
+import { CourierAnalyticsModal } from './CourierAnalyticsModal';
+import { OrderAuditTimeline } from '../common/OrderAuditTimeline';
 
 interface WarehouseDashboardProps {
   onShowToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  isPlatformWarehouse?: boolean;
 }
 
 type WarehouseTab =
+  | 'pipeline'
   | 'pending'
   | 'preparation'
   | 'delivery'
   | 'completed'
   | 'returned'
+  | 'inbound'
   | 'products'
   | 'tracking'
   | 'financial'
   | 'analytics'
   | 'profile';
+
 
 const REJECTION_REASONS = [
   'المنتج غير متوفر بالمخزن',
@@ -107,7 +137,7 @@ const REJECTION_REASONS = [
   'سبب آخر',
 ];
 
-export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
+export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: WarehouseDashboardProps) {
   const { categories } = useCategories();
   const {
     orders,
@@ -116,10 +146,13 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
     setTrackingCode,
     updateOrderStatus,
     updateOrder,
+    updateOrdersBatch,
     confirmReturnInWarehouse,
   } = useOrders();
 
-  const [activeTab, setActiveTab] = useState<WarehouseTab>('pending');
+  const [activeTab, setActiveTab] = useState<WarehouseTab>(() =>
+    isPlatformWarehouse ? 'preparation' : 'pipeline'
+  );
 
   // Vertical Sidebar State
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
@@ -143,14 +176,16 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
 
   const getWarehouseTabTitle = (tab: WarehouseTab) => {
     switch (tab) {
+      case 'pipeline': return 'متابعة حركة الطلبيات (المزامنة الحية)';
       case 'pending': return '1. مراجعة وتأكيد الطلبيات';
       case 'preparation': return '2. التحضير وتوليد البوردورو';
       case 'delivery': return '3. قيد التوصيل مع الشركات';
       case 'completed': return '4. طلبيات مسلمة ومكتملة';
       case 'returned': return '5. المرتجعات والرجوع';
+      case 'inbound': return 'شحنات التوريد لمستودع المنصة';
       case 'products': return 'منتجاتي والمخزون الحي';
       case 'tracking': return 'تتبع الشحنات ومزامنة API';
-      case 'financial': return 'التحصيلات وسحب المستحقات';
+      case 'financial': return 'التحصيلات وسحب المستحقات وأتعاب التغليف';
       case 'analytics': return 'إحصائيات المبيعات والأداء';
       case 'profile': return 'بيانات المستودع والحساب';
       default: return 'لوحة المستودع';
@@ -159,14 +194,17 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
 
   const getWarehouseTabSubtitle = (tab: WarehouseTab) => {
     switch (tab) {
+      case 'pipeline': return 'عرض دورة حياة طلبات منتجاتك ابتداءً من قيد المراجعة في وضع المراقبة اللحظية فقط';
       case 'pending': return 'مراجعة بيانات الزبون، توفر المخزون، والتأكيد الهاتفي للشحن الفوري';
       case 'preparation': return 'طباعة ملصقات الشحن (Bordereau) وتعيين شركات التوصيل وحزم الطرود';
       case 'delivery': return 'متابعة مسار الشحنات المنطلقة مع شركات التوصيل بالتحديث اللحظي';
       case 'completed': return 'سجل الطلبيات المسلمة للزبائن بنجاح وتحصيل أموال الـ COD';
       case 'returned': return 'استلام الطرود المرتجعة وإعادة فحص المنتجات وإرجاعها للمخزون';
+      case 'inbound': return 'استقبال وفحص شحنات كراتين الموردين وتغذية المخزون الحي للمنصة تلقائياً';
       case 'products': return 'إدارة الكتالوج، أسعار الجملة، الكميات لكل مقاس ولون، وإضافة منتجات جديدة';
+
       case 'tracking': return 'أداة الاستعلام اللحظي عن كود التتبع مع خوادم شركات التوصيل';
-      case 'financial': return 'كشف حساب الأرباح، المستحقات الصافية، وتقديم طلبات سحب الأموال';
+      case 'financial': return 'كشف حساب الأرباح، أتعاب التغليف والتجهيز (Pick & Pack)، والمستحقات، وتقديم طلبات سحب الأموال';
       case 'analytics': return 'معدلات تسليم الشحنات، أعلى المنتجات طلباً، ومؤشرات الأداء';
       case 'profile': return 'معلومات المستودع، أرقام CCP / BaridiMob، والعنوان للتوصيل';
       default: return '';
@@ -220,6 +258,27 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
   const [isLowStockModalOpen, setIsLowStockModalOpen] = useState(false);
   const [isUrlImportModalOpen, setIsUrlImportModalOpen] = useState(false);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+
+  // Inbound Stock Shipments to Platform Warehouse State
+  const [inboundRequests, setInboundRequests] = useState<InboundStockRequest[]>(() => getStoredInboundRequests());
+  const [isInboundModalOpen, setIsInboundModalOpen] = useState(false);
+  const [inboundSelectedProductId, setInboundSelectedProductId] = useState<string>('');
+  const [inboundQuantitySent, setInboundQuantitySent] = useState<number>(50);
+  const [inboundNotes, setInboundNotes] = useState<string>('');
+  const [inboundCarrier, setInboundCarrier] = useState<string>('شاحنة خاصة بالمورد');
+  const [inspectingInboundRequest, setInspectingInboundRequest] = useState<InboundStockRequest | null>(null);
+  const [inboundTabFilter, setInboundTabFilter] = useState<'pending' | 'received' | 'all'>('pending');
+
+  // Phase 2: Picking Sheet & Courier Handover Manifest State
+  const [isPickingModalOpen, setIsPickingModalOpen] = useState(false);
+  const [isManifestModalOpen, setIsManifestModalOpen] = useState(false);
+  const [isCentralFulfillmentMode, setIsCentralFulfillmentMode] = useState(Boolean(isPlatformWarehouse));
+
+  // Phase 3: COD Reconciliation, Returns QC & Courier Analytics State
+  const [isCodReconcileModalOpen, setIsCodReconcileModalOpen] = useState(false);
+  const [isReturnsQCModalOpen, setIsReturnsQCModalOpen] = useState(false);
+  const [isCourierAnalyticsModalOpen, setIsCourierAnalyticsModalOpen] = useState(false);
+  const [selectedTimelineOrder, setSelectedTimelineOrder] = useState<Order | null>(null);
 
   // Supplier Profile & Financials State
   const { user } = useAuth();
@@ -328,6 +387,24 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
 
   // Settlement Deletion Modal State
   const [settlementToDelete, setSettlementToDelete] = useState<SupplierSettlement | null>(null);
+
+  // Packer / Warehouse Worker Packaging Fees Withdrawals State
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(getStoredWithdrawals);
+  const [isPackerWithdrawModalOpen, setIsPackerWithdrawModalOpen] = useState(false);
+  const [packerWithdrawAmount, setPackerWithdrawAmount] = useState<number>(0);
+  const [packerWithdrawMethod, setPackerWithdrawMethod] = useState<'BARIDIMOB' | 'CCP' | 'CASH' | 'BANK'>('BARIDIMOB');
+  const [packerWithdrawAccountDetails, setPackerWithdrawAccountDetails] = useState('');
+  const [packerWorkerName, setPackerWorkerName] = useState(supplierProfile.fullName || 'عامل ومغلف المستودع');
+  const [packerWorkerPhone, setPackerWorkerPhone] = useState(supplierProfile.phone || user?.phone || '');
+  const [packerWithdrawNotes, setPackerWithdrawNotes] = useState('');
+
+  useEffect(() => {
+    const handleWithdrawalsSync = () => {
+      setWithdrawals(getStoredWithdrawals());
+    };
+    window.addEventListener('nouva_withdrawals_updated', handleWithdrawalsSync);
+    return () => window.removeEventListener('nouva_withdrawals_updated', handleWithdrawalsSync);
+  }, []);
 
   // Clean up legacy auto-delivery sync flag if exists to ensure strict preparation workflow
   useEffect(() => {
@@ -624,23 +701,40 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
     onShowToast(`🚚 تم تعيين شركة التوصيل: ${courier.name}`, 'info');
   };
 
-  // Apply chosen courier to all selected preparation orders in bulk
+  // Apply chosen courier to all selected preparation orders in bulk (or all visible preparation orders if none selected)
   const handleApplyBulkCourier = (courierId: string) => {
-    if (selectedPrepOrderIds.length === 0) {
-      onShowToast('الرجاء تحديد طلبية واحدة على الأقل لتطبيق شركة التوصيل', 'info');
-      return;
-    }
     const courier = couriers.find((c) => c.id === courierId) || activeCouriersList.find((c) => c.id === courierId);
     if (!courier) return;
 
-    selectedPrepOrderIds.forEach((orderId) => {
-      updateOrder(orderId, {
+    const visibleOrders = filterBySearch(preparationOrders);
+    const targetOrderIds = selectedPrepOrderIds.length > 0
+      ? selectedPrepOrderIds
+      : visibleOrders.map((o) => o.id);
+
+    if (targetOrderIds.length === 0) {
+      onShowToast('لا توجد طلبيات متاحة لتطبيق شركة التوصيل عليها', 'info');
+      return;
+    }
+
+    if (updateOrdersBatch) {
+      updateOrdersBatch(targetOrderIds, {
         courierPartnerId: courier.id,
         deliveryCompanyName: courier.name,
       });
-    });
+    } else {
+      targetOrderIds.forEach((orderId) => {
+        updateOrder(orderId, {
+          courierPartnerId: courier.id,
+          deliveryCompanyName: courier.name,
+        });
+      });
+    }
 
-    onShowToast(`🚚 تم تعيين شركة (${courier.name}) لـ ${selectedPrepOrderIds.length} طلبية محددة بنجاح!`, 'success');
+    const scopeLabel = selectedPrepOrderIds.length > 0
+      ? `لـ ${targetOrderIds.length} طلبية محددة`
+      : `لجميع طلبات التحضير المعروضة (${targetOrderIds.length} طلبية)`;
+
+    onShowToast(`⚡ تم التغيير التلقائي الفوري لشركة التوصيل (${courier.name}) ${scopeLabel} بنجاح!`, 'success');
   };
 
   // Create Bordereau for an order via the selected courier's API
@@ -949,6 +1043,128 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
         o.situation === 'Retour')
   );
 
+  // SUPPLIER PIPELINE: Orders belonging to this supplier starting from REVIEW
+  const supplierOrders = useMemo(() => {
+    return dateFilteredOrders.filter((order) => {
+      if (order.status === 'LINK_ORDER') return false;
+      if (isDemoSupplier) return true;
+      return order.items?.some((it) =>
+        it.supplierId === supplierProfile.id ||
+        (it.supplierName && (it.supplierName === supplierProfile.companyName || it.supplierName === supplierProfile.fullName))
+      );
+    });
+  }, [dateFilteredOrders, isDemoSupplier, supplierProfile]);
+
+  const [supplierPipelineFilter, setSupplierPipelineFilter] = useState<
+    'ALL' | 'REVIEW' | 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'FAILED'
+  >('ALL');
+
+  const supplierReviewCount = useMemo(
+    () =>
+      supplierOrders.filter(
+        (o) =>
+          o.status === 'PENDING' ||
+          (!o.adminConfirmed &&
+            o.status !== 'CONFIRMED' &&
+            o.status !== 'PROCESSING' &&
+            o.status !== 'SHIPPED' &&
+            o.status !== 'DELIVERED' &&
+            o.status !== 'FAILED' &&
+            o.status !== 'CANCELLED' &&
+            o.situation !== 'Confirmé' &&
+            o.situation !== 'EnPréparation')
+      ).length,
+    [supplierOrders]
+  );
+  const supplierConfirmedCount = useMemo(
+    () =>
+      supplierOrders.filter(
+        (o) =>
+          (o.status === 'CONFIRMED' || o.situation === 'Confirmé') &&
+          o.status !== 'PROCESSING' &&
+          o.status !== 'SHIPPED' &&
+          o.status !== 'DELIVERED'
+      ).length,
+    [supplierOrders]
+  );
+  const supplierProcessingCount = useMemo(
+    () =>
+      supplierOrders.filter(
+        (o) =>
+          (o.status === 'PROCESSING' || o.situation === 'EnPréparation') &&
+          o.status !== 'SHIPPED' &&
+          o.status !== 'DELIVERED'
+      ).length,
+    [supplierOrders]
+  );
+  const supplierShippedCount = useMemo(
+    () => supplierOrders.filter((o) => o.status === 'SHIPPED').length,
+    [supplierOrders]
+  );
+  const supplierDeliveredCount = useMemo(
+    () => supplierOrders.filter((o) => o.status === 'DELIVERED').length,
+    [supplierOrders]
+  );
+  const supplierFailedCount = useMemo(
+    () =>
+      supplierOrders.filter(
+        (o) => o.status === 'FAILED' || o.status === 'CANCELLED' || o.situation === 'Retour'
+      ).length,
+    [supplierOrders]
+  );
+
+  const filteredSupplierPipelineOrders = useMemo(() => {
+    return supplierOrders.filter((o) => {
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase();
+        const matches =
+          o.id.toLowerCase().includes(term) ||
+          o.customerName?.toLowerCase().includes(term) ||
+          o.phone?.includes(term) ||
+          o.wilaya?.toLowerCase().includes(term) ||
+          o.trackingCode?.toLowerCase().includes(term);
+        if (!matches) return false;
+      }
+
+      if (supplierPipelineFilter === 'ALL') return true;
+      if (supplierPipelineFilter === 'REVIEW') {
+        return (
+          o.status === 'PENDING' ||
+          (!o.adminConfirmed &&
+            o.status !== 'CONFIRMED' &&
+            o.status !== 'PROCESSING' &&
+            o.status !== 'SHIPPED' &&
+            o.status !== 'DELIVERED' &&
+            o.status !== 'FAILED' &&
+            o.status !== 'CANCELLED' &&
+            o.situation !== 'Confirmé' &&
+            o.situation !== 'EnPréparation')
+        );
+      }
+      if (supplierPipelineFilter === 'CONFIRMED') {
+        return (
+          (o.status === 'CONFIRMED' || o.situation === 'Confirmé') &&
+          o.status !== 'PROCESSING' &&
+          o.status !== 'SHIPPED' &&
+          o.status !== 'DELIVERED'
+        );
+      }
+      if (supplierPipelineFilter === 'PROCESSING') {
+        return (
+          (o.status === 'PROCESSING' || o.situation === 'EnPréparation') &&
+          o.status !== 'SHIPPED' &&
+          o.status !== 'DELIVERED'
+        );
+      }
+      if (supplierPipelineFilter === 'SHIPPED') return o.status === 'SHIPPED';
+      if (supplierPipelineFilter === 'DELIVERED') return o.status === 'DELIVERED';
+      if (supplierPipelineFilter === 'FAILED') {
+        return o.status === 'FAILED' || o.status === 'CANCELLED' || o.situation === 'Retour';
+      }
+      return true;
+    });
+  }, [supplierOrders, supplierPipelineFilter, searchTerm]);
+
   // Helper to calculate wholesale dues for a given order belonging to this supplier
   const getOrderWholesaleAmount = useCallback(
     (order: Order): number => {
@@ -1070,7 +1286,9 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
     }
 
     let accountDetailsStr = '';
-    if (payoutForm.payoutMethod === 'BARIDIMOB') {
+    if (isPlatformWarehouse) {
+      accountDetailsStr = 'الخزينة المركزية الرسمية لمنصة Nouva Market (Platform Central Operating Treasury)';
+    } else if (payoutForm.payoutMethod === 'BARIDIMOB') {
       accountDetailsStr = `BaridiMob: ${payoutForm.baridiMobPhoneOrRip || supplierProfile.baridiMobNumber || supplierProfile.ccpOrRip || '00799999000123456789'}`;
     } else if (payoutForm.payoutMethod === 'CCP') {
       accountDetailsStr = `CCP: ${payoutForm.ccpNumber || '1234567'} Clé: ${payoutForm.ccpKey || '89'}`;
@@ -1081,9 +1299,9 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
     const newSettlement = requestSupplierPayout(
       supplierProfile.id,
       payoutForm.amountDzd,
-      payoutForm.payoutMethod,
+      isPlatformWarehouse ? 'BANK' : payoutForm.payoutMethod,
       accountDetailsStr,
-      payoutForm.notes || 'طلب سحب مستحقات مبيعات الجملة'
+      payoutForm.notes || (isPlatformWarehouse ? 'ترحيل تحصيلات مستودع المنصة إلى الخزينة المركزية' : 'طلب سحب مستحقات مبيعات الجملة')
     );
 
     setSettlements((prev) => {
@@ -1091,20 +1309,136 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
       return [newSettlement, ...prev];
     });
 
-    addWarehouseNotification({
-      titleAr: 'تم إرسال طلب سحب المستحقات 💰',
-      bodyAr: `تم تقديم طلب سحب مستحقات جملة بمبلغ ${payoutForm.amountDzd.toLocaleString()} د.ج بنجاح وبانتظار تحويل الإدارة.`,
-      type: 'wallet',
-    });
-    addAdminNotification({
-      titleAr: 'طلب سحب مستحقات جديد لمورد 🔔',
-      bodyAr: `المورد ${supplierProfile.companyName || supplierProfile.fullName} طلب سحب مستحقات بمبلغ ${payoutForm.amountDzd.toLocaleString()} د.ج (${payoutForm.payoutMethod}).`,
-      type: 'wallet',
+    if (isPlatformWarehouse) {
+      addWarehouseNotification({
+        titleAr: 'تم ترحيل التحصيلات إلى الخزينة المركزية 🏛️',
+        bodyAr: `تم ترحيل تحصيلات مستودع المنصة بمبلغ ${payoutForm.amountDzd.toLocaleString()} د.ج إلى حساب الخزينة المركزية بنجاح.`,
+        type: 'wallet',
+      });
+      addAdminNotification({
+        titleAr: 'ترحيل تحصيلات مستودع المنصة 🏛️',
+        bodyAr: `تم تسجيل ترحيل مبلغ ${payoutForm.amountDzd.toLocaleString()} د.ج من عوائد مستودع المنصة إلى الخزينة المركزية.`,
+        type: 'wallet',
+      });
+      setIsRequestPayoutModalOpen(false);
+      onShowToast(
+        `✔ تم ترحيل تحصيلات مستودع المنصة بمبلغ ${payoutForm.amountDzd.toLocaleString()} د.ج بنجاح إلى الخزينة المركزية!`,
+        'success'
+      );
+    } else {
+      addWarehouseNotification({
+        titleAr: 'تم إرسال طلب سحب المستحقات 💰',
+        bodyAr: `تم تقديم طلب سحب مستحقات جملة بمبلغ ${payoutForm.amountDzd.toLocaleString()} د.ج بنجاح وبانتظار تحويل الإدارة.`,
+        type: 'wallet',
+      });
+      addAdminNotification({
+        titleAr: 'طلب سحب مستحقات جديد لمورد 🔔',
+        bodyAr: `المورد ${supplierProfile.companyName || supplierProfile.fullName} طلب سحب مستحقات بمبلغ ${payoutForm.amountDzd.toLocaleString()} د.ج (${payoutForm.payoutMethod}).`,
+        type: 'wallet',
+      });
+      setIsRequestPayoutModalOpen(false);
+      onShowToast(
+        `✔ تم إرسال طلب سحب المستحقات بمبلغ ${payoutForm.amountDzd.toLocaleString()} د.ج بنجاح إلى إدارة المنصة! سيتم التحويل وإشعارك قريباً.`,
+        'success'
+      );
+    }
+  };
+
+  // ==================== PACKER / WAREHOUSE WORKER PACKAGING FEES LOGIC ====================
+  const feeSettings = useMemo(() => getStoredMarketplaceFees(), []);
+  const packagingFeePerOrder = feeSettings.pickAndPackFeeDzd ?? 100;
+
+  const myPackerWithdrawals = useMemo(() => {
+    return withdrawals.filter(
+      (w) =>
+        w.userType === 'PACKER' &&
+        (w.sellerId === supplierProfile.id ||
+          w.sellerId === 'warehouse-main' ||
+          w.sellerName === packerWorkerName ||
+          isDemoSupplier)
+    );
+  }, [withdrawals, supplierProfile.id, packerWorkerName, isDemoSupplier]);
+
+  const totalEarnedPackagingDzd = useMemo(() => {
+    return completedOrders.length * packagingFeePerOrder;
+  }, [completedOrders.length, packagingFeePerOrder]);
+
+  const paidPackerWithdrawalsDzd = useMemo(() => {
+    return myPackerWithdrawals
+      .filter((w) => w.status === 'APPROVED')
+      .reduce((sum, w) => sum + (w.amountDzd || 0), 0);
+  }, [myPackerWithdrawals]);
+
+  const pendingPackerWithdrawalsDzd = useMemo(() => {
+    return myPackerWithdrawals
+      .filter((w) => w.status === 'PENDING')
+      .reduce((sum, w) => sum + (w.amountDzd || 0), 0);
+  }, [myPackerWithdrawals]);
+
+  const availablePackerWithdrawalDzd = useMemo(() => {
+    return Math.max(
+      0,
+      totalEarnedPackagingDzd - (paidPackerWithdrawalsDzd + pendingPackerWithdrawalsDzd)
+    );
+  }, [totalEarnedPackagingDzd, paidPackerWithdrawalsDzd, pendingPackerWithdrawalsDzd]);
+
+  const handleOpenPackerWithdrawModal = (presetAmount?: number) => {
+    if (availablePackerWithdrawalDzd <= 0) {
+      onShowToast('الرصيد المتاح لأتعاب التغليف حالياً هو 0 د.ج. يتم احتساب الأتعاب فور تسليم الطرود للزبائن!', 'error');
+      return;
+    }
+    setPackerWithdrawAmount(
+      presetAmount !== undefined ? Math.min(presetAmount, availablePackerWithdrawalDzd) : availablePackerWithdrawalDzd
+    );
+    setIsPackerWithdrawModalOpen(true);
+  };
+
+  const handleRequestPackerPayout = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!packerWithdrawAmount || packerWithdrawAmount <= 0) {
+      onShowToast('يرجى إدخال مبلغ صالح لأتعاب التغليف والتجهيز!', 'error');
+      return;
+    }
+    if (packerWithdrawAmount > availablePackerWithdrawalDzd) {
+      onShowToast(
+        `المبلغ المطلوب (${packerWithdrawAmount.toLocaleString()} د.ج) أكبر من الرصيد المتاح لأتعاب التغليف (${availablePackerWithdrawalDzd.toLocaleString()} د.ج)!`,
+        'error'
+      );
+      return;
+    }
+    if (packerWithdrawMethod !== 'CASH' && !packerWithdrawAccountDetails.trim()) {
+      onShowToast(
+        packerWithdrawMethod === 'BARIDIMOB'
+          ? 'يرجى إدخال رقم هاتف BaridiMob أو الـ RIP'
+          : 'يرجى إدخال رقم حساب CCP والمفتاح Clé أو رقم الحساب البنكي',
+        'error'
+      );
+      return;
+    }
+
+    const details =
+      packerWithdrawMethod === 'CASH'
+        ? `استلام نقدي باليد في المستودع/المقر (${packerWorkerPhone || 'بدون هاتف'})${packerWithdrawNotes ? ` - ملاحظة: ${packerWithdrawNotes}` : ''}`
+        : `${packerWithdrawAccountDetails.trim()}${packerWithdrawNotes ? ` - ملاحظة: ${packerWithdrawNotes}` : ''}`;
+
+    createWithdrawalRequest({
+      sellerId: supplierProfile.id || 'warehouse-main',
+      sellerName: packerWorkerName.trim() || 'عامل ومغلف المستودع',
+      storeName: `مستودع ${supplierProfile.warehouseName || 'المنصة'} (أتعاب التغليف)`,
+      phone: packerWorkerPhone || '',
+      amountDzd: packerWithdrawAmount,
+      method: packerWithdrawMethod,
+      accountDetails: details,
+      userType: 'PACKER',
     });
 
-    setIsRequestPayoutModalOpen(false);
+    setWithdrawals(getStoredWithdrawals());
+    setIsPackerWithdrawModalOpen(false);
+    setPackerWithdrawAmount(0);
+    setPackerWithdrawAccountDetails('');
+    setPackerWithdrawNotes('');
     onShowToast(
-      `✔ تم إرسال طلب سحب المستحقات بمبلغ ${payoutForm.amountDzd.toLocaleString()} د.ج بنجاح إلى إدارة المنصة! سيتم التحويل وإشعارك قريباً.`,
+      `✔ تم إرسال طلب سحب أتعاب التغليف بمبلغ ${packerWithdrawAmount.toLocaleString()} د.ج بنجاح إلى إدارة المنصة!`,
       'success'
     );
   };
@@ -1139,9 +1473,15 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
           completedCount: completedOrders.length,
           returnedCount: returnedOrders.length,
           productsCount: mySupplierProducts.length,
+          pipelineCount: supplierOrders.length,
         }}
         availableBalance={availableBalance}
-        supplierName={supplierProfile?.companyName || supplierProfile?.fullName || 'المستودع الرئيسي'}
+        supplierName={
+          isPlatformWarehouse
+            ? 'مستودع المنصة'
+            : supplierProfile?.companyName || supplierProfile?.fullName || 'بوابة المورّد'
+        }
+        isPlatformWarehouse={isPlatformWarehouse}
         onOpenPayoutModal={() => handleOpenPayoutModal()}
         onOpenPickupModal={() => setIsPickupModalOpen(true)}
         onOpenAddProduct={() => {
@@ -1235,15 +1575,26 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
               </div>
             )}
 
-            {/* Ramassage Quick Button */}
-            <button
-              onClick={() => setIsPickupModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-200 text-violet-800 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
-              title="طلب سيارة جمع الطرود (Demande Ramassage)"
-            >
-              <Truck className="w-3.5 h-3.5 text-violet-600" />
-              <span className="hidden sm:inline">طلب راماساج</span>
-            </button>
+            {/* Ramassage Quick Button (Platform Central Warehouse ONLY) */}
+            {isPlatformWarehouse ? (
+              <button
+                onClick={() => setIsPickupModalOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-violet-50 hover:bg-violet-100 border border-violet-200 text-violet-800 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                title="طلب سيارة جمع الطرود من المستودع المركزي (Demande Ramassage)"
+              >
+                <Truck className="w-3.5 h-3.5 text-violet-600" />
+                <span className="hidden sm:inline">طلب راماساج للشحنات</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setActiveTab('inbound')}
+                className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                title="إرسال شحنة توريد بضاعة جديدة لمستودع المنصة المركزي"
+              >
+                <Boxes className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="hidden sm:inline">📦 إرسال توريد للمستودع</span>
+              </button>
+            )}
 
             {/* Shipping Rates Modal Button */}
             <button
@@ -1272,11 +1623,21 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
             {/* Available Balance Pill */}
             <div
               onClick={() => handleOpenPayoutModal()}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black cursor-pointer hover:bg-emerald-100 transition shadow-2xs"
-              title="رصيدك المتاح للسحب (انقر لطلب سحب)"
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-xl border text-xs font-black cursor-pointer transition shadow-2xs ${
+                isPlatformWarehouse
+                  ? 'bg-violet-50 dark:bg-violet-950/60 border-violet-200 dark:border-violet-800 text-violet-800 dark:text-violet-300 hover:bg-violet-100'
+                  : 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100'
+              }`}
+              title={
+                isPlatformWarehouse
+                  ? 'تحصيلات المنصة المؤكدة (انقر للترحيل إلى الخزينة المركزية)'
+                  : 'رصيدك المتاح للسحب (انقر لطلب سحب)'
+              }
             >
-              <span>المتاح:</span>
-              <span className="font-mono text-emerald-600">{availableBalance.toLocaleString()} دج</span>
+              <span>{isPlatformWarehouse ? 'التحصيلات:' : 'المتاح:'}</span>
+              <span className={`font-mono ${isPlatformWarehouse ? 'text-violet-700 dark:text-violet-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                {availableBalance.toLocaleString()} دج
+              </span>
             </div>
           </div>
         </header>
@@ -1318,28 +1679,425 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
         setEndDate={setEndDate}
       />
 
-      {/* Real-time Confirmation Sync Banner with Confirmer & Delivery API */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 dark:from-purple-950/30 dark:via-indigo-950/30 dark:to-blue-950/30 border border-purple-200/70 dark:border-purple-800/40 text-xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-            <Radio className="w-4 h-4 animate-pulse" />
-          </div>
-          <div>
-            <div className="font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-              <span>المزامنة الموحدة للطلبات مع المؤكد وشركة التوصيل</span>
-              <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px]">مباشر ولحظي</span>
+      {/* ==================== TAB: حركة الطلبيات (المزامنة الحية للمورد) ==================== */}
+      {activeTab === 'pipeline' && (
+        <div className="space-y-4 animate-fadeIn">
+          {/* Executive Supplier KPIs (المبيعات، أتعاب التغليف والتجهيز، نسبة التسليم، الرصيد، والطلبات النشطة) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {/* KPI 1: Available Balance */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
+                <span>المستحقات المتاحة للسحب</span>
+                <Wallet className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                <span className="text-xl sm:text-2xl font-black text-emerald-600 font-mono">
+                  {availableBalance.toLocaleString()} <span className="text-xs">دج</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleOpenPayoutModal()}
+                  disabled={availableBalance <= 0}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition active:scale-95 shadow-xs cursor-pointer ${
+                    availableBalance > 0
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                  }`}
+                >
+                  طلب سحب
+                </button>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 font-normal">
-              الطلبات المؤكدة هاتفياً من المؤكد تغادر "قيد المراجعة" تلقائياً وفورياً. يمنع التأكيد المزدوج بين المؤكد والمورد لمنع تكرار الشحن.
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-violet-100 dark:bg-violet-950/60 border border-violet-300 dark:border-violet-800 text-violet-900 dark:text-violet-200 font-bold text-xs shrink-0">
-          <Clock className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
-          <span>مسار موحد: التأكيد ⬅️ قيد التحضير ⬅️ قيد التوصيل</span>
+            {/* KPI 2: Pick & Pack for Platform Warehouse OR Supplier Products for Suppliers */}
+            {isPlatformWarehouse ? (
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-slate-900 dark:to-amber-950/30 border-2 border-amber-300 dark:border-amber-700/80 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-amber-800 dark:text-amber-300 text-xs font-bold">
+                    <span>أتعاب التغليف والتجهيز (Pick & Pack)</span>
+                    <Package className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between gap-2">
+                    <span className="text-xl sm:text-2xl font-black text-amber-700 dark:text-amber-400 font-mono">
+                      {availablePackerWithdrawalDzd.toLocaleString()} <span className="text-xs">دج</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPackerWithdrawModal()}
+                      disabled={availablePackerWithdrawalDzd <= 0}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition active:scale-95 shadow-xs ${
+                        availablePackerWithdrawalDzd > 0
+                          ? 'bg-amber-600 hover:bg-amber-500 text-white cursor-pointer'
+                          : 'bg-amber-200/50 text-amber-600/60 dark:bg-amber-950/50 dark:text-amber-700/50 cursor-not-allowed'
+                      }`}
+                    >
+                      سحب الأتعاب
+                    </button>
+                  </div>
+                </div>
+                <div className="pt-2 mt-2 border-t border-amber-200 dark:border-amber-800/40 flex items-center justify-between gap-1 flex-wrap">
+                  <span className="text-[9px] font-black text-amber-900 dark:text-amber-200 bg-amber-200/70 dark:bg-amber-900/60 px-2 py-0.5 rounded-full">
+                    مضمونة 100% على عاتق الإدارة
+                  </span>
+                  <span className="text-[9px] text-amber-700/80 dark:text-amber-400/80 font-medium">
+                    ({completedOrders.length} مسلّمة × {packagingFeePerOrder} دج)
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
+                  <span>منتجاتي الموردة بالمستودع</span>
+                  <Package className="w-4 h-4 text-purple-600" />
+                </div>
+                <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                  <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono">
+                    {mySupplierProducts.length} <span className="text-xs">منتج معتمد</span>
+                  </span>
+                  <span className="text-[10px] text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-800">
+                    متاح للبيع
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* KPI 3: Delivered Wholesale GMV */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
+                <span>إجمالي مبيعات الجملة</span>
+                <CheckCircle2 className="w-4 h-4 text-violet-600" />
+              </div>
+              <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono">
+                  {totalDeliveredWholesale.toLocaleString()} <span className="text-xs">دج</span>
+                </span>
+                <span className="text-[10px] text-violet-700 dark:text-violet-300 font-bold bg-violet-50 dark:bg-violet-950/60 px-2 py-0.5 rounded-full border border-violet-200 dark:border-violet-800">
+                  {completedOrders.length} مسلّمة 🎉
+                </span>
+              </div>
+            </div>
+
+            {/* KPI 4: Delivery Rate */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
+                <span>نسبة نجاح التسليم</span>
+                <TrendingUp className="w-4 h-4 text-purple-600" />
+              </div>
+              <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                <span className="text-xl sm:text-2xl font-black text-purple-600 dark:text-purple-400 font-mono">
+                  {completedOrders.length + returnedOrders.length > 0
+                    ? `${((completedOrders.length / (completedOrders.length + returnedOrders.length)) * 100).toFixed(1)}%`
+                    : isDemoSupplier
+                    ? '86.4%'
+                    : '100%'}
+                </span>
+                <span className="text-[10px] text-purple-700 dark:text-purple-300 font-bold bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-800">
+                  معدل ممتاز ✨
+                </span>
+              </div>
+            </div>
+
+            {/* KPI 5: Active Orders in Pipeline */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
+                <span>الطلبات النشطة في المسار</span>
+                <Clock className="w-4 h-4 text-blue-600" />
+              </div>
+              <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                <span className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 font-mono">
+                  {supplierShippedCount + supplierProcessingCount}
+                </span>
+                <span className="text-[10px] text-blue-700 dark:text-blue-300 font-bold bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
+                  تجهيز وتوصيل 🚚
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Detailed Wholesale Dues Breakdown: Delivered vs In-Transit */}
+          <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-violet-50 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                    {isPlatformWarehouse
+                      ? 'تحصيلات وعوائد مبيعات مستودع المنصة (المحررة vs قيد التوصيل)'
+                      : 'تفصيل دورة مستحقات الجملة (المحررة vs قيد التوصيل)'}
+                  </h2>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {isPlatformWarehouse
+                      ? 'متابعة العوائد المحصلة من السلع المسلّمة والجاهزة للترحيل إلى خزينة المنصة'
+                      : 'مقارنة دقيقة بين مستحقات السلع المسلّمة الجاهزة للسحب ومستحقات السلع التي خرجت مع الناقل'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Card 1: مستحقات طرود سُلّمت (جاهزة للسحب / للترحيل) */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border-2 border-emerald-500/30 dark:border-emerald-500/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-xs font-black text-emerald-800 dark:text-emerald-300">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>
+                      {isPlatformWarehouse
+                        ? 'تحصيلات مؤكدة (جاهزة للترحيل للخزينة)'
+                        : 'مستحقات سُلّمت (جاهزة للسحب)'}
+                    </span>
+                  </span>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    {completedOrders.length} طلب مسلّم
+                  </span>
+                </div>
+
+                <div className="flex items-baseline justify-between pt-1">
+                  <div className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                    {availableBalance.toLocaleString()} <span className="text-xs">دج</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenPayoutModal()}
+                    disabled={availableBalance <= 0}
+                    className={`text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                      availableBalance > 0
+                        ? 'text-emerald-700 dark:text-emerald-300 hover:underline'
+                        : 'text-slate-400 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    <span>{isPlatformWarehouse ? 'ترحيل للخزينة' : 'طلب سحب'}</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed border-t border-emerald-500/10 pt-2">
+                  {isPlatformWarehouse
+                    ? 'عوائد بيع السلع المحصلة ورسوم التجهيز والتغليف للطرود المسلّمة، جاهزة للتحويل مباشرة إلى الخزينة المركزية للمنصة.'
+                    : 'مستحقات بيع الجملة لسلع تم تسليمها وتحصيل ثمنها، محررة بحسابك وجاهزة للتحويل الفوري عبر CCP أو BaridiMob.'}
+                </p>
+              </div>
+
+              {/* Card 2: مستحقات طرود في الطريق (In-Transit) */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-transparent border-2 border-blue-500/30 dark:border-blue-500/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-xs font-black text-blue-800 dark:text-blue-300">
+                    <Truck className="w-4 h-4 text-blue-600" />
+                    <span>مستحقات مع الناقل (In-Transit)</span>
+                  </span>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                    {deliveryOrders.length} طرد مع الناقل
+                  </span>
+                </div>
+
+                <div className="flex items-baseline justify-between pt-1">
+                  <div className="text-xl font-black font-mono text-blue-600 dark:text-blue-400">
+                    +{inTransitWholesale.toLocaleString()} <span className="text-xs">دج</span>
+                  </div>
+                  {preparationOrders.length > 0 && (
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      ({preparationOrders.length} طرد قيد التجهيز)
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed border-t border-blue-500/10 pt-2">
+                  سلع خرجت للتوصيل الفعلي لدى شركات الشحن، وتُضاف مستحقات جملتها تلقائياً إلى رصيدك المتاح فور إتمام التسليم.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Pipeline Horizontal Status Tabs (Starting from Review) */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {[
+              { id: 'ALL', labelAr: 'الكل', count: supplierOrders.length, color: 'bg-slate-100 text-slate-800' },
+              { id: 'REVIEW', labelAr: '🔍 قيد المراجعة', count: supplierReviewCount, color: 'bg-amber-100 text-amber-800' },
+              { id: 'CONFIRMED', labelAr: '✅ تم التأكيد', count: supplierConfirmedCount, color: 'bg-blue-100 text-blue-800' },
+              { id: 'PROCESSING', labelAr: '📦 قيد التحضير', count: supplierProcessingCount, color: 'bg-purple-100 text-purple-800' },
+              { id: 'SHIPPED', labelAr: '🚚 قيد التوصيل', count: supplierShippedCount, color: 'bg-indigo-100 text-indigo-800' },
+              { id: 'DELIVERED', labelAr: '🎉 تم التسليم', count: supplierDeliveredCount, color: 'bg-emerald-100 text-emerald-800' },
+              { id: 'FAILED', labelAr: '❌ فشل التسليم', count: supplierFailedCount, color: 'bg-rose-100 text-rose-800' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setSupplierPipelineFilter(tab.id as any)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-2 cursor-pointer shadow-2xs ${
+                  supplierPipelineFilter === tab.id
+                    ? 'bg-violet-600 text-white shadow-xs scale-102 ring-2 ring-violet-400/40'
+                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                }`}
+              >
+                <span>{tab.labelAr}</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                    supplierPipelineFilter === tab.id
+                      ? 'bg-white/20 text-white'
+                      : tab.color
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Supplier Orders List */}
+          {filteredSupplierPipelineOrders.length === 0 ? (
+            <div className="p-12 text-center text-slate-400 text-xs bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2">
+              <Package className="w-8 h-8 text-slate-300 mx-auto" />
+              <p>لا توجد طلبات في هذه المرحلة حالياً.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredSupplierPipelineOrders.map((order, idx) => {
+                const wholesaleAmount = getOrderWholesaleAmount(order);
+                const orderDate = order.createdAt ? new Date(order.createdAt).toLocaleDateString('ar-DZ') : '-';
+
+                // Status badge display info
+                let statusBadge = {
+                  label: 'قيد المراجعة',
+                  color: 'bg-amber-100 text-amber-900 border-amber-300',
+                  dot: 'bg-amber-500',
+                };
+                if (order.status === 'CONFIRMED' || order.situation === 'Confirmé') {
+                  statusBadge = {
+                    label: 'مؤكدة هاتفياً • بانتظار التجهيز بالمنصة',
+                    color: 'bg-blue-100 text-blue-900 border-blue-300',
+                    dot: 'bg-blue-500',
+                  };
+                } else if (order.status === 'PROCESSING' || order.situation === 'EnPréparation') {
+                  statusBadge = {
+                    label: 'قيد التجهيز والتغليف بمستودع المنصة',
+                    color: 'bg-purple-100 text-purple-900 border-purple-300',
+                    dot: 'bg-purple-500',
+                  };
+                } else if (order.status === 'SHIPPED') {
+                  statusBadge = {
+                    label: 'في الطريق مع شركة التوصيل',
+                    color: 'bg-indigo-100 text-indigo-900 border-indigo-300',
+                    dot: 'bg-indigo-500',
+                  };
+                } else if (order.status === 'DELIVERED') {
+                  statusBadge = {
+                    label: 'تم التسليم بنجاح • أرباح الجملة مضافة',
+                    color: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+                    dot: 'bg-emerald-500',
+                  };
+                } else if (order.status === 'FAILED' || order.status === 'CANCELLED' || order.situation === 'Retour') {
+                  statusBadge = {
+                    label: 'فشل التسليم • أعيدت للمخزون',
+                    color: 'bg-rose-100 text-rose-900 border-rose-300',
+                    dot: 'bg-rose-500',
+                  };
+                }
+
+                return (
+                  <div
+                    key={`${order.id || 'sup-ord'}-${idx}`}
+                    className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3 transition hover:border-violet-300 dark:hover:border-violet-800"
+                  >
+                    {/* Header: ID, Date, Status Badge, Timeline Button */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-black text-sm text-slate-900 dark:text-white">
+                          #{order.id}
+                        </span>
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border flex items-center gap-1.5 ${statusBadge.color}`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot} animate-pulse`} />
+                          <span>{statusBadge.label}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTimelineOrder(order)}
+                          className="px-2 py-0.5 rounded-md bg-violet-50 hover:bg-violet-100 dark:bg-violet-950/60 text-violet-800 dark:text-violet-300 border border-violet-200 dark:border-violet-800 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
+                          title="عرض المسار اللحظي والمزامنة عبر كافة الداشبوردات"
+                        >
+                          <Clock className="w-3 h-3 text-violet-600 dark:text-violet-400" />
+                          <span>المسار اللحظي ⚡</span>
+                        </button>
+                      </div>
+
+                      <div className="text-end font-mono text-xs">
+                        <span className="text-[10px] text-slate-400 block">تاريخ الإضافة:</span>
+                        <span className="font-bold text-slate-600 dark:text-slate-300 text-[11px]">
+                          {orderDate}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Customer Location & Courier Tracking */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">وجهة التوصيل:</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                          {order.wilaya} {order.commune ? `• ${order.commune}` : ''}
+                        </span>
+                      </div>
+
+                      {order.trackingCode && (
+                        <div className="sm:text-end">
+                          <span className="text-[10px] text-slate-400 block">رقم التتبع (Tracking):</span>
+                          <span className="font-mono font-black text-xs text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-900 inline-block">
+                            {order.trackingCode}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Products belonging to this Supplier */}
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl space-y-1.5 text-xs">
+                      <span className="text-[10px] text-slate-400 font-bold block mb-1">
+                        المنتجات التابعة لمستودعك في هذا الطلب:
+                      </span>
+                      {order.items.map((item, itemIdx) => (
+                        <div key={itemIdx} className="flex justify-between items-center font-bold">
+                          <span className="text-slate-800 dark:text-slate-200">
+                            • {item.productName}{' '}
+                            <span className="text-purple-500 font-medium text-[11px]">
+                              ({item.variantSize || 'قياسي'} / {item.variantColor || 'افتراضي'})
+                            </span>
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono bg-white dark:bg-slate-900 px-2 py-0.5 rounded border text-[11px]">
+                              × {item.quantity}
+                            </span>
+                            <span className="font-mono text-purple-700 dark:text-purple-300 text-xs font-bold">
+                              {((item.wholesalePrice || item.supplierNetPrice || 0) * (item.quantity || 1)).toLocaleString()} دج
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Supplier Wholesale Net Total & Reassurance Notice */}
+                    <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
+                      <div className="flex items-center gap-1.5 text-purple-900 dark:text-purple-200">
+                        <DollarSign className="w-4 h-4 text-purple-600 shrink-0" />
+                        <span>مستحقات سعر الجملة الصافية لهذا الطلب:</span>
+                      </div>
+                      <span className="font-mono text-sm font-black text-purple-700 dark:text-purple-300">
+                        +<MoneyText amount={wholesaleAmount} />
+                      </span>
+                    </div>
+
+                    {/* Read-Only Observation Notice */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 dark:text-slate-500 flex items-center justify-between">
+                      <span>👁️ وضع المراقبة اللحظية فقط • المزامنة ثنائية الاتجاه مع المنصة</span>
+                      <span className="font-medium text-slate-500">
+                        {order.status === 'DELIVERED' ? '✔ مضاف للرصيد المتاح' : '⏳ يضاف للرصيد فور التسليم'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* ==================== TAB 1: قيد المراجعة ==================== */}
       {activeTab === 'pending' && (
@@ -1374,6 +2132,15 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                       <span className="text-[10px] text-slate-400">
                         البائع: بائع متميز
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTimelineOrder(order)}
+                        className="px-2 py-0.5 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
+                        title="عرض مسار وتزامن الطلبية عبر جميع الداشبوردات"
+                      >
+                        <Clock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                        <span>المسار اللحظي ⚡</span>
+                      </button>
                     </div>
 
                     <span className="font-mono font-black text-purple-600 dark:text-purple-400 text-xs">
@@ -1417,7 +2184,17 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                   </div>
 
                   {/* STEP 1 ACTIONS: Confirm Order vs Reject Order vs Locked by Confirmer */}
-                  {order.assignedConfirmerId ? (
+                  {!isPlatformWarehouse ? (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex-1 py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-600" />
+                        <span>🛡️ يتم الاتصال والتأكيد هاتفياً عبر <strong>فريق التأكيد (Confirmer)</strong> والتجهيز عبر <strong>مستودع المنصة المركزي</strong> آلياً.</span>
+                      </div>
+                      <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold px-2.5 py-1 bg-amber-50 dark:bg-amber-950/60 rounded-lg border border-amber-200">
+                        مخزون محجوز مؤقتاً
+                      </span>
+                    </div>
+                  ) : order.assignedConfirmerId ? (
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                       <div className="flex-1 py-2 px-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 font-bold text-xs flex items-center gap-2">
                         <Lock className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
@@ -1439,9 +2216,10 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                           setConfirmingOrderModal(order);
                         }}
                         className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
+                        title="تأكيد جاهزية المنتج بالمستودع وتحويله للتحضير والتغليف فوراً"
                       >
                         <Check className="w-4 h-4" />
-                        <span>✅ تم التأكيد</span>
+                        <span>✅ تأكيد التوفر بالمستودع والتحويل للتحضير</span>
                       </button>
 
                       <button
@@ -1452,9 +2230,10 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                         className="flex-1 py-2.5 rounded-xl bg-rose-600/10 hover:bg-rose-600/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 font-black text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
                       >
                         <XCircle className="w-4 h-4" />
-                        <span>❌ فشل التأكيد</span>
+                        <span>❌ غير متوفر بالمستودع</span>
                       </button>
                     </div>
+
                   )}
                 </div>
               ))
@@ -1465,18 +2244,97 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
 
       {/* ==================== TAB 2: قيد التحضير ==================== */}
       {activeTab === 'preparation' && (
-        <div className="space-y-3">
-          <div className="p-3 bg-violet-500/10 border border-violet-500/20 rounded-2xl text-xs text-violet-800 dark:text-violet-300 flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Package className="w-4 h-4 shrink-0 text-violet-500" />
-              <span>
-                الطلبات المؤكدة الجاهزة للتحضير. يمكنك تحديد طلبات متعددة أو "تحديد الكل" لطباعة ملصقات الشحن الحرارية دفعة واحدة.
-              </span>
-            </div>
-          </div>
+        <div className="space-y-4">
+          {/* Executive Platform Warehouse & Packer KPIs Banner */}
+          {Boolean(isPlatformWarehouse) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* KPI 1: Dedicated Packaging & Fulfillment Fees (Pick & Pack) */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-slate-900 dark:to-amber-950/30 border-2 border-amber-300 dark:border-amber-700/80 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-amber-800 dark:text-amber-300 text-xs font-bold">
+                    <span>أتعاب التغليف والتجهيز (Pick & Pack)</span>
+                    <Package className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="mt-2 flex items-baseline justify-between gap-2">
+                    <span className="text-xl sm:text-2xl font-black text-amber-700 dark:text-amber-400 font-mono">
+                      {availablePackerWithdrawalDzd.toLocaleString()} <span className="text-xs">دج</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPackerWithdrawModal()}
+                      disabled={availablePackerWithdrawalDzd <= 0}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition active:scale-95 shadow-xs ${
+                        availablePackerWithdrawalDzd > 0
+                          ? 'bg-amber-600 hover:bg-amber-500 text-white cursor-pointer'
+                          : 'bg-amber-200/50 text-amber-600/60 dark:bg-amber-950/50 dark:text-amber-700/50 cursor-not-allowed'
+                      }`}
+                    >
+                      سحب الأتعاب
+                    </button>
+                  </div>
+                </div>
+                <div className="pt-2 mt-2 border-t border-amber-200 dark:border-amber-800/40 flex items-center justify-between gap-1 flex-wrap">
+                  <span className="text-[9px] font-black text-amber-900 dark:text-amber-200 bg-amber-200/70 dark:bg-amber-900/60 px-2 py-0.5 rounded-full">
+                    مضمونة 100% على عاتق الإدارة
+                  </span>
+                  <span className="text-[9px] text-amber-700/80 dark:text-amber-400/80 font-medium">
+                    ({completedOrders.length} مسلّمة × {packagingFeePerOrder} دج)
+                  </span>
+                </div>
+              </div>
 
-          {/* BATCH SELECTION & BULK ACTION TOOLBAR */}
-          {filterBySearch(preparationOrders).length > 0 && (
+              {/* KPI 2: Preparation Orders */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
+                  <span>طلبيات قيد التجهيز والتغليف</span>
+                  <Boxes className="w-4 h-4 text-violet-600" />
+                </div>
+                <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                  <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono">
+                    {preparationOrders.length} <span className="text-xs">طرد</span>
+                  </span>
+                  <span className="text-[10px] text-violet-700 dark:text-violet-300 font-bold bg-violet-50 dark:bg-violet-950/60 px-2 py-0.5 rounded-full border border-violet-200 dark:border-violet-800">
+                    بانتظار الباركود
+                  </span>
+                </div>
+              </div>
+
+              {/* KPI 3: Delivery Ready */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
+                  <span>جاهزة لوصل تسليم الناقل</span>
+                  <Truck className="w-4 h-4 text-blue-600" />
+                </div>
+                <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                  <span className="text-xl sm:text-2xl font-black text-blue-600 dark:text-blue-400 font-mono">
+                    {deliveryOrders.length} <span className="text-xs">طرد</span>
+                  </span>
+                  <span className="text-[10px] text-blue-700 dark:text-blue-300 font-bold bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
+                    Bordereau
+                  </span>
+                </div>
+              </div>
+
+              {/* KPI 4: Delivered */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
+                  <span>طرود تم تسليمها بنجاح</span>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                  <span className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                    {completedOrders.length} <span className="text-xs">طرد مسلّم</span>
+                  </span>
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                    COD محصل 🎉
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* BATCH SELECTION & BULK ACTION TOOLBAR (Platform Warehouse Only) */}
+          {Boolean(isPlatformWarehouse && filterBySearch(preparationOrders).length > 0) && (
             <div className="p-4 bg-white dark:bg-slate-900 border-2 border-violet-400 dark:border-violet-900 rounded-2xl space-y-3 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -1521,7 +2379,7 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                     onClick={handleBulkCreateBordereaux}
                     className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition ${
                       selectedPrepOrderIds.length > 0
-                        ? 'bg-amber-600 hover:bg-amber-500 text-white cursor-pointer'
+                        ? 'bg-purple-600 hover:bg-purple-500 text-white cursor-pointer'
                         : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-60'
                     }`}
                   >
@@ -1580,8 +2438,12 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                   </span>
                   <select
                     value={bulkTargetCourierId}
-                    onChange={(e) => setBulkTargetCourierId(e.target.value)}
-                    className="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold text-xs focus:ring-1 focus:ring-violet-500"
+                    onChange={(e) => {
+                      const newId = e.target.value;
+                      setBulkTargetCourierId(newId);
+                      handleApplyBulkCourier(newId);
+                    }}
+                    className="px-2.5 py-1 rounded-lg border-2 border-violet-400 dark:border-violet-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold text-xs focus:ring-2 focus:ring-violet-500 shadow-xs cursor-pointer"
                   >
                     {activeCouriersList.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -1589,22 +2451,29 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                       </option>
                     ))}
                   </select>
+
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] font-black flex items-center gap-1 shadow-xs">
+                    <span>⚡ تغيير تلقائي ولحظي متزامن</span>
+                  </span>
+
                   <button
                     type="button"
-                    disabled={selectedPrepOrderIds.length === 0}
                     onClick={() => handleApplyBulkCourier(bulkTargetCourierId)}
+                    disabled={selectedPrepOrderIds.length === 0 && filterBySearch(preparationOrders).length === 0}
                     className={`px-3 py-1 rounded-lg text-xs font-black transition ${
-                      selectedPrepOrderIds.length > 0
-                        ? 'bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-800 cursor-pointer'
+                      selectedPrepOrderIds.length > 0 || filterBySearch(preparationOrders).length > 0
+                        ? 'bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-800 cursor-pointer shadow-xs'
                         : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                     }`}
                   >
-                    تطبيق على المحدد
+                    {selectedPrepOrderIds.length > 0
+                      ? `تطبيق على المحدد (${selectedPrepOrderIds.length})`
+                      : `تطبيق على كل المعروض (${filterBySearch(preparationOrders).length})`}
                   </button>
                 </div>
 
                 <span className="text-[11px] text-slate-500 font-medium">
-                  💡 يتم إنشاء وطباعة البوردورو آلياً عبر API شركة التوصيل المختارة من طرف المورد
+                  ⚡ بمجرد اختيار شركة التوصيل تتغير فوراً خانة «شركة التوصيل لشحنات المنصة:» في جميع بطاقات الطلبات
                 </span>
               </div>
             </div>
@@ -1671,131 +2540,187 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                         )}
                       </div>
 
-                      <div className="text-end font-mono text-xs">
-                        <span className="text-[10px] text-slate-400 block">تاريخ الإضافة:</span>
-                        <span className="font-bold text-slate-600 dark:text-slate-300 text-[11px]">
-                          {order.createdAt ? new Date(order.createdAt).toLocaleDateString('ar-DZ') : '-'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* COURIER PARTNER SELECTOR BAR (SELECTED BY SUPPLIER) */}
-                    <div className="p-3 bg-violet-50/60 dark:bg-violet-950/30 border border-violet-200/80 dark:border-violet-900/60 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Truck className="w-4 h-4 text-violet-600 dark:text-violet-400 shrink-0" />
-                        <span className="font-black text-slate-800 dark:text-slate-200">
-                          شركة التوصيل المختارة من طرف المورد:
-                        </span>
-                        <select
-                          value={order.courierPartnerId || chosenCourier.id}
-                          onChange={(e) => handleSelectCourierForOrder(order.id, e.target.value)}
-                          className="px-3 py-1.5 rounded-xl border-2 border-violet-400 dark:border-violet-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-black text-xs cursor-pointer focus:ring-2 focus:ring-violet-500 shadow-xs"
-                        >
-                          {activeCouriersList.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name} {c.connectionStatus === 'CONNECTED' ? '✓ (متصل API)' : ''}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] font-black">
-                          ✓ API متصل
-                        </span>
-                      </div>
-
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-slate-500 font-bold">رقم التتبع (Tracking API):</span>
-                        <span className="font-mono font-black text-xs text-violet-700 dark:text-violet-300 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-violet-200 dark:border-violet-800">
-                          {order.trackingCode || 'بانتظار الإنشاء عبر API'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Customer & Address */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="font-black text-slate-900 dark:text-white block">{order.customerName}</span>
-                        <span className="font-mono text-slate-500 text-[11px] block">{order.phone}</span>
-                      </div>
-                      <div className="sm:text-end">
-                        <span className="font-bold text-amber-600 dark:text-amber-400 block">{order.wilaya}</span>
-                        <span className="text-[10px] text-slate-500 block truncate">{order.commune} - {order.address}</span>
-                      </div>
-                    </div>
-
-                    {/* Order Items */}
-                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl space-y-1 text-xs">
-                      {order.items.map((item, i) => (
-                        <div key={i} className="flex justify-between items-center font-bold">
-                          <span>
-                            • {item.productName} ({item.variantSize} / {item.variantColor})
-                          </span>
-                          <span className="font-mono bg-white dark:bg-slate-900 px-2 py-0.5 rounded border">
-                            × {item.quantity}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTimelineOrder(order)}
+                          className="px-2.5 py-1 rounded-lg bg-violet-100 dark:bg-violet-950/80 text-violet-800 dark:text-violet-200 hover:bg-violet-200 border border-violet-200 dark:border-violet-800 text-[10px] font-extrabold flex items-center gap-1 transition cursor-pointer"
+                          title="عرض سجل التدقيق والمزامنة اللحظية للطلب"
+                        >
+                          <Clock className="w-3 h-3 text-violet-600 dark:text-violet-400" />
+                          <span>المسار اللحظي ⚡</span>
+                        </button>
+                        <div className="text-end font-mono text-xs">
+                          <span className="text-[10px] text-slate-400 block">تاريخ الإضافة:</span>
+                          <span className="font-bold text-slate-600 dark:text-slate-300 text-[11px]">
+                            {order.createdAt ? new Date(order.createdAt).toLocaleDateString('ar-DZ') : '-'}
                           </span>
                         </div>
-                      ))}
+                      </div>
                     </div>
 
-                    {/* API BORDEREAU ACTIONS (TIED TO SELECTED COURIER API) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-bold">
-                      {/* Button 1: Create Bordereau via Selected Courier API */}
-                      <button
-                        disabled={isCreatingThis}
-                        onClick={() => handleCreateBordereauForOrder(order)}
-                        className={`py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer text-xs font-black shadow-xs ${
-                          hasBordereau
-                            ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 dark:bg-amber-950/80 dark:text-amber-200 border border-amber-300'
-                            : 'bg-violet-600 hover:bg-violet-500 text-white'
-                        }`}
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isCreatingThis ? 'animate-spin' : ''}`} />
-                        <span>
-                          {isCreatingThis
-                            ? 'جاري الاتصال بالـ API...'
-                            : hasBordereau
-                            ? `🔄 1. إعادة توليد البوردورو (${chosenCourier.name.split(' ')[0]})`
-                            : `⚡ 1. إنشاء البوردورو عبر API (${chosenCourier.name.split(' ')[0]})`}
-                        </span>
-                      </button>
+                    {/* COURIER PARTNER SELECTOR BAR (Platform Warehouse ONLY) */}
+                    {isPlatformWarehouse ? (
+                      <>
+                        <div className="p-3 bg-violet-50/60 dark:bg-violet-950/30 border border-violet-200/80 dark:border-violet-900/60 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Truck className="w-4 h-4 text-violet-600 dark:text-violet-400 shrink-0" />
+                            <span className="font-black text-slate-800 dark:text-slate-200">
+                              شركة التوصيل لشحنات المنصة:
+                            </span>
+                            <select
+                              value={order.courierPartnerId || chosenCourier.id}
+                              onChange={(e) => handleSelectCourierForOrder(order.id, e.target.value)}
+                              className="px-3 py-1.5 rounded-xl border-2 border-violet-400 dark:border-violet-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-black text-xs cursor-pointer focus:ring-2 focus:ring-violet-500 shadow-xs"
+                            >
+                              {activeCouriersList.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name} {c.connectionStatus === 'CONNECTED' ? '✓ (متصل API)' : ''}
+                                </option>
+                              ))}
+                            </select>
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] font-black">
+                              ✓ API متصل
+                            </span>
+                          </div>
 
-                      {/* Button 2: Print Bordereau via Selected Courier API */}
-                      <button
-                        onClick={() => handlePrintBordereauForOrder(order)}
-                        className="py-2 px-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer text-xs font-black ring-2 ring-violet-400/40"
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                        <span>🖨️ 2. طباعة البوردورو عبر API</span>
-                      </button>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-slate-500 font-bold">رقم التتبع (Tracking API):</span>
+                            <span className="font-mono font-black text-xs text-violet-700 dark:text-violet-300 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-violet-200 dark:border-violet-800">
+                              {order.trackingCode || 'بانتظار الإنشاء عبر API'}
+                            </span>
+                          </div>
+                        </div>
 
-                      {/* Button 3: Direct API Bordereau Web / PDF */}
-                      <button
-                        disabled={!order.bordereauUrl}
-                        onClick={() => {
-                          if (order.bordereauUrl) {
-                            window.open(order.bordereauUrl, '_blank');
-                          } else {
-                            handleCreateBordereauForOrder(order);
-                          }
-                        }}
-                        className={`py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition text-xs font-black ${
-                          order.bordereauUrl
-                            ? 'bg-slate-800 hover:bg-slate-700 text-white cursor-pointer'
-                            : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                        }`}
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>📄 3. سند الشحن الرسمي (PDF)</span>
-                      </button>
+                        {/* Customer & Address */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="font-black text-slate-900 dark:text-white block">{order.customerName}</span>
+                            <span className="font-mono text-slate-500 text-[11px] block">{order.phone}</span>
+                          </div>
+                          <div className="sm:text-end">
+                            <span className="font-bold text-amber-600 dark:text-amber-400 block">{order.wilaya}</span>
+                            <span className="text-[10px] text-slate-500 block truncate">{order.commune} - {order.address}</span>
+                          </div>
+                        </div>
 
-                      {/* Button 4: Mark Package Ready */}
-                      <button
-                        onClick={() => handleMarkPackageReady(order.id)}
-                        className="py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer text-xs font-black"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>4. تأكيد تجهيز الطرد (قيد التوصيل)</span>
-                      </button>
-                    </div>
+                        {/* Order Items */}
+                        <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl space-y-1 text-xs">
+                          {order.items.map((item, i) => (
+                            <div key={i} className="flex justify-between items-center font-bold">
+                              <span>
+                                • {item.productName} ({item.variantSize} / {item.variantColor})
+                              </span>
+                              <span className="font-mono bg-white dark:bg-slate-900 px-2 py-0.5 rounded border">
+                                × {item.quantity}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* API BORDEREAU ACTIONS (TIED TO SELECTED COURIER API) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-bold">
+                          {/* Button 1: Create Bordereau via Selected Courier API */}
+                          <button
+                            disabled={isCreatingThis}
+                            onClick={() => handleCreateBordereauForOrder(order)}
+                            className={`py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer text-xs font-black shadow-xs ${
+                              hasBordereau
+                                ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 dark:bg-amber-950/80 dark:text-amber-200 border border-amber-300'
+                                : 'bg-violet-600 hover:bg-violet-500 text-white'
+                            }`}
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isCreatingThis ? 'animate-spin' : ''}`} />
+                            <span>
+                              {isCreatingThis
+                                ? 'جاري الاتصال بالـ API...'
+                                : hasBordereau
+                                ? `🔄 1. إعادة توليد البوردورو (${chosenCourier.name.split(' ')[0]})`
+                                : `⚡ 1. إنشاء البوردورو عبر API (${chosenCourier.name.split(' ')[0]})`}
+                            </span>
+                          </button>
+
+                          {/* Button 2: Print Bordereau via Selected Courier API */}
+                          <button
+                            onClick={() => handlePrintBordereauForOrder(order)}
+                            className="py-2 px-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer text-xs font-black ring-2 ring-violet-400/40"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>🖨️ 2. طباعة البوردورو عبر API</span>
+                          </button>
+
+                          {/* Button 3: Direct API Bordereau Web / PDF */}
+                          <button
+                            disabled={!order.bordereauUrl}
+                            onClick={() => {
+                              if (order.bordereauUrl) {
+                                window.open(order.bordereauUrl, '_blank');
+                              } else {
+                                handleCreateBordereauForOrder(order);
+                              }
+                            }}
+                            className={`py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 transition text-xs font-black ${
+                              order.bordereauUrl
+                                ? 'bg-slate-800 hover:bg-slate-700 text-white cursor-pointer'
+                                : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                            }`}
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>📄 3. سند الشحن الرسمي (PDF)</span>
+                          </button>
+
+                          {/* Button 4: Mark Package Ready */}
+                          <button
+                            onClick={() => handleMarkPackageReady(order.id)}
+                            className="py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer text-xs font-black"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>4. تأكيد تجهيز الطرد (قيد التوصيل)</span>
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="space-y-2">
+                        {/* Customer & Address */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="font-black text-slate-900 dark:text-white block">{order.customerName}</span>
+                            <span className="font-mono text-slate-500 text-[11px] block">{order.phone}</span>
+                          </div>
+                          <div className="sm:text-end">
+                            <span className="font-bold text-amber-600 dark:text-amber-400 block">{order.wilaya}</span>
+                            <span className="text-[10px] text-slate-500 block truncate">{order.commune} - {order.address}</span>
+                          </div>
+                        </div>
+
+                        {/* Order Items */}
+                        <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl space-y-1 text-xs">
+                          {order.items.map((item, i) => (
+                            <div key={i} className="flex justify-between items-center font-bold">
+                              <span>
+                                • {item.productName} ({item.variantSize} / {item.variantColor})
+                              </span>
+                              <span className="font-mono bg-white dark:bg-slate-900 px-2 py-0.5 rounded border">
+                                × {item.quantity}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Status Banner for Supplier */}
+                        <div className="p-3 rounded-xl bg-violet-50/70 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 text-xs text-violet-900 dark:text-violet-200 flex flex-wrap items-center justify-between gap-2 font-bold">
+                          <div className="flex items-center gap-2">
+                            <Package className="w-4 h-4 text-violet-600 shrink-0" />
+                            <span>📦 قيد التحضير والتغليف في مستودع المنصة</span>
+                          </div>
+                          {order.trackingCode && (
+                            <span className="font-mono text-xs px-2.5 py-1 bg-white dark:bg-slate-900 rounded-lg border border-violet-200 text-violet-700 dark:text-violet-300">
+                              كود التتبع: {order.trackingCode}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })
@@ -1808,11 +2733,21 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
       {activeTab === 'delivery' && (
         <div className="space-y-4">
 
-          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-xs text-blue-800 dark:text-blue-300 flex items-center gap-2">
-            <Truck className="w-4 h-4 shrink-0 text-blue-500" />
-            <span>
-              الطلبات المشحونة التي تم تسليمها لشركة التوصيل. يتم التتبع التلقائي عبر API وتتحدث الحالات الفنية داخلياً، بينما يرى البائع فقط "قيد التوصيل".
-            </span>
+          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-xs text-blue-800 dark:text-blue-300 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Truck className="w-4 h-4 shrink-0 text-blue-500" />
+              <span>
+                الطلبات المشحونة التي تم تسليمها لشركة التوصيل. يتم التتبع التلقائي عبر API وتتحدث الحالات الفنية داخلياً.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsCourierAnalyticsModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>📊 مصفوفة معدلات التسليم والولايات</span>
+            </button>
           </div>
 
           <div className="space-y-3">
@@ -1832,6 +2767,15 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                       <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 text-[10px] font-black">
                         قيد التوصيل
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTimelineOrder(order)}
+                        className="px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
+                        title="عرض مسار وتزامن الطلبية عبر جميع الداشبوردات"
+                      >
+                        <Clock className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                        <span>المسار اللحظي ⚡</span>
+                      </button>
                     </div>
 
                     <span className="font-mono font-bold text-slate-500 text-[11px]">
@@ -1850,26 +2794,38 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                    <button
-                      onClick={() => handleSyncDeliveryStatus(order)}
-                      className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5 text-blue-500" />
-                      <span>مزامنة التتبع التلقائي مع API الشحن</span>
-                    </button>
+                  {isPlatformWarehouse ? (
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        onClick={() => handleSyncDeliveryStatus(order)}
+                        className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 text-blue-500" />
+                        <span>مزامنة التتبع التلقائي مع API الشحن</span>
+                      </button>
 
-                    <button
-                      onClick={() => {
-                        updateOrderStatus(order.id, 'DELIVERED');
-                        onShowToast(`🎉 تم تأكيد التسليم النهائي للطلب #${order.id}`, 'success');
-                      }}
-                      className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-[11px] flex items-center justify-center gap-1 shadow-xs transition cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>تأكيد التسليم (تم التوصيل)</span>
-                    </button>
-                  </div>
+                      <button
+                        onClick={() => {
+                          updateOrderStatus(order.id, 'DELIVERED');
+                          onShowToast(`🎉 تم تأكيد التسليم النهائي للطلب #${order.id}`, 'success');
+                        }}
+                        className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-[11px] flex items-center justify-center gap-1 shadow-xs transition cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>تأكيد التسليم (تم التوصيل)</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                      <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 font-medium">
+                        <Truck className="w-3.5 h-3.5 text-blue-500" />
+                        <span>في الطريق مع الموزع • التحديث اللحظي عبر API شركة التوصيل</span>
+                      </div>
+                      <span className="font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/50">
+                        {order.trackingCode || 'قيد المتابعة'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -1878,21 +2834,75 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
       )}
 
       {/* ==================== TAB 4: مكتمل (تم التوصيل) ==================== */}
-      {activeTab === 'completed' && (
-        <div className="space-y-3">
-          <div className="p-3.5 bg-purple-500/10 border border-purple-500/30 rounded-2xl text-xs text-purple-800 dark:text-purple-300 flex items-center justify-between gap-2 shadow-xs">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 shrink-0 text-purple-500" />
-              <div>
-                <span className="font-black block text-sm">الطلبات المكتملة (تم التوصيل بنجاح)</span>
-                <span className="text-[11px] text-purple-700 dark:text-purple-400">
-                  عند مزامنة وتأكيد التسليم مع API شركة التوصيل، تضاف مستحقات مبيعات الجملة تلقائياً إلى رصيدك المتاح للسحب 💰
-                </span>
+      {activeTab === 'completed' && (() => {
+        const filteredCompleted = filterBySearch(completedOrders);
+        const totalCodCash = filteredCompleted.reduce((sum, o) => sum + (o.totalAmount || 0) + (o.shippingFee || 0), 0);
+        const totalWholesale = filteredCompleted.reduce((sum, o) => sum + getOrderWholesaleAmount(o), 0);
+        const totalSellerProfits = filteredCompleted.reduce((sum, o) => sum + (o.totalProfit || 0), 0);
+        const totalDeliveryFees = filteredCompleted.reduce((sum, o) => sum + (o.shippingFee || 0), 0);
+
+        return (
+          <div className="space-y-4">
+            {/* COD Cash Reconciliation Banner */}
+            <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white border border-indigo-500/30 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-sm sm:text-base font-black">مطابقة كاش الـ COD وتسوية المستحقات</h2>
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        مطابقة دقيقة 100%
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      توزيع الكاش المحصل من الناقلين بين مستحقات الموردين، أرباح المسوقين، ورسوم التوصيل حتى آخر دينار.
+                    </p>
+                  </div>
+                </div>
+                <div className="text-start sm:text-end">
+                  <span className="text-[11px] text-slate-400 block font-medium">إجمالي كاش COD المحصل:</span>
+                  <span className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
+                    <MoneyText amount={totalCodCash} />
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-2.5 pt-2 border-t border-white/10 text-xs">
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                  <span className="text-[11px] text-slate-400 block">1. مستحقات الموردين بالجملة</span>
+                  <span className="text-base font-black font-mono text-white block">
+                    <MoneyText amount={totalWholesale} />
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-medium">محررة لرصيد المورد ✅</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                  <span className="text-[11px] text-slate-400 block">2. أرباح المسوقين المحررة</span>
+                  <span className="text-base font-black font-mono text-violet-300 block">
+                    <MoneyText amount={totalSellerProfits} />
+                  </span>
+                  <span className="text-[10px] text-violet-300 font-medium">محررة بمحافظ البائعين 🛍️</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                  <span className="text-[11px] text-slate-400 block">3. رسوم شركات التوصيل</span>
+                  <span className="text-base font-black font-mono text-blue-300 block">
+                    <MoneyText amount={totalDeliveryFees} />
+                  </span>
+                  <span className="text-[10px] text-blue-300 font-medium">مقتطعة للناقلين 🚚</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                  <span className="text-[11px] text-slate-400 block">4. الطرود المسلّمة</span>
+                  <span className="text-base font-black font-mono text-amber-300 block">
+                    {filteredCompleted.length} طرد
+                  </span>
+                  <span className="text-[10px] text-amber-300 font-medium">تسليم وتحصيل مكتمل 🎉</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="space-y-3">
+            <div className="space-y-3">
             {filterBySearch(completedOrders).length === 0 ? (
               <div className="p-12 text-center text-slate-400 text-xs bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
                 لا توجد طلبات مكتملة حالياً.
@@ -1910,6 +2920,15 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                         <CheckCircle2 className="w-3 h-3" />
                         تم التوصيل بنجاح 🎉
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTimelineOrder(order)}
+                        className="px-2 py-0.5 rounded-lg bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
+                        title="عرض مسار وتزامن الطلبية عبر جميع الداشبوردات"
+                      >
+                        <Clock className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                        <span>المسار اللحظي ⚡</span>
+                      </button>
                     </div>
 
                     <span className="font-mono font-black text-purple-600 dark:text-purple-400 text-sm">
@@ -1953,21 +2972,37 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
             )}
           </div>
         </div>
-      )}
+      );
+    })()}
 
       {/* ==================== TAB 5: مرتجع (المرتجعات) ==================== */}
       {activeTab === 'returned' && (
         <div className="space-y-3">
-          <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-xs text-rose-800 dark:text-rose-300 flex items-center justify-between gap-2 shadow-xs">
-            <div className="flex items-center gap-2">
-              <RotateCcw className="w-5 h-5 shrink-0 text-rose-500" />
+          <div className="p-3.5 bg-gradient-to-r from-rose-500/10 via-amber-500/10 to-purple-500/10 border border-rose-500/30 rounded-2xl text-xs text-rose-900 dark:text-rose-200 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-rose-600 text-white rounded-xl shadow-xs">
+                <RotateCcw className="w-4 h-4" />
+              </div>
               <div>
-                <span className="font-black block text-sm">إدارة الطلبات المرتجعة للمستودع</span>
-                <span className="text-[11px] text-rose-700 dark:text-rose-400">
-                  عند وصول الطرد الجسدي إلى المخزن، يضغط مسؤل المستودع على "تم الإرجاع بالمخزن" لإعادة السلعة تلقائياً لمكانها في المخزون! 📦
+                <span className="font-black block text-sm text-slate-900 dark:text-white">
+                  فحص جودة المرتجعات QC وإعادة التخزين
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  فحص سلامة الطرود المرتجعة، مطابقة المنتجات وإعادتها فورياً لمواقع الأرفف بالمستودع أو تسجيل التوالف.
                 </span>
               </div>
             </div>
+
+            {isPlatformWarehouse && (
+              <button
+                type="button"
+                onClick={() => setIsReturnsQCModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-rose-600/20 transition cursor-pointer"
+              >
+                <ShieldAlert className="w-4 h-4 text-amber-200 animate-pulse" />
+                <span>🔍 فحص جودة الطرود المرتجعة QC</span>
+              </button>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -1997,6 +3032,15 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                         >
                           {isReturnedInStock ? '✔ تم الاستلام بالمخزن وتحديث المخزون' : 'بانتظار وصول الطرد للمستودع ⏳'}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTimelineOrder(order)}
+                          className="px-2 py-0.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
+                          title="عرض مسار وتزامن الطلبية عبر جميع الداشبوردات"
+                        >
+                          <Clock className="w-3 h-3 text-rose-600 dark:text-rose-400" />
+                          <span>المسار اللحظي ⚡</span>
+                        </button>
                       </div>
 
                       <span className="font-mono text-slate-500 font-bold text-xs">
@@ -2036,20 +3080,27 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
 
                     {/* ACTION BUTTON OR CONFIRMATION BANNER */}
                     {!isReturnedInStock ? (
-                      <button
-                        onClick={() => {
-                          confirmReturnInWarehouse(order.id);
-                          setProducts(getStoredProducts());
-                          onShowToast(
-                            `✔ تم استلام الطرد #${order.id} بالمخزن، إضافة ${totalItemsQty} قطعة إلى المخزون تلقائياً، وحذفه من قائمة المرتجعات!`,
-                            'success'
-                          );
-                        }}
-                        className="w-full py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                        <span>تم الاستلام بالمخزن وتحديث المخزون (إضافة للمخزون وحذف من القائمة)</span>
-                      </button>
+                      isPlatformWarehouse ? (
+                        <button
+                          onClick={() => {
+                            confirmReturnInWarehouse(order.id);
+                            setProducts(getStoredProducts());
+                            onShowToast(
+                              `✔ تم استلام الطرد #${order.id} بالمخزن، إضافة ${totalItemsQty} قطعة إلى المخزون تلقائياً، وحذفه من قائمة المرتجعات!`,
+                              'success'
+                            );
+                          }}
+                          className="w-full py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          <span>تم الاستلام بالمخزن وتحديث المخزون (إضافة للمخزون وحذف من القائمة)</span>
+                        </button>
+                      ) : (
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                          <span>بانتظار استلام الطرد من شركة التوصيل وفحصه بمستودع المنصة المركزي لإعادته لمخزونك المتاح للبيع.</span>
+                        </div>
+                      )
                     ) : (
                       <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-800 dark:text-purple-300 text-[11px] font-black flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-purple-500 shrink-0" />
@@ -2100,12 +3151,22 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                 </button>
 
                 <button
+                  onClick={() => setActiveTab('inbound')}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer"
+                  title="توريد شحنة بضاعة لمستودع المنصة"
+                >
+                  <Boxes className="w-4 h-4 text-emerald-200" />
+                  <span>📦 توريد بضاعة للمستودع</span>
+                </button>
+
+                <button
                   onClick={handleOpenAddProduct}
                   className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>إضافة منتج جديد للمخزون</span>
+                  <span>إضافة منتج جديد</span>
                 </button>
+
               </div>
             </div>
 
@@ -2233,8 +3294,384 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
         );
       })()}
 
+      {/* ==================== TAB: شحنات التوريد لمستودع المنصة (Inbound Stock to Central Warehouse) ==================== */}
+      {activeTab === 'inbound' && (() => {
+        return (
+          <div className="space-y-4">
+            {/* Header / Info Banner */}
+            <div className="p-5 bg-gradient-to-r from-emerald-900/90 via-slate-900 to-teal-950 border border-emerald-500/30 rounded-3xl text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="p-3 bg-emerald-600 text-white rounded-2xl shrink-0 shadow-lg shadow-emerald-600/30">
+                  <Boxes className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-black text-base">استقبال كراتين التوريد لمستودع المنصة</h3>
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+                      توريد وفحص السلع
+                    </span>
+                  </div>
+                  <p className="text-slate-300 text-xs leading-relaxed max-w-2xl">
+                    استقبال كراتين السلع من الموردين، مطابقة عدد القطع مع الفواتير، وتعيين أرفف التخزين بالمستودع لتغذية جاهزية الطلبيات للتجهيز والشحن.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (mySupplierProducts.length > 0) {
+                    setInboundSelectedProductId(mySupplierProducts[0].id);
+                  }
+                  setIsInboundModalOpen(true);
+                }}
+                className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/20 flex items-center gap-2 shrink-0 cursor-pointer active:scale-95 transition"
+              >
+                <Plus className="w-4 h-4" />
+                <span>إرسال إشعار شحنة توريد جديدة للمستودع</span>
+              </button>
+            </div>
+
+            {/* Filter Tabs for Inbound Shipments */}
+            {inboundRequests.length > 0 && (
+              <div className="flex items-center justify-between gap-3 flex-wrap bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setInboundTabFilter('pending')}
+                    className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                      inboundTabFilter === 'pending'
+                        ? 'bg-emerald-600 text-white shadow-xs font-black'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>شحنات قيد التوريد بانتظار الإيداع ({inboundRequests.filter((r) => r.status !== 'RECEIVED').length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setInboundTabFilter('received')}
+                    className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                      inboundTabFilter === 'received'
+                        ? 'bg-emerald-600 text-white shadow-xs font-black'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>سجل الشحنات المودعة في الرفوف ({inboundRequests.filter((r) => r.status === 'RECEIVED').length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setInboundTabFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                      inboundTabFilter === 'all'
+                        ? 'bg-slate-900 dark:bg-slate-700 text-white shadow-xs font-black'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span>الكل ({inboundRequests.length})</span>
+                  </button>
+                </div>
+
+                <span className="text-[11px] text-slate-500 font-bold">
+                  ⚡ تختفي الشحنة الموردة تلقائياً من هذه القائمة بمجرد الضغط على إيداعها وتأكيد المخزون الحي
+                </span>
+              </div>
+            )}
+
+            {/* Inbound Requests List */}
+            <div className="space-y-3">
+              {inboundRequests.filter((req) => {
+                if (inboundTabFilter === 'pending') return req.status !== 'RECEIVED';
+                if (inboundTabFilter === 'received') return req.status === 'RECEIVED';
+                return true;
+              }).length === 0 ? (
+                <div className="p-12 text-center text-slate-400 text-xs bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+                  {inboundTabFilter === 'pending'
+                    ? '✔ لا توجد شحنات توريد معلقة حالياً — تم إيداع جميع السلع الموردة في رفوف المستودع والمخزون متاح للمسوقين بنجاح! 📦'
+                    : 'لا توجد شحنات مسجلة في هذا القسم.'}
+                </div>
+              ) : (
+                inboundRequests
+                  .filter((req) => {
+                    if (inboundTabFilter === 'pending') return req.status !== 'RECEIVED';
+                    if (inboundTabFilter === 'received') return req.status === 'RECEIVED';
+                    return true;
+                  })
+                  .map((req, rIdx) => {
+                    const isReceived = req.status === 'RECEIVED';
+                    return (
+                      <div
+                        key={req.id || rIdx}
+                        className={`p-4 rounded-2xl bg-white dark:bg-slate-900 border transition shadow-xs space-y-3 ${
+                          isReceived
+                            ? 'border-emerald-200/90 dark:border-emerald-900/40 bg-emerald-50/20 dark:bg-emerald-950/10'
+                            : 'border-amber-200/90 dark:border-amber-900/40'
+                        }`}
+                      >
+                        {/* Request Header */}
+                        <div className="flex flex-wrap justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2.5 gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-xs font-black text-slate-900 dark:text-white">
+                              #{req.id}
+                            </span>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
+                                isReceived
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300'
+                                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 animate-pulse'
+                              }`}
+                            >
+                              {isReceived ? '✔ تم إيداع الشحنة في الرفوف والمخزون متاح' : '🚚 في الطريق لمستودع المنصة'}
+                            </span>
+                            <span className="text-[11px] text-slate-500 font-bold">
+                              المورد: {req.supplierName} ({req.supplierPhone || ''})
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="font-mono text-purple-600 dark:text-purple-400 font-black">
+                              القيمة بالجملة: <MoneyText amount={req.totalWholesaleValueDzd} />
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 font-bold text-[11px]">
+                              {req.totalUnits} قطعة
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Items Details */}
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl space-y-1.5 text-xs">
+                          <div className="text-[11px] font-bold text-slate-400 mb-1">السلع المضمنة في هذه الشحنة:</div>
+                          {req.items.map((item, itIdx) => (
+                            <div key={itIdx} className="flex justify-between items-center font-bold">
+                              <span className="text-slate-800 dark:text-slate-200">
+                                • {item.productName}{' '}
+                                <span className="text-purple-500 font-medium text-[11px]">
+                                  ({item.variantSize || 'قياسي'} / {item.variantColor || 'عادي'})
+                                </span>
+                              </span>
+                              <div className="flex items-center gap-3 font-mono">
+                                <span className="text-slate-500">{item.wholesalePrice} دج/قطعة</span>
+                                <span className="bg-white dark:bg-slate-900 px-2 py-0.5 rounded border text-emerald-600 dark:text-emerald-400">
+                                  {isReceived ? `استُلمت: ${item.quantityReceived ?? item.quantitySent}` : `المرسلة: ${item.quantitySent}`} قطعة
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Logistics Info & Notes */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 pt-1">
+                          <div>
+                            <span>🚚 الناقل / وسيلة الشحن: <strong>{req.carrierName || 'شاحنة خاصة'}</strong></span>
+                            {req.trackingNumber && <span className="ms-3 font-mono">كود الشحنة: <strong>{req.trackingNumber}</strong></span>}
+                          </div>
+                          <div>
+                            <span>تاريخ الإنشاء: {new Date(req.createdAt).toLocaleDateString('ar-DZ')}</span>
+                          </div>
+                        </div>
+
+                        {req.notes && (
+                          <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-[11px]">
+                            <strong>ملاحظات المورد:</strong> {req.notes}
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                          {!isReceived ? (
+                            <button
+                              onClick={() => {
+                                // Perform inspect, deposit and receive
+                                const verified = req.items.map((it) => ({
+                                  productId: it.productId,
+                                  variantId: it.variantId,
+                                  quantityReceived: it.quantitySent,
+                                }));
+                                const ok = receiveAndInspectInboundStock(req.id, verified);
+                                if (ok) {
+                                  // Immediately remove from active pending shipments so it disappears automatically
+                                  setInboundRequests((prev) => prev.filter((item) => item.id !== req.id));
+                                  setProducts(getStoredProducts());
+                                  onShowToast(
+                                    `✔ تم إيداع الشحنة #${req.id} في رفوف المستودع واختفت الشحنة الموردة تلقائياً والمخزون متاح للمسوقين فوراً (${req.totalUnits} قطعة)!`,
+                                    'success'
+                                  );
+                                }
+                              }}
+                              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition cursor-pointer"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              <span>تم إيداع الشحنة في رفوف المستودع والمخزون متاح للمسوقين فوراً</span>
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-emerald-600 dark:text-emerald-400 font-black text-xs flex items-center gap-1.5">
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>تم إيداع الشحنة في رفوف المستودع والمخزون متاح للمسوقين فوراً</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setInboundRequests((prev) => prev.filter((item) => item.id !== req.id));
+                                  onShowToast(`📦 تم إخفاء الشحنة المودعة #${req.id} من القائمة بنجاح`, 'info');
+                                }}
+                                className="px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 text-[10px] font-bold transition cursor-pointer"
+                              >
+                                إخفاء من القائمة
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+
+            {/* Modal: New Inbound Request by Supplier */}
+            {isInboundModalOpen && (
+              <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <h3 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                      <Boxes className="w-4 h-4 text-emerald-600" />
+                      <span>إرسال بضاعة إلى مستودع المنصة المركزي</span>
+                    </h3>
+                    <button
+                      onClick={() => setIsInboundModalOpen(false)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <XCircle className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const targetProd = products.find((p) => p.id === inboundSelectedProductId) || products[0];
+                      if (!targetProd) {
+                        onShowToast('الرجاء اختيار منتج صالح', 'error');
+                        return;
+                      }
+
+                      createInboundStockRequest({
+                        supplierId: supplierProfile.id,
+                        supplierName: supplierProfile.companyName || supplierProfile.fullName,
+                        supplierPhone: supplierProfile.phone,
+                        supplierEmail: supplierProfile.email,
+                        carrierName: inboundCarrier,
+                        items: [
+                          {
+                            productId: targetProd.id,
+                            productName: targetProd.nameAr,
+                            productImage: targetProd.images?.[0],
+                            variantSize: targetProd.variants?.[0]?.size || 'Standard',
+                            variantColor: targetProd.variants?.[0]?.color || 'Original',
+                            quantitySent: Number(inboundQuantitySent) || 50,
+                            wholesalePrice: targetProd.wholesalePrice || 2500,
+                          },
+                        ],
+                        notes: inboundNotes,
+                      });
+
+                      setInboundRequests(getStoredInboundRequests());
+                      setIsInboundModalOpen(false);
+                      setInboundNotes('');
+                      onShowToast('✔ تم تسجيل إرسال شحنة التوريد بنجاح! سيتم فحصها واستلامها في المستودع فور وصولها.', 'success');
+                    }}
+                    className="space-y-3.5 text-xs"
+                  >
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                        اختر المنتج المراد توريده للمستودع:
+                      </label>
+                      <select
+                        value={inboundSelectedProductId}
+                        onChange={(e) => setInboundSelectedProductId(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-bold"
+                      >
+                        {products.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nameAr} (سعر الجملة: {p.wholesalePrice} دج)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                          الكمية المرسلة (قطع):
+                        </label>
+                        <input
+                          type="number"
+                          min="5"
+                          max="5000"
+                          value={inboundQuantitySent}
+                          onChange={(e) => setInboundQuantitySent(Number(e.target.value))}
+                          className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono font-black"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                          وسيلة النقل / الناقل:
+                        </label>
+                        <input
+                          type="text"
+                          value={inboundCarrier}
+                          onChange={(e) => setInboundCarrier(e.target.value)}
+                          className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold"
+                          placeholder="مثلاً: شاحنة خاصة، ياليدين، ..."
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                        ملاحظات أو رقم كود الشحنة للتعرف عليها:
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={inboundNotes}
+                        onChange={(e) => setInboundNotes(e.target.value)}
+                        placeholder="مثلاً: 3 كراتين كبيرة، ملصق عليها كود SUP-100..."
+                        className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-medium"
+                      />
+                    </div>
+
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-300">
+                      💡 فور وصول الشحنة للمستودع وتأكيد استلامها، سيتم زيادة كميات المنتج تلقائياً وسيبدأ المسوقون في جلب المبيعات فوراً!
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setIsInboundModalOpen(false)}
+                        className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold"
+                      >
+                        إلغاء
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow-md cursor-pointer"
+                      >
+                        إرسال الإشعار للمستودع
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* ==================== TAB 7: المالية ومستحقات منتجات الجملة للمورد (Financial & Wholesale Dues) ==================== */}
       {activeTab === 'financial' && (() => {
+
         const filteredSettlements = settlements.filter((st) => {
           const matchesStatus =
             settlementFilterStatus === 'ALL' || st.status === settlementFilterStatus;
@@ -2257,20 +3694,26 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                 <div className="p-3.5 bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-2xl shrink-0 shadow-lg shadow-purple-600/30">
                   <Wallet className="w-6 h-6" />
                 </div>
-                <div className="space-y-1.5 text-right">
+                  <div className="space-y-1.5 text-right">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h4 className="font-black text-base text-white flex items-center gap-2">
-                      <span>القسم المالي لمستحقات المورد (Supplier Wholesale Revenue)</span>
+                      <span>
+                        {isPlatformWarehouse
+                          ? 'القسم المالي لمستودع المنصة (Platform Warehouse Central Treasury)'
+                          : 'القسم المالي لمستحقات المورد (Supplier Wholesale Revenue)'}
+                      </span>
                     </h4>
                     <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold border border-emerald-500/30">
-                      COD Guaranteed Payouts
+                      {isPlatformWarehouse ? 'Platform Central Revenue' : 'COD Guaranteed Payouts'}
                     </span>
                     <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-mono border border-purple-500/30">
-                      مستحقات الجملة الصافية
+                      {isPlatformWarehouse ? 'عوائد السلع + رسوم التغليف' : 'مستحقات الجملة الصافية'}
                     </span>
                   </div>
                   <p className="text-slate-300 text-xs leading-relaxed max-w-3xl">
-                    يتم تحصيل أموال الطلبيات (COD) مركزياً عبر شركات التوصيل لحساب المنصة، ومستحقات منتجات الجملة الخاصة بك تُضاف فورا وتلقائياً لرصيدك المتاح فور تسليم الطلبية للزبون. يمكنك في أي وقت طلب تحويل مستحقاتك لحسابك البريدي أو البنكي.
+                    {isPlatformWarehouse
+                      ? 'تحصيلات أموال السلع ورسوم التغليف والتجهيز (Pick & Pack) المحصلة من شركات التوصيل بعد تسليم الطرود للزبائن. هذه الأموال يتم ترحيلها دورياً ومباشرة إلى الخزينة المركزية للمنصة.'
+                      : 'يتم تحصيل أموال الطلبيات (COD) مركزياً عبر شركات التوصيل لحساب المنصة، ومستحقات منتجات الجملة الخاصة بك تُضاف فورا وتلقائياً لرصيدك المتاح فور تسليم الطلبية للزبون. يمكنك في أي وقت طلب تحويل مستحقاتك لحسابك البريدي أو البنكي.'}
                   </p>
                 </div>
               </div>
@@ -2286,19 +3729,27 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                   }`}
                 >
                   <Plus className="w-4 h-4" />
-                  <span>{availableBalance <= 0 ? 'لا توجد مستحقات للسحب (0 د.ج)' : 'طلب سحب المستحقات (Demande de Retrait)'}</span>
+                  <span>
+                    {isPlatformWarehouse
+                      ? availableBalance <= 0
+                        ? 'لا توجد تحصيلات للترحيل (0 د.ج)'
+                        : 'ترحيل إلى خزينة المنصة المركزية'
+                      : availableBalance <= 0
+                      ? 'لا توجد مستحقات للسحب (0 د.ج)'
+                      : 'طلب سحب المستحقات (Demande de Retrait)'}
+                  </span>
                 </button>
               </div>
             </div>
 
-            {/* Financial Overview Cards - 5 Key Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
-              {/* Card 1: Available Balance for Withdrawal */}
+            {/* Financial Overview Cards - 6 Key Metrics */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
+              {/* Card 1: Available Balance for Withdrawal / Treasury Transfer */}
               <div className="p-4 rounded-3xl bg-gradient-to-br from-purple-900/30 via-slate-900 to-indigo-950/40 border-2 border-purple-500/60 shadow-lg shadow-purple-900/20 space-y-2 relative overflow-hidden">
                 <div className="flex justify-between items-center text-[11px] font-black text-purple-300">
                   <span className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>الرصيد المتاح للسحب</span>
+                    <span>{isPlatformWarehouse ? 'تحصيلات مؤكدة للخزينة' : 'الرصيد المتاح للسحب'}</span>
                   </span>
                   <Wallet className="w-4 h-4 text-purple-400" />
                 </div>
@@ -2306,13 +3757,15 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                   <MoneyText amount={availableBalance} />
                 </div>
                 <div className="flex items-center justify-between pt-1 border-t border-purple-800/40">
-                  <p className="text-[10px] text-purple-200/80 font-medium">جاهز للتحويل الفوري</p>
+                  <p className="text-[10px] text-purple-200/80 font-medium">
+                    {isPlatformWarehouse ? 'جاهز للترحيل للخزينة' : 'جاهز للتحويل الفوري'}
+                  </p>
                   <button
                     onClick={() => handleOpenPayoutModal()}
                     disabled={availableBalance <= 0}
                     className="text-[10px] px-2.5 py-1 rounded-lg bg-purple-500/30 hover:bg-purple-500 text-purple-200 hover:text-white font-bold transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    سحب الآن ←
+                    {isPlatformWarehouse ? 'ترحيل الآن ←' : 'سحب الآن ←'}
                   </button>
                 </div>
               </div>
@@ -2345,21 +3798,76 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                 </p>
               </div>
 
-              {/* Card 4: Pending Payout Requests */}
-              <div className="p-4 rounded-3xl bg-amber-500/10 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800/60 shadow-xs space-y-1.5">
-                <div className="flex justify-between items-center text-[11px] text-amber-800 dark:text-amber-300 font-bold">
+              {/* Card 4: Pick & Pack for Platform Warehouse OR In-Prep Goods for Supplier */}
+              {isPlatformWarehouse ? (
+                <div className="p-4 rounded-3xl bg-gradient-to-br from-amber-500/15 via-amber-500/10 to-orange-500/15 dark:bg-amber-950/30 border-2 border-amber-400 dark:border-amber-700/80 shadow-xs space-y-1.5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-center text-[11px] text-amber-900 dark:text-amber-200 font-bold">
+                      <span>أتعاب التغليف والتجهيز (Pick & Pack)</span>
+                      <Package className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="text-xl font-black text-amber-700 dark:text-amber-400 font-mono mt-0.5">
+                      <MoneyText amount={availablePackerWithdrawalDzd} />
+                    </div>
+                    <p className="text-[10px] text-amber-800/90 dark:text-amber-400/90">
+                      متاح للسحب: {availablePackerWithdrawalDzd.toLocaleString()} دج (إجمالي {totalEarnedPackagingDzd.toLocaleString()} دج لـ {completedOrders.length} طرد مسلّم)
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-amber-300/50 dark:border-amber-800/50 flex items-center justify-between gap-1 flex-wrap">
+                    <span className="text-[9px] font-black text-amber-900 dark:text-amber-200 bg-amber-200/80 dark:bg-amber-900/60 px-2 py-0.5 rounded-full">
+                      مضمونة 100% على عاتق الإدارة
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPackerWithdrawModal()}
+                      disabled={availablePackerWithdrawalDzd <= 0}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition flex items-center gap-1 ${
+                        availablePackerWithdrawalDzd > 0
+                          ? 'bg-amber-600 hover:bg-amber-500 text-white cursor-pointer active:scale-95 shadow-xs'
+                          : 'bg-amber-200/50 text-amber-600/60 dark:bg-amber-950/50 dark:text-amber-700/50 cursor-not-allowed'
+                      }`}
+                    >
+                      <ArrowDownToLine className="w-3 h-3" />
+                      <span>طلب سحب الأتعاب</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-3xl bg-violet-500/10 dark:bg-violet-950/20 border border-violet-300 dark:border-violet-800/60 shadow-xs space-y-1.5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-center text-[11px] text-violet-800 dark:text-violet-300 font-bold">
+                      <span>بضاعة قيد التحضير بالمستودع</span>
+                      <Package className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                    </div>
+                    <div className="text-xl font-black text-violet-700 dark:text-violet-400 font-mono mt-0.5">
+                      <MoneyText amount={preparationOrders.reduce((acc, o) => acc + getOrderWholesaleAmount(o), 0)} />
+                    </div>
+                    <p className="text-[10px] text-violet-700/80 dark:text-violet-400/80">
+                      قيمة الجملة لـ {preparationOrders.length} طلبية يجري تجهيزها حالياً
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-violet-300/40 dark:border-violet-800/40 flex items-center justify-between">
+                    <span className="text-[9px] text-violet-700 dark:text-violet-300 font-bold">يتم تحصيلها فور التسليم</span>
+                    <span className="text-[10px] text-violet-600 font-mono font-bold">{preparationOrders.length} طرد</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Card 5: Pending Payout Requests */}
+              <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-1.5">
+                <div className="flex justify-between items-center text-[11px] text-slate-500 font-bold">
                   <span>طلبات سحب قيد المعالجة</span>
                   <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div className="text-xl font-black text-amber-700 dark:text-amber-400 font-mono">
                   <MoneyText amount={pendingPayoutsAmount} />
                 </div>
-                <p className="text-[10px] text-amber-700/80 dark:text-amber-400/80">
+                <p className="text-[10px] text-slate-400">
                   جارٍ التدقيق والتحويل من طرف الإدارة
                 </p>
               </div>
 
-              {/* Card 5: In-Transit Wholesale Dues */}
+              {/* Card 6: In-Transit Wholesale Dues */}
               <div className="p-4 rounded-3xl bg-blue-500/10 dark:bg-blue-950/20 border border-blue-300 dark:border-blue-800/60 shadow-xs space-y-1.5">
                 <div className="flex justify-between items-center text-[11px] text-blue-800 dark:text-blue-300 font-bold">
                   <span>مستحقات قيد التوصيل</span>
@@ -2637,13 +4145,186 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                 </table>
               </div>
             </div>
+
+            {/* ==================== SECTION: مستحقات وأتعاب التغليف والتجهيز لعامل ومغلف المستودع ==================== */}
+            {Boolean(isPlatformWarehouse) && (
+              <div className="p-6 rounded-3xl bg-gradient-to-br from-amber-50/70 via-orange-50/40 to-yellow-50/50 dark:from-slate-900 dark:via-amber-950/20 dark:to-slate-900 border-2 border-amber-300 dark:border-amber-800/60 shadow-lg space-y-5">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-amber-200/80 dark:border-amber-900/40 pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="p-2.5 rounded-2xl bg-amber-500 text-white shadow-md shadow-amber-500/30">
+                        <Boxes className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                          <span>أتعاب التغليف والتجهيز (خاص بعامل ومغلف مستودع المنصة)</span>
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-[10px] font-black border border-emerald-500/30">
+                            على عاتق الإدارة 100%
+                          </span>
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          عن كل طرد يتم تحضيره ويُسلّم بنجاح للزبون، تضمن إدارة المنصة استحقاق {packagingFeePerOrder} دج لعامل التغليف. يتم تحويل المستحقات لحسابك عبر BaridiMob أو CCP أو نقداً باليد.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenPackerWithdrawModal()}
+                    disabled={availablePackerWithdrawalDzd <= 0}
+                    className={`px-5 py-2.5 rounded-2xl text-xs font-black flex items-center gap-2 shadow-lg transition shrink-0 ${
+                      availablePackerWithdrawalDzd > 0
+                        ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white cursor-pointer active:scale-95 shadow-amber-600/20 border border-amber-400/40'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    <ArrowDownToLine className="w-4 h-4" />
+                    <span>طلب سحب أتعاب التغليف ({availablePackerWithdrawalDzd.toLocaleString()} دج)</span>
+                  </button>
+                </div>
+
+                {/* 4 Financial Metric Cards for Packer */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                  <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 shadow-xs text-center space-y-1">
+                    <span className="text-[11px] text-slate-400 font-bold block">إجمالي أتعاب التغليف المكتسبة</span>
+                    <strong className="text-amber-600 dark:text-amber-400 font-black font-mono text-lg block">
+                      {totalEarnedPackagingDzd.toLocaleString()} دج
+                    </strong>
+                    <span className="text-[10px] text-slate-400 block font-medium">({completedOrders.length} طرد مسلّم × {packagingFeePerOrder} دج)</span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 shadow-xs text-center space-y-1">
+                    <span className="text-[11px] text-slate-400 font-bold block">المبالغ المصروفة والمحولة</span>
+                    <strong className="text-emerald-600 dark:text-emerald-400 font-black font-mono text-lg block">
+                      {paidPackerWithdrawalsDzd.toLocaleString()} دج
+                    </strong>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-bold">تم تحويلها لحسابك بنجاح</span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 shadow-xs text-center space-y-1">
+                    <span className="text-[11px] text-slate-400 font-bold block">طلبات قيد المراجعة والتحويل</span>
+                    <strong className="text-orange-600 dark:text-orange-400 font-black font-mono text-lg block">
+                      {pendingPackerWithdrawalsDzd.toLocaleString()} دج
+                    </strong>
+                    <span className="text-[10px] text-orange-600 dark:text-orange-400 block font-bold">بانتظار إشعار تحويل الإدارة</span>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-400 dark:border-emerald-700 text-center space-y-1 shadow-sm">
+                    <span className="text-[11px] text-emerald-800 dark:text-emerald-300 font-black block">الرصيد المتاح للسحب الآن</span>
+                    <strong className="text-emerald-700 dark:text-emerald-300 font-black font-mono text-xl block">
+                      {availablePackerWithdrawalDzd.toLocaleString()} دج
+                    </strong>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-bold">جاهز للتحويل الفوري</span>
+                  </div>
+                </div>
+
+                {/* Packer Withdrawals History */}
+                <div className="pt-2 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <History className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      <span>سجل طلبات سحب أتعاب التغليف والتجهيز ({myPackerWithdrawals.length})</span>
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-mono">تحديث فوري ومباشر</span>
+                  </div>
+
+                  {myPackerWithdrawals.length === 0 ? (
+                    <div className="p-6 text-center rounded-2xl bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-400 text-xs font-bold">
+                      لا توجد طلبات سحب سابقة لأتعاب التغليف. يمكنك تقديم طلب السحب متى توفر لديك رصيد متاح من الطرود المسلّمة!
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {myPackerWithdrawals.map((w) => (
+                        <div
+                          key={w.id}
+                          className="p-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-xs"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono font-black text-amber-600 dark:text-amber-400">{w.id}</span>
+                              <span className="text-slate-400">•</span>
+                              <span className="font-mono text-slate-500 text-[11px]">{w.requestDate}</span>
+                              <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-bold">
+                                {w.method === 'BARIDIMOB' ? '📱 BaridiMob' : w.method === 'CCP' ? '📮 حساب CCP' : w.method === 'CASH' ? '💵 نقداً باليد' : '🏛️ تحويل بنكي'}
+                              </span>
+                              <span className="text-slate-500 text-[11px] font-medium">({w.sellerName})</span>
+                            </div>
+                            <div className="text-[11px] text-slate-600 dark:text-slate-300">
+                              تفاصيل الحساب: <strong className="font-mono text-slate-900 dark:text-white">{w.accountDetails}</strong>
+                            </div>
+                            {w.proofReference && (
+                              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold flex items-center gap-1">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>وصل إثبات التحويل من الإدارة: {w.proofReference}</span>
+                              </div>
+                            )}
+                            {w.rejectionReason && (
+                              <div className="text-[10px] text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1">
+                                <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                                <span>سبب الرفض: {w.rejectionReason}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 self-end sm:self-center">
+                            <span className="font-black font-mono text-base text-slate-900 dark:text-white">
+                              {w.amountDzd.toLocaleString()} دج
+                            </span>
+                            <span
+                              className={`px-3 py-1 rounded-full text-[10px] font-black ${
+                                w.status === 'APPROVED'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300'
+                                  : w.status === 'PENDING'
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300'
+                                  : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300'
+                              }`}
+                            >
+                              {w.status === 'APPROVED' ? '✔ تم الصرف والتحويل' : w.status === 'PENDING' ? '⏳ قيد المراجعة لدى الإدارة' : '✖ مرفوض'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         );
       })()}
 
-      {/* ==================== TAB: تتبع الشحنة المباشر (Shipment Tracking) ==================== */}
+      {/* ==================== TAB: معدلات التوصيل بالولايات وتتبع الشحنات ==================== */}
       {activeTab === 'tracking' && (
         <div className="space-y-6 animate-fadeIn max-w-5xl mx-auto">
+          {/* Header Banner */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-cyan-900/80 via-slate-900 to-blue-950 border border-cyan-500/30 text-white shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-cyan-600 text-white rounded-2xl shadow-lg shadow-cyan-600/30 shrink-0">
+                <Truck className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base font-black">معدلات التوصيل بالولايات والربط اللوجستي</h2>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                    58 ولاية
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  جدول أسعار ومعدلات نجاح التوصيل عبر شبكة شركات التوصيل المعتمدة (Yalidine, Ecom, ZR Express).
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowShippingRatesModal(true)}
+              className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-600/20 transition cursor-pointer active:scale-95 shrink-0"
+            >
+              <Search className="w-4 h-4" />
+              <span>عرض جدول الأسعار لـ 58 ولاية</span>
+            </button>
+          </div>
+
           <ShipmentTrackingTool
             isDarkTheme={true}
             onShowNotice={(msg) => onShowToast(msg, 'success')}
@@ -3861,6 +5542,16 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
           onSaveProduct={handleSaveProductFromWarehouse}
           onDeleteProduct={handleDeleteProductFromWarehouse}
           onShowToast={onShowToast}
+          isPlatformWarehouse={isPlatformWarehouse}
+          currentSupplier={
+            !isPlatformWarehouse
+              ? {
+                  id: supplierProfile.id,
+                  name: supplierProfile.companyName || supplierProfile.fullName,
+                  wilaya: supplierProfile.wilaya,
+                }
+              : undefined
+          }
         />
       )}
 
@@ -3893,9 +5584,15 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                 </div>
                 <div>
                   <h3 className="font-black text-base text-slate-900 dark:text-white">
-                    طلب سحب مستحقات مبيعات الجملة
+                    {isPlatformWarehouse
+                      ? 'ترحيل تحصيلات مستودع المنصة إلى الخزينة المركزية'
+                      : 'طلب سحب مستحقات مبيعات الجملة'}
                   </h3>
-                  <p className="text-[11px] text-slate-500">Demande de Retrait des Revenus de Vente en Gros</p>
+                  <p className="text-[11px] text-slate-500">
+                    {isPlatformWarehouse
+                      ? 'Transfert des Recettes du Dépôt vers la Trésorerie Centrale'
+                      : 'Demande de Retrait des Revenus de Vente en Gros'}
+                  </p>
                 </div>
               </div>
               <button
@@ -3911,9 +5608,15 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
               <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border-2 border-rose-500/50 flex items-start gap-2.5 text-rose-700 dark:text-rose-300">
                 <AlertTriangle className="w-5 h-5 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
                 <div className="space-y-0.5 text-right">
-                  <span className="font-black text-xs block">رصيدك المتاح للسحب هو 0 د.ج</span>
+                  <span className="font-black text-xs block">
+                    {isPlatformWarehouse
+                      ? 'رصيد التحصيلات المتاح حالياً هو 0 د.ج'
+                      : 'رصيدك المتاح للسحب هو 0 د.ج'}
+                  </span>
                   <p className="text-[11px] leading-relaxed text-rose-600/90 dark:text-rose-300/90">
-                    لا يمكنك سحب أي مبلغ حالياً. يتم تحرير المستحقات وإضافتها للرصيد المتاح فور تسليم طلبيات مبيعات الجملة للزبائن وتأكيد التوصيل (COD).
+                    {isPlatformWarehouse
+                      ? 'لا توجد تحصيلات مؤكدة للترحيل حالياً. يتم إضافة عوائد مبيعات السلع ورسوم التغليف فور تسليم الطرود للزبائن واستلام أموال الـ COD.'
+                      : 'لا يمكنك سحب أي مبلغ حالياً. يتم تحرير المستحقات وإضافتها للرصيد المتاح فور تسليم طلبيات مبيعات الجملة للزبائن وتأكيد التوصيل (COD).'}
                   </p>
                 </div>
               </div>
@@ -3921,14 +5624,16 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
               <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-500/30 flex items-center justify-between">
                 <div>
                   <span className="text-[11px] text-purple-900 dark:text-purple-300 font-bold block">
-                    الرصيد المتاح للسحب حالياً:
+                    {isPlatformWarehouse
+                      ? 'التحصيلات المؤكدة الجاهزة للترحيل للخزينة:'
+                      : 'الرصيد المتاح للسحب حالياً:'}
                   </span>
                   <span className="text-xl font-black font-mono text-purple-700 dark:text-purple-400">
                     <MoneyText amount={availableBalance} />
                   </span>
                 </div>
                 <span className="text-[10px] bg-purple-600 text-white px-2.5 py-1 rounded-full font-bold">
-                  تحويل مباشر
+                  {isPlatformWarehouse ? 'ترحيل داخلي للخزينة 🏛️' : 'تحويل مباشر'}
                 </span>
               </div>
             )}
@@ -3938,7 +5643,9 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                    مبلغ السحب المطلوب (DZD) *
+                    {isPlatformWarehouse
+                      ? 'مبلغ التحصيلات المراد ترحيله إلى الخزينة (DZD) *'
+                      : 'مبلغ السحب المطلوب (DZD) *'}
                   </label>
                   {availableBalance > 0 && (
                     <div className="flex items-center gap-1 text-[10px]">
@@ -3964,7 +5671,7 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                         }
                         className="px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 font-bold"
                       >
-                        كامل الرصيد (100%)
+                        {isPlatformWarehouse ? 'كامل المبلغ (100%)' : 'كامل الرصيد (100%)'}
                       </button>
                     </div>
                   )}
@@ -4001,181 +5708,216 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                 </span>
               </div>
 
-              {/* Payout Method Selection */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                  طريقة استلام المستحقات *
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPayoutForm({ ...payoutForm, payoutMethod: 'BARIDIMOB' })}
-                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
-                      payoutForm.payoutMethod === 'BARIDIMOB'
-                        ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-500 text-purple-700 dark:text-purple-300 font-black shadow-xs'
-                        : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-bold'
-                    }`}
-                  >
-                    <Phone className="w-4 h-4 text-purple-600" />
-                    <span className="text-[11px]">بريدي موب</span>
-                    <span className="text-[9px] text-slate-400">BaridiMob</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPayoutForm({ ...payoutForm, payoutMethod: 'CCP' })}
-                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
-                      payoutForm.payoutMethod === 'CCP'
-                        ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-500 text-purple-700 dark:text-purple-300 font-black shadow-xs'
-                        : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-bold'
-                    }`}
-                  >
-                    <FileText className="w-4 h-4 text-purple-600" />
-                    <span className="text-[11px]">حساب CCP</span>
-                    <span className="text-[9px] text-slate-400">حوالة بريدية</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPayoutForm({ ...payoutForm, payoutMethod: 'BANK' })}
-                    className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
-                      payoutForm.payoutMethod === 'BANK'
-                        ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-500 text-purple-700 dark:text-purple-300 font-black shadow-xs'
-                        : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-bold'
-                    }`}
-                  >
-                    <Building2 className="w-4 h-4 text-indigo-600" />
-                    <span className="text-[11px]">تحويل بنكي</span>
-                    <span className="text-[9px] text-slate-400">Virement RIB</span>
-                  </button>
+              {/* Payout Method / Treasury Destination Selection */}
+              {isPlatformWarehouse ? (
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-500/10 via-indigo-500/5 to-purple-500/10 border-2 border-violet-500/30 dark:border-violet-500/20 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-black text-violet-900 dark:text-violet-300">
+                      <Building2 className="w-4 h-4 text-violet-600" />
+                      <span>وجهة الترحيل: الخزينة المركزية الرسمية لمنصة Nouva Market</span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border border-violet-200">
+                      حساب معتمد 🏛️
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-600 dark:text-slate-300 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">طبيعة العملية:</span>
+                      <span className="font-bold text-violet-700 dark:text-violet-400">ترحيل إيرادات وتحصيلات COD داخلية</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">الحساب المستلم:</span>
+                      <span className="font-mono font-bold">Nouva Market Platform Central Treasury</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed border-t border-violet-200/50 dark:border-violet-800/40 pt-2">
+                    بما أن هذا المستودع تابع للمنصة، فإن هذه التحصيلات تُقيد تلقائياً لصالح الخزينة العامة للمنصة لتغطية دورة رأس المال وتصفية فواتير شركات التوصيل.
+                  </p>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                      طريقة استلام المستحقات *
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPayoutForm({ ...payoutForm, payoutMethod: 'BARIDIMOB' })}
+                        className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                          payoutForm.payoutMethod === 'BARIDIMOB'
+                            ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-500 text-purple-700 dark:text-purple-300 font-black shadow-xs'
+                            : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-bold'
+                        }`}
+                      >
+                        <Phone className="w-4 h-4 text-purple-600" />
+                        <span className="text-[11px]">بريدي موب</span>
+                        <span className="text-[9px] text-slate-400">BaridiMob</span>
+                      </button>
 
-              {/* Dynamic Account Inputs based on Method */}
-              {payoutForm.payoutMethod === 'BARIDIMOB' && (
-                <div className="space-y-1.5 p-3.5 rounded-2xl bg-purple-50/40 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40">
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                    رقم الحساب أو RIP لتطبيق بريدي موب *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={payoutForm.baridiMobPhoneOrRip}
-                    onChange={(e) =>
-                      setPayoutForm({ ...payoutForm, baridiMobPhoneOrRip: e.target.value })
-                    }
-                    placeholder="مثال: 00799999000123456789"
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-xs"
-                  />
-                  <span className="text-[10px] text-slate-400 block">
-                    يتم التحويل الفوري مباشرة عبر شبكة بريد الجزائر.
-                  </span>
-                </div>
-              )}
+                      <button
+                        type="button"
+                        onClick={() => setPayoutForm({ ...payoutForm, payoutMethod: 'CCP' })}
+                        className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                          payoutForm.payoutMethod === 'CCP'
+                            ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-500 text-purple-700 dark:text-purple-300 font-black shadow-xs'
+                            : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-bold'
+                        }`}
+                      >
+                        <FileText className="w-4 h-4 text-purple-600" />
+                        <span className="text-[11px]">حساب CCP</span>
+                        <span className="text-[9px] text-slate-400">حوالة بريدية</span>
+                      </button>
 
-              {payoutForm.payoutMethod === 'CCP' && (
-                <div className="space-y-2 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="col-span-2">
-                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        رقم حساب CCP *
+                      <button
+                        type="button"
+                        onClick={() => setPayoutForm({ ...payoutForm, payoutMethod: 'BANK' })}
+                        className={`p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                          payoutForm.payoutMethod === 'BANK'
+                            ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-500 text-purple-700 dark:text-purple-300 font-black shadow-xs'
+                            : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-bold'
+                        }`}
+                      >
+                        <Building2 className="w-4 h-4 text-indigo-600" />
+                        <span className="text-[11px]">تحويل بنكي</span>
+                        <span className="text-[9px] text-slate-400">Virement RIB</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Dynamic Account Inputs based on Method */}
+                  {payoutForm.payoutMethod === 'BARIDIMOB' && (
+                    <div className="space-y-1.5 p-3.5 rounded-2xl bg-purple-50/40 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800/40">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        رقم الحساب أو RIP لتطبيق بريدي موب *
                       </label>
                       <input
                         type="text"
                         required
-                        value={payoutForm.ccpNumber}
+                        value={payoutForm.baridiMobPhoneOrRip}
                         onChange={(e) =>
-                          setPayoutForm({ ...payoutForm, ccpNumber: e.target.value })
+                          setPayoutForm({ ...payoutForm, baridiMobPhoneOrRip: e.target.value })
                         }
-                        placeholder="مثال: 1234567"
+                        placeholder="مثال: 00799999000123456789"
                         className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-xs"
                       />
+                      <span className="text-[10px] text-slate-400 block">
+                        يتم التحويل الفوري مباشرة عبر شبكة بريد الجزائر.
+                      </span>
                     </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        المفتاح Clé *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={payoutForm.ccpKey}
-                        onChange={(e) =>
-                          setPayoutForm({ ...payoutForm, ccpKey: e.target.value })
-                        }
-                        placeholder="89"
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-xs text-center"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
+                  )}
 
-              {payoutForm.payoutMethod === 'BANK' && (
-                <div className="space-y-2 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      اسم البنك *
-                    </label>
-                    <select
-                      value={payoutForm.bankName}
-                      onChange={(e) =>
-                        setPayoutForm({ ...payoutForm, bankName: e.target.value })
-                      }
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold"
-                    >
-                      <option value="BNA - البنك الوطني الجزائري">BNA - البنك الوطني الجزائري</option>
-                      <option value="BEA - بنك الجزائر الخارجي">BEA - بنك الجزائر الخارجي</option>
-                      <option value="BADR - بنك الفلاحة والتنمية الريفية">BADR - بنك الفلاحة والتنمية الريفية</option>
-                      <option value="BDL - بنك التنمية المحلية">BDL - بنك التنمية المحلية</option>
-                      <option value="CPA - القرض الشعبي الجزائري">CPA - القرض الشعبي الجزائري</option>
-                      <option value="Al Baraka - بنك البركة الجزائري">Al Baraka - بنك البركة الجزائري</option>
-                      <option value="Gulf Bank - بنك الخليج الجزائر">Gulf Bank - بنك الخليج الجزائر</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      رقم الحساب البنكي RIB (20 رقم) *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={payoutForm.bankRib}
-                      onChange={(e) =>
-                        setPayoutForm({ ...payoutForm, bankRib: e.target.value })
-                      }
-                      placeholder="00100999000012345678"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      اسم صاحب الحساب أو الشركة *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={payoutForm.accountHolderName}
-                      onChange={(e) =>
-                        setPayoutForm({ ...payoutForm, accountHolderName: e.target.value })
-                      }
-                      placeholder="اسم المستفيد الكامل"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
-                    />
-                  </div>
-                </div>
+                  {payoutForm.payoutMethod === 'CCP' && (
+                    <div className="space-y-2 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700">
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="col-span-2">
+                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            رقم حساب CCP *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={payoutForm.ccpNumber}
+                            onChange={(e) =>
+                              setPayoutForm({ ...payoutForm, ccpNumber: e.target.value })
+                            }
+                            placeholder="مثال: 1234567"
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            المفتاح Clé *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={payoutForm.ccpKey}
+                            onChange={(e) =>
+                              setPayoutForm({ ...payoutForm, ccpKey: e.target.value })
+                            }
+                            placeholder="89"
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-xs text-center"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {payoutForm.payoutMethod === 'BANK' && (
+                    <div className="space-y-2 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          اسم البنك *
+                        </label>
+                        <select
+                          value={payoutForm.bankName}
+                          onChange={(e) =>
+                            setPayoutForm({ ...payoutForm, bankName: e.target.value })
+                          }
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold"
+                        >
+                          <option value="BNA - البنك الوطني الجزائري">BNA - البنك الوطني الجزائري</option>
+                          <option value="BEA - بنك الجزائر الخارجي">BEA - بنك الجزائر الخارجي</option>
+                          <option value="BADR - بنك الفلاحة والتنمية الريفية">BADR - بنك الفلاحة والتنمية الريفية</option>
+                          <option value="BDL - بنك التنمية المحلية">BDL - بنك التنمية المحلية</option>
+                          <option value="CPA - القرض الشعبي الجزائري">CPA - القرض الشعبي الجزائري</option>
+                          <option value="Al Baraka - بنك البركة الجزائري">Al Baraka - بنك البركة الجزائري</option>
+                          <option value="Gulf Bank - بنك الخليج الجزائر">Gulf Bank - بنك الخليج الجزائر</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          رقم الحساب البنكي RIB (20 رقم) *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={payoutForm.bankRib}
+                          onChange={(e) =>
+                            setPayoutForm({ ...payoutForm, bankRib: e.target.value })
+                          }
+                          placeholder="00100999000012345678"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          اسم صاحب الحساب أو الشركة *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={payoutForm.accountHolderName}
+                          onChange={(e) =>
+                            setPayoutForm({ ...payoutForm, accountHolderName: e.target.value })
+                          }
+                          placeholder="اسم المستفيد الكامل"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Notes */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  ملاحظات أو تعليمات خاصة لطلب السحب (اختياري)
+                  {isPlatformWarehouse
+                    ? 'ملاحظات أو مرجع إيداع الخزينة (اختياري)'
+                    : 'ملاحظات أو تعليمات خاصة لطلب السحب (اختياري)'}
                 </label>
                 <textarea
                   rows={2}
                   value={payoutForm.notes}
                   onChange={(e) => setPayoutForm({ ...payoutForm, notes: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
-                  placeholder="أي ملاحظة أو تفاصيل إضافية للإدارة المالية..."
+                  placeholder={
+                    isPlatformWarehouse
+                      ? 'أي مرجع أو ملاحظة خاصة بترحيل التحصيلات إلى الخزينة المركزية...'
+                      : 'أي ملاحظة أو تفاصيل إضافية للإدارة المالية...'
+                  }
                 />
               </div>
 
@@ -4203,11 +5945,243 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                     payoutForm.amountDzd > availableBalance ||
                     payoutForm.amountDzd < 1000
                       ? 'bg-slate-300 dark:bg-slate-800 text-slate-400 cursor-not-allowed shadow-none'
+                      : isPlatformWarehouse
+                      ? 'bg-violet-600 hover:bg-violet-500 text-white shadow-violet-600/30 cursor-pointer'
                       : 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-600/30 cursor-pointer'
                   }`}
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>إرسال طلب السحب للإدارة</span>
+                  <span>
+                    {isPlatformWarehouse
+                      ? 'تأكيد الترحيل إلى الخزينة المركزية 🏛️'
+                      : 'إرسال طلب السحب للإدارة'}
+                  </span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PACKER / WAREHOUSE WORKER WITHDRAWAL MODAL */}
+      {isPackerWithdrawModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-amber-500 text-white shadow-md shadow-amber-500/30">
+                  <Boxes className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900 dark:text-white">
+                    طلب سحب أتعاب التغليف والتجهيز
+                  </h3>
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 font-bold">
+                    مستحقات عامل ومغلف المستودع (على عاتق الإدارة 100%)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPackerWithdrawModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer p-1"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Available Balance Box */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 border border-amber-300 dark:border-amber-800/60 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] text-amber-800 dark:text-amber-300 font-bold block">
+                  رصيدك المتاح للسحب من أتعاب التغليف:
+                </span>
+                <span className="text-xl font-black text-amber-700 dark:text-amber-300 font-mono">
+                  {availablePackerWithdrawalDzd.toLocaleString()} د.ج
+                </span>
+              </div>
+              <span className="text-[10px] px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-black border border-amber-500/30">
+                {completedOrders.length} طرد مسلّم
+              </span>
+            </div>
+
+            <form onSubmit={handleRequestPackerPayout} className="space-y-4 text-xs font-bold">
+              {/* Amount to withdraw */}
+              <div className="space-y-1.5">
+                <label className="text-slate-700 dark:text-slate-300 block">
+                  المبلغ المراد سحبه (دج) *
+                </label>
+                <input
+                  type="number"
+                  min={100}
+                  max={availablePackerWithdrawalDzd}
+                  value={packerWithdrawAmount || ''}
+                  onChange={(e) => setPackerWithdrawAmount(Number(e.target.value))}
+                  placeholder={`الحد الأقصى: ${availablePackerWithdrawalDzd.toLocaleString()} دج`}
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-mono text-base focus:border-amber-500 focus:outline-hidden"
+                />
+
+                {/* Quick Presets */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setPackerWithdrawAmount(availablePackerWithdrawalDzd)}
+                    className="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-300 text-[10px] font-black transition cursor-pointer"
+                  >
+                    كامل الرصيد ({availablePackerWithdrawalDzd.toLocaleString()} دج)
+                  </button>
+                  {availablePackerWithdrawalDzd >= 2000 && (
+                    <button
+                      type="button"
+                      onClick={() => setPackerWithdrawAmount(Math.floor(availablePackerWithdrawalDzd / 2))}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] transition cursor-pointer"
+                    >
+                      نصف الرصيد (50%)
+                    </button>
+                  )}
+                  {[5000, 10000, 20000].map(
+                    (amt) =>
+                      availablePackerWithdrawalDzd >= amt && (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setPackerWithdrawAmount(amt)}
+                          className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] transition cursor-pointer"
+                        >
+                          {amt.toLocaleString()} دج
+                        </button>
+                      )
+                  )}
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div className="space-y-1.5">
+                <label className="text-slate-700 dark:text-slate-300 block">
+                  طريقة استلام الأتعاب *
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: 'BARIDIMOB' as const, label: '📱 BaridiMob' },
+                    { id: 'CCP' as const, label: '📮 حساب CCP' },
+                    { id: 'CASH' as const, label: '💵 نقداً بالمستودع' },
+                    { id: 'BANK' as const, label: '🏛️ حساب بنكي' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setPackerWithdrawMethod(m.id)}
+                      className={`p-2.5 rounded-xl border text-center transition cursor-pointer text-xs font-black ${
+                        packerWithdrawMethod === m.id
+                          ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 shadow-xs'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Worker Name & Phone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-slate-700 dark:text-slate-300 block">
+                    اسم عامل / مسؤول التغليف *
+                  </label>
+                  <input
+                    type="text"
+                    value={packerWorkerName}
+                    onChange={(e) => setPackerWorkerName(e.target.value)}
+                    required
+                    placeholder="مثال: يونس قاسم"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-slate-700 dark:text-slate-300 block">
+                    رقم الهاتف للتواصل *
+                  </label>
+                  <input
+                    type="text"
+                    value={packerWorkerPhone}
+                    onChange={(e) => setPackerWorkerPhone(e.target.value)}
+                    required
+                    placeholder="05 / 06 / 07 ..."
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Account Details depending on method */}
+              {packerWithdrawMethod !== 'CASH' && (
+                <div className="space-y-1">
+                  <label className="text-slate-700 dark:text-slate-300 block">
+                    {packerWithdrawMethod === 'BARIDIMOB'
+                      ? 'رقم BaridiMob أو الـ RIP (20 رقم) *'
+                      : packerWithdrawMethod === 'CCP'
+                      ? 'رقم حساب CCP والمفتاح Clé *'
+                      : 'رقم الحساب البنكي RIB واسم البنك *'}
+                  </label>
+                  <input
+                    type="text"
+                    value={packerWithdrawAccountDetails}
+                    onChange={(e) => setPackerWithdrawAccountDetails(e.target.value)}
+                    required
+                    placeholder={
+                      packerWithdrawMethod === 'BARIDIMOB'
+                        ? 'مثال: 00799999000123456789 أو 0550123456'
+                        : packerWithdrawMethod === 'CCP'
+                        ? 'مثال: CCP: 1234567 Clé 89'
+                        : 'مثال: BNA - RIB: 00100999000012345678'
+                    }
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-mono"
+                  />
+                </div>
+              )}
+
+              {/* Notes */}
+              <div className="space-y-1">
+                <label className="text-slate-700 dark:text-slate-300 block">
+                  ملاحظات إضافية (اختياري)
+                </label>
+                <input
+                  type="text"
+                  value={packerWithdrawNotes}
+                  onChange={(e) => setPackerWithdrawNotes(e.target.value)}
+                  placeholder="أي توضيحات بخصوص التحويل..."
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsPackerWithdrawModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold hover:bg-slate-200 transition cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    availablePackerWithdrawalDzd <= 0 ||
+                    !packerWithdrawAmount ||
+                    packerWithdrawAmount <= 0 ||
+                    packerWithdrawAmount > availablePackerWithdrawalDzd
+                  }
+                  className={`px-6 py-2.5 rounded-xl font-black flex items-center gap-2 shadow-lg transition ${
+                    availablePackerWithdrawalDzd <= 0 ||
+                    !packerWithdrawAmount ||
+                    packerWithdrawAmount <= 0 ||
+                    packerWithdrawAmount > availablePackerWithdrawalDzd
+                      ? 'bg-slate-300 dark:bg-slate-800 text-slate-400 cursor-not-allowed shadow-none'
+                      : 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white shadow-amber-600/30 cursor-pointer active:scale-95'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>إرسال طلب سحب أتعاب التغليف 📦</span>
                 </button>
               </div>
             </form>
@@ -4461,8 +6435,8 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
         <ShippingRatesModal onClose={() => setShowShippingRatesModal(false)} />
       )}
 
-      {/* ==================== E-COM DELIVERY API v2: RAMASSAGE MODAL ==================== */}
-      {isPickupModalOpen && (
+      {/* ==================== E-COM DELIVERY API v2: RAMASSAGE MODAL (Platform Warehouse Only) ==================== */}
+      {Boolean(isPlatformWarehouse && isPickupModalOpen) && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-5 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -4471,8 +6445,8 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
                   <Truck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">طلب سائق للجمع (Demande de Ramassage)</h3>
-                  <p className="text-[10px] text-slate-500 font-mono">POST https://ecom-dz.com/api_v2/ramassage</p>
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">طلب سائق لجمع الطرود من المستودع المركزي</h3>
+                  <p className="text-[10px] text-slate-500 font-mono">Platform Warehouse Pickup (Ramassage) • E-com API</p>
                 </div>
               </div>
               <button
@@ -4694,6 +6668,109 @@ export function WarehouseDashboard({ onShowToast }: WarehouseDashboardProps) {
               <button
                 onClick={() => setShowEcomPaiementsModal(false)}
                 className="px-4 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== PHASE 2: PICKING & PACKING MODAL ==================== */}
+      {isPickingModalOpen && (
+        <PickingPackingModal
+          orders={
+            selectedPrepOrderIds.length > 0
+              ? preparationOrders.filter((o) => selectedPrepOrderIds.includes(o.id))
+              : filterBySearch(preparationOrders)
+          }
+          products={products}
+          onClose={() => setIsPickingModalOpen(false)}
+          onUpdateOrderStatus={(orderId, status) => {
+            updateOrderStatus(orderId, status);
+          }}
+          onShowToast={onShowToast}
+        />
+      )}
+
+      {/* ==================== PHASE 2: COURIER HANDOVER MANIFEST MODAL ==================== */}
+      {isManifestModalOpen && (
+        <CourierManifestModal
+          orders={
+            selectedPrepOrderIds.length > 0
+              ? preparationOrders.filter((o) => selectedPrepOrderIds.includes(o.id))
+              : filterBySearch(preparationOrders)
+          }
+          onClose={() => setIsManifestModalOpen(false)}
+          onShowToast={onShowToast}
+          onMarkOrdersShipped={(orderIds) => {
+            orderIds.forEach((id) => updateOrderStatus(id, 'SHIPPED'));
+            setSelectedPrepOrderIds([]);
+          }}
+        />
+      )}
+
+      {/* ==================== PHASE 3: COD RECONCILIATION MODAL ==================== */}
+      {isCodReconcileModalOpen && (
+        <CodReconciliationModal
+          orders={orders}
+          onClose={() => setIsCodReconcileModalOpen(false)}
+          onShowToast={onShowToast}
+          onOrdersUpdated={(updatedOrders) => {
+            updatedOrders.forEach((uo) => updateOrder(uo.id, uo));
+          }}
+        />
+      )}
+
+      {/* ==================== PHASE 3: RETURNS QC & CLAIMS MODAL ==================== */}
+      {isReturnsQCModalOpen && (
+        <ReturnsQCModal
+          returnedOrders={returnedOrders}
+          products={products}
+          onClose={() => setIsReturnsQCModalOpen(false)}
+          onShowToast={onShowToast}
+          onOrderRestocked={(orderId) => {
+            confirmReturnInWarehouse(orderId);
+            setProducts(getStoredProducts());
+          }}
+        />
+      )}
+
+      {/* ==================== PHASE 3: COURIER ANALYTICS & WILAYA MATRIX MODAL ==================== */}
+      {isCourierAnalyticsModalOpen && (
+        <CourierAnalyticsModal
+          orders={orders}
+          onClose={() => setIsCourierAnalyticsModalOpen(false)}
+        />
+      )}
+
+      {/* ==================== LIVE AUDIT TRAIL & TIMELINE MODAL ==================== */}
+      {selectedTimelineOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-base text-slate-900 dark:text-white">
+                  سجل التزامن والمسار اللحظي للطلب
+                </span>
+                <span className="font-mono text-xs px-2.5 py-0.5 rounded-full bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300 font-extrabold">
+                  #{selectedTimelineOrder.id}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedTimelineOrder(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 font-bold flex items-center justify-center cursor-pointer transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <OrderAuditTimeline order={selectedTimelineOrder} />
+
+            <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => setSelectedTimelineOrder(null)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer transition"
               >
                 إغلاق
               </button>

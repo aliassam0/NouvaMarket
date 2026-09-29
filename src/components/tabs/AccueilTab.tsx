@@ -11,6 +11,8 @@ import {
   Flame,
   Share2,
   Bell,
+  CheckCircle2,
+  Truck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useOrders } from '../../context/OrderContext';
@@ -20,7 +22,6 @@ import { ProfitBadge } from '../ui/ProfitBadge';
 import { Product } from '../../types';
 import { getUnreadNotificationsCount } from '../../lib/notificationHelper';
 import { getStoredWalletBalance } from '../../lib/walletHelper';
-import { testSalePushNotification } from '../../lib/pwaNotificationManager';
 import { PWAInstallButton } from '../common/PWAInstallButton';
 
 
@@ -57,19 +58,19 @@ export function AccueilTab({
 
   const storedBalance = getStoredWalletBalance(user?.id, 0);
 
-  const activeOrders = orders.filter((o) => o.status === 'PROCESSING' || o.status === 'SHIPPED');
-  const deliveredOrdersCount = orders.filter((o) => o.status === 'DELIVERED').length;
+  const deliveredOrders = orders.filter((o) => o.status === 'DELIVERED');
+  const deliveredOrdersCount = deliveredOrders.length;
+  const inTransitOrders = orders.filter((o) => o.status === 'SHIPPED');
+  const inPrepOrders = orders.filter((o) => o.status === 'PROCESSING');
+  const activeOrders = [...inPrepOrders, ...inTransitOrders];
+
   const totalOrdersCount = orders.length;
   const deliveryRateCalculated = totalOrdersCount > 0 ? `${((deliveredOrdersCount / totalOrdersCount) * 100).toFixed(1)}%` : '0.0%';
 
-  const totalDeliveredProfit = orders
-    .filter((o) => o.status === 'DELIVERED')
-    .reduce((acc, o) => acc + o.totalProfit, 0);
-
-  const pendingProfit = orders
-    .filter((o) => o.status === 'PROCESSING' || o.status === 'SHIPPED')
-    .reduce((acc, o) => acc + o.totalProfit, 0);
-
+  const totalDeliveredProfit = deliveredOrders.reduce((acc, o) => acc + (o.totalProfit || 0), 0);
+  const inTransitProfit = inTransitOrders.reduce((acc, o) => acc + (o.totalProfit || 0), 0);
+  const inPrepProfit = inPrepOrders.reduce((acc, o) => acc + (o.totalProfit || 0), 0);
+  const pendingProfit = inTransitProfit + inPrepProfit;
   const displayPendingProfit = pendingProfit;
 
   return (
@@ -190,6 +191,85 @@ export function AccueilTab({
         </div>
       </div>
 
+      {/* Detailed Profit Breakdown: Delivered & Ready vs In-Transit */}
+      <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-violet-50 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                تفصيل دورة الأرباح (المحررة vs قيد التوزيع)
+              </h2>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                مقارنة واضحة بين أرباح الطرود المسلّمة الجاهزة للسحب والطرود التي خرجت مع الناقل
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Card 1: أرباح الطرود التي سُلّمت وأصبحت جاهزة للسحب */}
+          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border-2 border-emerald-500/30 dark:border-emerald-500/20 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-xs font-black text-emerald-800 dark:text-emerald-300">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>أرباح جاهزة للسحب (مسلّمة)</span>
+              </span>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                {deliveredOrdersCount} طرد مسلّم
+              </span>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                <MoneyText amount={storedBalance + totalDeliveredProfit} />
+              </div>
+              <button
+                onClick={onOpenWallet}
+                className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>طلب سحب</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed border-t border-emerald-500/10 pt-2">
+              أموال محصلة نقدياً ومطابقة آلياً بحسابك، محررة ومتاحة للتحويل الفوري إلى CCP أو BaridiMob.
+            </p>
+          </div>
+
+          {/* Card 2: أرباح الطرود التي خرجت مع الناقل وقيد التوزيع حالياً (In-Transit) */}
+          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-transparent border-2 border-blue-500/30 dark:border-blue-500/20 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-xs font-black text-blue-800 dark:text-blue-300">
+                <Truck className="w-4 h-4 text-blue-600" />
+                <span>أرباح مع الناقل (In-Transit)</span>
+              </span>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                {inTransitOrders.length} طرد مع الناقل
+              </span>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div className="text-xl font-black font-mono text-blue-600 dark:text-blue-400">
+                +<MoneyText amount={inTransitProfit} />
+              </div>
+              {inPrepOrders.length > 0 && (
+                <span className="text-[10px] text-slate-400 font-medium">
+                  (+{inPrepProfit.toLocaleString()} دج قيد التحضير)
+                </span>
+              )}
+            </div>
+
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed border-t border-blue-500/10 pt-2">
+              خرجت مع موزعي شركات التوصيل وقيد التسليم، وتتحول تلقائياً إلى رصيدك فور استلام الزبون للطلب.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Quick Action CTA Bar */}
       <div className="grid grid-cols-2 gap-3">
         <button
@@ -209,66 +289,66 @@ export function AccueilTab({
         </button>
       </div>
 
-      {/* PWA & Instant Sale Notification Alert Card */}
-      <div className="p-3.5 rounded-3xl bg-gradient-to-r from-violet-600/10 via-amber-500/15 to-purple-600/10 border border-amber-300/70 dark:border-amber-500/30 flex items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center font-black text-xl shadow-xs shrink-0">
-            🔔
+      {/* Core Performance KPIs (المبيعات، نسبة التسليم، الرصيد، والطلبات النشطة) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
+            <span>المبيعات المسلّمة</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
-          <div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs font-black text-slate-900 dark:text-white">
-                إشعار المبيعة الفوري (PWA)
-              </span>
-              <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 text-[9px] font-black">
-                يهتز + رنين 💰
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium">
-              صوت رنين كاش وهزّة بهاتفك كلما تحققت مبيعة: <strong>💰 مبيعة جديدة! ربحك: 2,500 دج</strong>
-            </p>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-xl font-black text-slate-900 dark:text-white font-mono">
+              {deliveredOrdersCount}
+            </span>
+            <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+              ناجحة 🎉
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={() => testSalePushNotification(2500)}
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 font-black text-xs shadow-xs transition cursor-pointer whitespace-nowrap"
-            title="تجربة رنين المبيعة الفوري واهتزاز الهاتف"
-          >
-            جرّب الرنين 🔔
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Summary Bar */}
-
-      <div className="grid grid-cols-3 gap-2.5">
-        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-center shadow-xs">
-          <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">
-            {t('home.ordersToday')}
-          </span>
-          <span className="text-base font-black text-slate-900 dark:text-white">
-            {orders.length}
-          </span>
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
+            <span>نسبة التسليم</span>
+            <TrendingUp className="w-4 h-4 text-purple-600" />
+          </div>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono">
+              {deliveryRateCalculated}
+            </span>
+            <span className="text-[10px] text-purple-600 font-bold bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-800">
+              معدل الإنجاز
+            </span>
+          </div>
         </div>
 
-        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-center shadow-xs">
-          <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">
-            {t('home.deliveryRate')}
-          </span>
-          <span className="text-base font-black text-purple-600 dark:text-purple-400">
-            {deliveryRateCalculated}
-          </span>
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
+            <span>الطلبات النشطة</span>
+            <Clock className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono">
+              {activeOrders.length}
+            </span>
+            <span className="text-[10px] text-blue-600 font-bold bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
+              قيد التوصيل 🚚
+            </span>
+          </div>
         </div>
 
-        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-center shadow-xs">
-          <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">
-            {t('home.salesThisMonth')}
-          </span>
-          <span className="text-base font-black text-violet-600 dark:text-violet-400">
-            {deliveredOrdersCount}
-          </span>
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
+            <span>إجمالي الأرباح</span>
+            <Wallet className="w-4 h-4 text-amber-500" />
+          </div>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-base font-black text-amber-600 dark:text-amber-400 font-mono">
+              <MoneyText amount={totalDeliveredProfit} />
+            </span>
+            <span className="text-[10px] text-amber-700 dark:text-amber-300 font-bold bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+              محققة 💰
+            </span>
+          </div>
         </div>
       </div>
 

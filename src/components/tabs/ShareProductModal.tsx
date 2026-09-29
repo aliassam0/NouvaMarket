@@ -21,6 +21,16 @@ import {
   ChevronUp,
   Layers,
   Eye,
+  TrendingUp,
+  Package,
+  SlidersHorizontal,
+  CheckCircle2,
+  ShieldCheck,
+  Clock,
+  ArrowUpRight,
+  Filter,
+  Palette,
+  Gift,
 } from 'lucide-react';
 import { Product, UpsellOffer } from '../../types';
 import { MoneyText } from '../ui/MoneyText';
@@ -49,6 +59,8 @@ interface ShareProductModalProps {
   onPreviewCustomerView?: (product: Product, linkId?: string) => void;
 }
 
+type ShareDashboardTab = 'links_list' | 'create_link' | 'upsells' | 'customize';
+
 export function ShareProductModal({
   product,
   onClose,
@@ -64,11 +76,14 @@ export function ShareProductModal({
     getProductShareLinks(product.id, defaultSellingPrice, initialVariant.size, initialVariant.color)
   );
 
-  // Modal Sub-Tab: 'links_list' | 'create_link' | 'customize'
-  const [activeTab, setActiveTab] = useState<'links_list' | 'create_link' | 'customize'>('links_list');
+  // Active vertical dashboard tab
+  const [activeTab, setActiveTab] = useState<ShareDashboardTab>('links_list');
   const [selectedCustomizationLinkId, setSelectedCustomizationLinkId] = useState<string>(
     () => links[0]?.id || 'link-default'
   );
+
+  // Filter for links tab: 'all' | 'active' | 'disabled'
+  const [linksFilter, setLinksFilter] = useState<'all' | 'active' | 'disabled'>('all');
 
   // Form state for creating a new link
   const [newTitle, setNewTitle] = useState('');
@@ -146,6 +161,11 @@ export function ShareProductModal({
     }
     return generateSmartBundleOffers(defaultSellingPrice);
   });
+
+  // Dedicated upsells tab target link
+  const [upsellTargetLinkId, setUpsellTargetLinkId] = useState<string>(
+    () => links[0]?.id || 'link-default'
+  );
 
   // Available unique sizes and colors
   const sizes = Array.from(new Set(product.variants.map((v) => v.size))).filter((s) => !isStandardSize(s));
@@ -276,7 +296,7 @@ export function ShareProductModal({
       delete copy[link.id];
       return copy;
     });
-    onShowToast(`✔ تم تحديث سعر البيع لـ "${link.title || 'الرابط'}" إلى ${targetPrice} دج بنجاح!`);
+    onShowToast(`✔ تم تحديث سعر البيع لـ "${link.title || 'الرابط'}" إلى ${targetPrice.toLocaleString()} دج بنجاح!`);
   };
 
   // Handle toggle active/disabled status
@@ -317,7 +337,7 @@ export function ShareProductModal({
       return;
     }
 
-    const titleText = newTitle.trim() || `رابط سعر ${newSellingPrice} دج`;
+    const titleText = newTitle.trim() || `رابط حملة ${newSellingPrice.toLocaleString()} دج`;
     const updated = saveSingleShareLink(
       {
         productId: product.id,
@@ -336,7 +356,7 @@ export function ShareProductModal({
     setLinks(updated);
     setNewTitle('');
     setActiveTab('links_list');
-    onShowToast(`✨ تم إنشاء رابط مشاركة مخصص جديد: "${titleText}"!`);
+    onShowToast(`✨ تم إنشاء وتفعيل رابط مشاركة مخصص جديد: "${titleText}"!`);
   };
 
   const handleCopyLink = (link: ProductShareLink) => {
@@ -349,7 +369,7 @@ export function ShareProductModal({
 
   const handleWhatsApp = (link: ProductShareLink) => {
     const url = getShareUrlForLink(link.id);
-    const text = `🔥 شُوف هاد المنتج المميز: ${product.nameAr}\n💰 السعر: ${link.sellingPrice} دج\n🛒 اطلب الآن مباشرة من هذا الرابط: ${url}`;
+    const text = `🔥 شُوف هاد المنتج المميز: ${product.nameAr}\n💰 السعر: ${link.sellingPrice.toLocaleString()} دج\n🛒 اطلب الآن مباشرة والدفع عند الاستلام:\n${url}`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -359,791 +379,981 @@ export function ShareProductModal({
   };
 
   const handlePreviewLink = (link: ProductShareLink) => {
-    const url = getShareUrlForLink(link.id);
-    const win = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!win) {
-      const a = document.createElement('a');
-      a.href = url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+    if (onPreviewCustomerView) {
+      onPreviewCustomerView(product, link.id);
+    } else {
+      const url = getShareUrlForLink(link.id);
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 
   const activeLinksCount = links.filter((l) => l.active).length;
   const disabledLinksCount = links.filter((l) => !l.active).length;
+  const averageProfit = links.length > 0
+    ? Math.round(links.reduce((acc, l) => acc + calculateProfit(product.wholesalePrice, l.sellingPrice), 0) / links.length)
+    : 0;
+
+  const filteredLinks = links.filter((l) => {
+    if (linksFilter === 'active') return l.active;
+    if (linksFilter === 'disabled') return !l.active;
+    return true;
+  });
+
+  const selectedLinkForUpsells = links.find((l) => l.id === upsellTargetLinkId) || links[0];
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[92vh]">
-        {/* Modal Header */}
-        <div className="p-4 bg-gradient-to-r from-violet-600 via-purple-600 to-slate-900 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-white/10 rounded-xl backdrop-blur-xs">
-              <Share2 className="w-5 h-5 text-amber-300" />
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-6xl h-[94vh] max-h-[920px] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        
+        {/* Top Header Cockpit */}
+        <div className="px-5 py-3.5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border-b border-indigo-500/20 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-violet-600/30 border border-violet-400/40 rounded-2xl text-violet-300">
+              <Share2 className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm font-black">إدارة روابط مشاركة المنتج</h2>
-              <p className="text-[11px] text-violet-200 font-medium">
-                تعديل أسعار البيع وتفعيل/تعطيل روابط المبيعات المباشرة
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-sm sm:text-base font-black tracking-tight">
+                  لوحة إدارة روابط المشاركة وحملات البيع
+                </h1>
+                <span className="text-[11px] font-bold text-violet-300 bg-violet-500/20 px-2.5 py-0.5 rounded-full border border-violet-500/30 font-mono">
+                  {links.length} رابط
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 hidden sm:block">
+                تعديل أسعار البيع، التحكم بهامش الربح، تخصيص صفحة الزبون، وإطلاق الحملات الإعلانية
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-white/20 text-white transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Product Card Summary */}
-        <div className="p-3 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <img
-              src={product.images[0]}
-              alt={product.nameAr}
-              className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
-            />
-            <div className="min-w-0">
-              <h3 className="font-extrabold text-xs text-slate-900 dark:text-white truncate">{product.nameAr}</h3>
-              <div className="flex items-center gap-2 text-[11px] mt-0.5">
-                <span className="text-slate-500">سعر الجملة:</span>
-                <span className="font-black text-slate-900 dark:text-white">
-                  <MoneyText amount={product.wholesalePrice} />
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => downloadAllImages(product.images, product.nameAr, onShowToast)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 font-bold text-xs transition cursor-pointer shrink-0"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">تحميل الصور</span>
-          </button>
-        </div>
-
-        {/* Sub-Tabs Switcher */}
-        <div className="px-4 pt-3 flex gap-2 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
-          <button
-            onClick={() => setActiveTab('links_list')}
-            className={`py-2 px-3 rounded-t-xl text-xs font-extrabold flex items-center gap-1.5 border-b-2 transition cursor-pointer ${
-              activeTab === 'links_list'
-                ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/30'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <LinkIcon className="w-3.5 h-3.5" />
-            <span>الروابط النشطة ({links.length})</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-purple-600 text-white text-[9px] font-black">
-              {activeLinksCount} نشط
-            </span>
-            {disabledLinksCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-slate-400 text-white text-[9px] font-black">
-                {disabledLinksCount} معطل
-              </span>
+          <div className="flex items-center gap-2">
+            {links[0] && (
+              <button
+                type="button"
+                onClick={() => handlePreviewLink(links[0])}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition border border-white/15 cursor-pointer"
+                title="معاينة صفحة الزبون الحية"
+              >
+                <Eye className="w-3.5 h-3.5 text-amber-300" />
+                <span>معاينة كزبون</span>
+              </button>
             )}
-          </button>
 
-          <button
-            onClick={() => setActiveTab('create_link')}
-            className={`py-2 px-3 rounded-t-xl text-xs font-extrabold flex items-center gap-1.5 border-b-2 transition cursor-pointer ${
-              activeTab === 'create_link'
-                ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/30'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ إنشاء رابط جديد</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('customize')}
-            className={`py-2 px-3 rounded-t-xl text-xs font-extrabold flex items-center gap-1.5 border-b-2 transition cursor-pointer ${
-              activeTab === 'customize'
-                ? 'border-violet-600 text-violet-600 dark:text-violet-400 bg-violet-50/50 dark:bg-violet-950/30'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-            <span>تخصيص وتمييز الصفحة (Differentiating)</span>
-          </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition cursor-pointer"
+              title="إغلاق"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        {/* Modal Scrollable Body */}
-        <div className="p-4 overflow-y-auto space-y-4 text-xs flex-1">
-          {/* TAB 1: LINKS LIST */}
-          {activeTab === 'links_list' && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
-                <span>يمكنك تعديل سعر البيع مباشرة لكل رابط أو تعطيله بنقرة واحدة:</span>
+        {/* Dashboard Split Body: Vertical Sidebar (Right in RTL) + Main Workspace (Left) */}
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          
+          {/* ==================== VERTICAL SIDEBAR ==================== */}
+          <aside className="w-full md:w-80 shrink-0 bg-slate-50/80 dark:bg-slate-900/90 border-b md:border-b-0 md:border-e border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between overflow-y-auto space-y-4">
+            <div className="space-y-4">
+              
+              {/* Product Mini-Card */}
+              <div className="p-3 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
+                <div className="flex items-start gap-3">
+                  <img
+                    src={product.images[0]}
+                    alt={product.nameAr}
+                    className="w-14 h-14 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <h2 className="font-black text-xs text-slate-900 dark:text-white line-clamp-2">
+                      {product.nameAr}
+                    </h2>
+                    <div className="mt-1 text-[11px] text-slate-500 space-x-1 space-x-reverse">
+                      <span>الجملة:</span>
+                      <span className="font-black text-slate-900 dark:text-white font-mono">
+                        <MoneyText amount={product.wholesalePrice} />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Financial Baseline Row */}
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800">
+                    <span className="text-slate-400 block text-[10px]">المقترح للبيع:</span>
+                    <span className="font-black text-slate-900 dark:text-white font-mono text-xs">
+                      <MoneyText amount={defaultSellingPrice} />
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300">
+                    <span className="block text-[10px] text-emerald-600 dark:text-emerald-400">ربحك المقترح:</span>
+                    <span className="font-black font-mono text-xs text-emerald-600 dark:text-emerald-400">
+                      +<MoneyText amount={calculateProfit(product.wholesalePrice, defaultSellingPrice)} />
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Image Download */}
+                <button
+                  type="button"
+                  onClick={() => downloadAllImages(product.images, product.nameAr, onShowToast)}
+                  className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-violet-600" />
+                  <span>تحميل باقة الصور كاملة ({product.images.length})</span>
+                </button>
               </div>
 
-              {links.map((link) => {
-                const currentPrice = editedPrices[link.id] ?? link.sellingPrice;
-                const isPriceModified = editedPrices[link.id] !== undefined && editedPrices[link.id] !== link.sellingPrice;
-                const linkProfit = calculateProfit(product.wholesalePrice, currentPrice);
-                const shareUrl = getShareUrlForLink(link.id);
-                const isCopied = copiedLinkId === link.id;
+              {/* Performance Indicators (Vertical Matrix) */}
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800">
+                  <span className="text-[10px] text-slate-400 block">إجمالي الروابط</span>
+                  <span className="text-sm font-black font-mono text-slate-900 dark:text-white">
+                    {links.length}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                  <span className="text-[10px] block">الروابط النشطة</span>
+                  <span className="text-sm font-black font-mono">
+                    {activeLinksCount}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-300">
+                  <span className="text-[10px] block">متوسط الربح</span>
+                  <span className="text-xs font-black font-mono">
+                    <MoneyText amount={averageProfit} />
+                  </span>
+                </div>
+              </div>
 
-                return (
-                  <div
-                    key={link.id}
-                    className={`p-3.5 rounded-2xl border transition-all space-y-3 shadow-xs ${
-                      link.active
-                        ? 'bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-800 hover:border-violet-300 dark:hover:border-violet-700'
-                        : 'bg-slate-50/80 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-75'
+              {/* Vertical Navigation Menu */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block px-1">
+                  أقسام لوحة التحكم
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('links_list')}
+                  className={`w-full p-3 rounded-2xl font-bold text-xs flex items-center justify-between transition cursor-pointer ${
+                    activeTab === 'links_list'
+                      ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20'
+                      : 'bg-white dark:bg-slate-850 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <LinkIcon className="w-4 h-4" />
+                    <span>روابط البيع وهوامش الربح</span>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-black font-mono ${
+                      activeTab === 'links_list'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                     }`}
                   >
-                    {/* Header Row: Title & Active Toggle */}
-                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Tag className="w-4 h-4 text-violet-500 shrink-0" />
-                        <span className="font-extrabold text-slate-900 dark:text-white truncate">
-                          {link.title || 'رابط مشاركة مخصص'}
-                        </span>
-                        {link.active ? (
-                          <span className="px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-400 font-extrabold text-[10px] flex items-center gap-1 border border-purple-500/30 shrink-0">
-                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-                            نشط
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-400 font-extrabold text-[10px] flex items-center gap-1 border border-rose-500/30 shrink-0">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                            معطل
-                          </span>
-                        )}
-                      </div>
+                    {links.length}
+                  </span>
+                </button>
 
-                      {/* Toggle & Delete Actions */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleLinkActive(link)}
-                          title={link.active ? 'تعطيل هذا الرابط' : 'تفعيل هذا الرابط'}
-                          className={`px-2.5 py-1 rounded-xl font-bold text-[11px] flex items-center gap-1 transition cursor-pointer border ${
-                            link.active
-                              ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 hover:bg-rose-100'
-                              : 'bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-900 text-purple-700 dark:text-purple-300 hover:bg-purple-100'
-                          }`}
-                        >
-                          <Power className="w-3.5 h-3.5" />
-                          <span>{link.active ? 'تعطيل' : 'تفعيل'}</span>
-                        </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('create_link')}
+                  className={`w-full p-3 rounded-2xl font-bold text-xs flex items-center justify-between transition cursor-pointer ${
+                    activeTab === 'create_link'
+                      ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20'
+                      : 'bg-white dark:bg-slate-850 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Plus className="w-4 h-4" />
+                    <span>إنشاء رابط بيع مخصص</span>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                      activeTab === 'create_link'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-violet-50 dark:bg-violet-950 text-violet-700 dark:text-violet-300'
+                    }`}
+                  >
+                    حملة جديدة ✨
+                  </span>
+                </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteLink(link)}
-                          title="حذف الرابط"
-                          className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('upsells')}
+                  className={`w-full p-3 rounded-2xl font-bold text-xs flex items-center justify-between transition cursor-pointer ${
+                    activeTab === 'upsells'
+                      ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20'
+                      : 'bg-white dark:bg-slate-850 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Gift className="w-4 h-4" />
+                    <span>عروض الكميات والـ Upsell</span>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                      activeTab === 'upsells'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                    }`}
+                  >
+                    مضاعفة الأرباح ⚡
+                  </span>
+                </button>
 
-                    {/* Price Direct Edit Row */}
-                    <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                          <Edit3 className="w-3.5 h-3.5 text-violet-500" />
-                          <span>سعر البيع المباشر:</span>
-                        </label>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('customize')}
+                  className={`w-full p-3 rounded-2xl font-bold text-xs flex items-center justify-between transition cursor-pointer ${
+                    activeTab === 'customize'
+                      ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20'
+                      : 'bg-white dark:bg-slate-850 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Palette className="w-4 h-4" />
+                    <span>تخصيص وتمييز صفحة الزبون</span>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                      activeTab === 'customize'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300'
+                    }`}
+                  >
+                    Differentiating 🚀
+                  </span>
+                </button>
+              </div>
+            </div>
 
-                        <div className="flex items-center gap-1.5">
-                          <div className="relative w-32">
-                            <input
-                              type="number"
-                              value={currentPrice}
-                              onChange={(e) =>
-                                setEditedPrices((prev) => ({
-                                  ...prev,
-                                  [link.id]: Number(e.target.value),
-                                }))
-                              }
-                              className="w-full p-1.5 ps-2 pe-7 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 font-black text-slate-900 dark:text-white text-xs text-start focus:ring-2 focus:ring-violet-500"
-                            />
-                            <span className="absolute end-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                              دج
-                            </span>
-                          </div>
+            {/* Sidebar Bottom: Tracking Pixels & Safe Product Delete */}
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2.5">
+              <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-500 dark:text-slate-400 space-y-1">
+                <span className="font-bold block text-slate-700 dark:text-slate-300">
+                  ربط البيكسل الإعلاني:
+                </span>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <span className={user?.metaPixelId ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
+                    • Meta Pixel {user?.metaPixelId ? '✔' : ''}
+                  </span>
+                  <span className={user?.tiktokPixelId ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
+                    • TikTok {user?.tiktokPixelId ? '✔' : ''}
+                  </span>
+                  <span className={user?.snapchatPixelId ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
+                    • Snap {user?.snapchatPixelId ? '✔' : ''}
+                  </span>
+                </div>
+              </div>
 
-                          {isPriceModified && (
-                            <button
-                              type="button"
-                              onClick={() => handleSaveLinkPrice(link)}
-                              className="px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-[11px] transition shadow-xs cursor-pointer"
-                            >
-                              حفظ
-                            </button>
-                          )}
-                        </div>
-                      </div>
+              <button
+                type="button"
+                onClick={() => setShowDeleteProductConfirm(true)}
+                className="w-full py-2 px-3 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer border border-rose-200 dark:border-rose-900/50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>إزالة المنتج من تبويب الروابط</span>
+              </button>
+            </div>
+          </aside>
 
-                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
-                        <span className="text-slate-500">الربح المقدر من هذا الرابط:</span>
-                        <span
-                          className={`font-black ${
-                            linkProfit > 0 ? 'text-purple-600 dark:text-purple-400' : 'text-rose-500'
-                          }`}
-                        >
-                          +<MoneyText amount={linkProfit} />
-                        </span>
-                      </div>
-                    </div>
+          {/* ==================== MAIN WORKSPACE ==================== */}
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-white dark:bg-slate-900">
+            
+            {/* -------------------- TAB 1: LINKS LIST -------------------- */}
+            {activeTab === 'links_list' && (
+              <div className="space-y-4 max-w-4xl mx-auto">
+                {/* Section Header with Segmented Filter */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>روابط البيع وهوامش الأرباح</span>
+                      <span className="text-xs font-bold text-slate-500">
+                        ({filteredLinks.length} من أصل {links.length})
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      عدّل سعر البيع المباشر، انسخ الرابط بنقرة واحدة، وشارك عبر واتساب وفيسبوك
+                    </p>
+                  </div>
 
-                    {/* UpSell Offers Linked to this Share Link */}
-                    {(() => {
+                  {/* Filter segmented buttons */}
+                  <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setLinksFilter('all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        linksFilter === 'all'
+                          ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                      }`}
+                    >
+                      الكل ({links.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLinksFilter('active')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        linksFilter === 'active'
+                          ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-2xs'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                      }`}
+                    >
+                      النشطة ({activeLinksCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLinksFilter('disabled')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        linksFilter === 'disabled'
+                          ? 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                      }`}
+                    >
+                      المعطلة ({disabledLinksCount})
+                    </button>
+                  </div>
+                </div>
+
+                {/* Empty State */}
+                {filteredLinks.length === 0 ? (
+                  <div className="p-12 text-center rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 space-y-3">
+                    <LinkIcon className="w-10 h-10 text-slate-300 mx-auto" />
+                    <p className="text-xs text-slate-500 font-bold">
+                      لا توجد روابط تطابق هذا التصنيف حالياً.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('create_link')}
+                      className="px-4 py-2 rounded-xl bg-violet-600 text-white font-bold text-xs transition shadow-xs cursor-pointer"
+                    >
+                      إنشاء رابط جديد الآن
+                    </button>
+                  </div>
+                ) : (
+                  /* Vertical Link Cards */
+                  <div className="space-y-3.5">
+                    {filteredLinks.map((link) => {
+                      const currentPrice = editedPrices[link.id] ?? link.sellingPrice;
+                      const isPriceModified =
+                        editedPrices[link.id] !== undefined && editedPrices[link.id] !== link.sellingPrice;
+                      const linkProfit = calculateProfit(product.wholesalePrice, currentPrice);
+                      const shareUrl = getShareUrlForLink(link.id);
+                      const isCopied = copiedLinkId === link.id;
                       const linkUpsells = handleGetLinkUpsells(link);
                       const isUpsellOpen = expandedUpsellLinkId === link.id;
-                      const hasUnsavedDrafts = !!linkUpsellDrafts[link.id];
 
                       return (
-                        <div className="rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/40 dark:bg-purple-950/20 overflow-hidden transition-all">
-                          {/* Accordion Header */}
-                          <div
-                            onClick={() => setExpandedUpsellLinkId(isUpsellOpen ? null : link.id)}
-                            className="p-2.5 flex items-center justify-between cursor-pointer select-none hover:bg-purple-100/50 dark:hover:bg-purple-900/30 transition"
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className="w-5 h-5 rounded-md bg-purple-600 text-white flex items-center justify-center text-[10px]">
-                                <Zap className="w-3 h-3 fill-current" />
+                        <div
+                          key={link.id}
+                          className={`p-4 rounded-3xl border transition-all space-y-3.5 ${
+                            link.active
+                              ? 'bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-800 shadow-xs hover:border-violet-300 dark:hover:border-violet-700'
+                              : 'bg-slate-50/70 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-80'
+                          }`}
+                        >
+                          {/* Card Top Row: Title, Status, and Controls */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800 pb-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div
+                                className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                                  link.active
+                                    ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                                }`}
+                              >
+                                <Tag className="w-4 h-4" />
                               </div>
-                              <span className="font-extrabold text-xs text-slate-800 dark:text-slate-200">
-                                عروض UpSell المرتبطة تلقائياً:
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-200/70 dark:bg-purple-900/80 text-purple-800 dark:text-purple-300">
-                                {linkUpsells.length} باقة
-                              </span>
-                              {hasUnsavedDrafts && (
-                                <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-amber-500 text-white animate-pulse">
-                                  تعديل غير محفوظ
-                                </span>
-                              )}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-black text-xs sm:text-sm text-slate-900 dark:text-white truncate">
+                                    {link.title || 'رابط مشاركة مخصص'}
+                                  </h4>
+                                  {link.active ? (
+                                    <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-800 shrink-0">
+                                      نشط للبيع ✔
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 shrink-0">
+                                      معطل مؤقتاً
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
+                                  <span>الكمية: {link.quantity || 1}</span>
+                                  <span>·</span>
+                                  <span>المقاس: {link.size || 'افتراضي'}</span>
+                                  <span>·</span>
+                                  <span>اللون: {link.color || 'افتراضي'}</span>
+                                </div>
+                              </div>
                             </div>
 
-                            <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-bold text-xs">
-                              <span>{isUpsellOpen ? 'إخفاء العروض' : 'تخصيص / عرض'}</span>
-                              {isUpsellOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            {/* Power Toggle & Delete */}
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleLinkActive(link)}
+                                className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition cursor-pointer border ${
+                                  link.active
+                                    ? 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900'
+                                    : 'bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-900'
+                                }`}
+                              >
+                                <Power className="w-3.5 h-3.5" />
+                                <span>{link.active ? 'تعطيل الرابط' : 'تفعيل للبيع'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteLink(link)}
+                                title="حذف هذا الرابط"
+                                className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
                           </div>
 
-                          {/* Expanded UpSell Content */}
-                          {isUpsellOpen && (
-                            <div className="p-3 border-t border-purple-200/80 dark:border-purple-900/60 space-y-2.5 bg-white/70 dark:bg-slate-900/70">
-                              <div className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center justify-between">
-                                <span>تظهر هذه العروض للزبون في صفحة الرابط ويتم احتساب ربحك تلقائياً:</span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleResetUpsellsToProduct(link);
-                                  }}
-                                  className="text-[10px] text-purple-600 hover:underline font-bold cursor-pointer"
-                                >
-                                  استعادة عروض المنتج الأصلية
-                                </button>
+                          {/* Direct Price & Profit Cockpit */}
+                          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-2.5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                  <Edit3 className="w-4 h-4 text-violet-600" />
+                                  <span>سعر البيع المباشر للزبون:</span>
+                                </label>
+                                <div className="relative w-36">
+                                  <input
+                                    type="number"
+                                    value={currentPrice}
+                                    onChange={(e) =>
+                                      setEditedPrices((prev) => ({
+                                        ...prev,
+                                        [link.id]: Number(e.target.value),
+                                      }))
+                                    }
+                                    className="w-full p-2 ps-3 pe-8 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 font-black text-slate-900 dark:text-white text-xs text-start focus:ring-2 focus:ring-violet-500"
+                                  />
+                                  <span className="absolute end-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                                    دج
+                                  </span>
+                                </div>
+
+                                {isPriceModified && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveLinkPrice(link)}
+                                    className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs transition shadow-xs cursor-pointer active:scale-95"
+                                  >
+                                    حفظ السعر
+                                  </button>
+                                )}
                               </div>
 
-                              {/* UpSells List */}
-                              <div className="space-y-1.5">
-                                {linkUpsells.map((upsell, uIdx) => {
-                                  const uWholesale = upsell.wholesalePrice || (product.wholesalePrice * (upsell.quantity || 1));
-                                  const uProfit = Math.max(0, (upsell.price || 0) - uWholesale);
+                              {/* Calculated Net Profit Indicator */}
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="text-slate-500 dark:text-slate-400">صافي ربحك في القطعة:</span>
+                                <span
+                                  className={`font-black font-mono text-sm px-2.5 py-1 rounded-xl ${
+                                    linkProfit > 0
+                                      ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                                      : 'bg-rose-100 text-rose-700'
+                                  }`}
+                                >
+                                  +<MoneyText amount={linkProfit} />
+                                </span>
+                              </div>
+                            </div>
+                          </div>
 
-                                  return (
-                                    <div
-                                      key={upsell.id || uIdx}
-                                      className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-850 flex flex-wrap items-center justify-between gap-2 text-xs"
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-extrabold text-slate-900 dark:text-white">
-                                          {upsell.title}
-                                        </span>
-                                        {upsell.badge && (
-                                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300">
-                                            {upsell.badge}
-                                          </span>
-                                        )}
-                                        {upsell.quantity && (
-                                          <span className="text-[10px] text-slate-400">
-                                            ({upsell.quantity} قطع)
-                                          </span>
-                                        )}
-                                      </div>
+                          {/* URL Box & 1-Click Action Buttons */}
+                          <div className="space-y-2">
+                            <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 font-mono text-[11px] text-slate-600 dark:text-slate-300 flex items-center justify-between gap-2 overflow-hidden">
+                              <span className="truncate">{shareUrl}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyLink(link)}
+                                className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-violet-500 text-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1 transition cursor-pointer shrink-0"
+                              >
+                                {isCopied ? <Check className="w-3.5 h-3.5 text-purple-600" /> : <Copy className="w-3.5 h-3.5 text-violet-500" />}
+                                <span>{isCopied ? 'تم النسخ' : 'نسخ'}</span>
+                              </button>
+                            </div>
 
-                                      <div className="flex items-center gap-2">
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-[10px] text-slate-500">سعر البيع:</span>
-                                          <div className="relative w-20">
+                            {/* Share Buttons Grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleWhatsApp(link)}
+                                className="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs active:scale-95"
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                                <span>مشاركة واتساب</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleFacebook(link)}
+                                className="py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs active:scale-95"
+                              >
+                                <Facebook className="w-4 h-4" />
+                                <span>مشاركة فيسبوك</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handlePreviewLink(link)}
+                                className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-extrabold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer border border-slate-200 dark:border-slate-700 active:scale-95"
+                              >
+                                <Eye className="w-4 h-4 text-violet-600" />
+                                <span>معاينة الزبون</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCustomizationLinkId(link.id);
+                                  setActiveTab('customize');
+                                }}
+                                className="py-2 px-3 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900 text-purple-700 dark:text-purple-300 font-extrabold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer border border-purple-200 dark:border-purple-800 active:scale-95"
+                              >
+                                <Palette className="w-4 h-4 text-purple-600" />
+                                <span>تخصيص الصفحة</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Inline UpSell Bundle Accordion */}
+                          <div className="rounded-2xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/30 dark:bg-purple-950/20 overflow-hidden">
+                            <div
+                              onClick={() => setExpandedUpsellLinkId(isUpsellOpen ? null : link.id)}
+                              className="p-3 flex items-center justify-between cursor-pointer select-none hover:bg-purple-100/40 dark:hover:bg-purple-900/30 transition text-xs"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Zap className="w-4 h-4 text-purple-600 fill-current" />
+                                <span className="font-black text-slate-900 dark:text-white">
+                                  باقات عروض الـ Upsell المرتبطة بالرابط ({linkUpsells.length} عروض)
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 text-purple-700 dark:text-purple-300 font-bold">
+                                <span>{isUpsellOpen ? 'إغلاق الباقات' : 'عرض وتعديل الباقات'}</span>
+                                {isUpsellOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              </div>
+                            </div>
+
+                            {isUpsellOpen && (
+                              <div className="p-3.5 border-t border-purple-200/80 dark:border-purple-900/60 space-y-2.5 bg-white dark:bg-slate-900">
+                                <div className="space-y-2">
+                                  {linkUpsells.map((upsell, uIdx) => {
+                                    const uWholesale = upsell.wholesalePrice || product.wholesalePrice * (upsell.quantity || 1);
+                                    const uProfit = Math.max(0, (upsell.price || 0) - uWholesale);
+
+                                    return (
+                                      <div
+                                        key={upsell.id || uIdx}
+                                        className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-extrabold text-slate-900 dark:text-white">
+                                            {upsell.title}
+                                          </span>
+                                          {upsell.badge && (
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                                              {upsell.badge}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-[10px] text-slate-400">سعر البيع:</span>
                                             <input
                                               type="number"
                                               value={upsell.price}
                                               onChange={(e) =>
                                                 handleUpdateLinkUpsellField(link.id, uIdx, 'price', Number(e.target.value))
                                               }
-                                              className="w-full p-1 ps-1.5 pe-5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 font-bold text-[11px] text-slate-900 dark:text-white"
+                                              className="w-24 p-1 ps-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-xs"
                                             />
-                                            <span className="absolute end-1 top-1/2 -translate-y-1/2 text-[9px] text-slate-400">
-                                              دج
-                                            </span>
+                                            <span className="text-[10px] text-slate-400">دج</span>
                                           </div>
+                                          <div className="text-xs font-bold text-purple-600 dark:text-purple-400 min-w-[80px] text-end font-mono">
+                                            ربحك: +<MoneyText amount={uProfit} />
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteUpsellFromLink(link.id, uIdx)}
+                                            className="p-1 rounded text-slate-400 hover:text-rose-500 cursor-pointer"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
                                         </div>
-
-                                        <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 min-w-[75px] text-end">
-                                          ربحك: +<MoneyText amount={uProfit} />
-                                        </div>
-
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeleteUpsellFromLink(link.id, uIdx)}
-                                          title="حذف هذا العرض"
-                                          className="p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                        </button>
                                       </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                                    );
+                                  })}
+                                </div>
 
-                              {/* Footer Action Buttons */}
-                              <div className="pt-2 flex items-center justify-between gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddUpsellToLink(link.id)}
-                                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-dashed border-purple-300 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-bold text-[11px] hover:bg-purple-50 dark:hover:bg-purple-950/40 transition cursor-pointer"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                  <span>إضافة عرض جديد</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleSaveLinkUpsells(link)}
-                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-black text-[11px] transition shadow-xs cursor-pointer"
-                                >
-                                  <Check className="w-3 h-3" />
-                                  <span>حفظ باقات UpSell للرابط</span>
-                                </button>
+                                <div className="flex items-center justify-between pt-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddUpsellToLink(link.id)}
+                                    className="px-3 py-1.5 rounded-xl border border-dashed border-purple-300 text-purple-700 dark:text-purple-300 text-xs font-bold flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>إضافة باقة جديدة</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveLinkUpsells(link)}
+                                    className="px-3.5 py-1.5 rounded-xl bg-purple-600 text-white text-xs font-black cursor-pointer shadow-xs"
+                                  >
+                                    حفظ باقات الرابط
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       );
-                    })()}
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
-                    {/* Differentiating Elements Button */}
+            {/* -------------------- TAB 2: CREATE NEW LINK -------------------- */}
+            {activeTab === 'create_link' && (
+              <div className="max-w-2xl mx-auto space-y-5">
+                <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
+                  <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <Plus className="w-5 h-5 text-violet-600" />
+                    <span>إنشاء رابط تسويقي مخصص جديد</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    خصّص سعراً مستقلاً لكل حملة إعلانية (مثلاً: رابط لحملة فيسبوك، رابط لتيكتوك، أو عرض تخفيض زمني)
+                  </p>
+                </div>
+
+                <form onSubmit={handleCreateNewLink} className="space-y-4">
+                  <div>
+                    <label className="block font-bold text-slate-800 dark:text-slate-200 text-xs mb-1.5">
+                      عنوان أو اسم الرابط (لتمييز الحملة):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="مثال: حملة فيسبوك - عرض حصري 4,200 دج"
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      className="w-full p-3 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-violet-500 shadow-2xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-800 dark:text-slate-200 text-xs mb-1.5">
+                      سعر البيع المقترح للزبون (دج):
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={newSellingPrice}
+                        onChange={(e) => setNewSellingPrice(Number(e.target.value))}
+                        className="w-full p-3 pe-10 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-black text-slate-900 dark:text-white text-base focus:ring-2 focus:ring-violet-500 shadow-2xs"
+                      />
+                      <span className="absolute end-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">
+                        دج
+                      </span>
+                    </div>
+
+                    <div className="mt-2 p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 flex items-center justify-between text-xs">
+                      <span className="text-purple-900 dark:text-purple-200 font-bold">
+                        هامش ربحك المحسوب آلياً في القطعة:
+                      </span>
+                      <span
+                        className={`font-black font-mono text-sm ${
+                          newProfit > 0 ? 'text-purple-700 dark:text-purple-300' : 'text-rose-600'
+                        }`}
+                      >
+                        +<MoneyText amount={newProfit} />
+                      </span>
+                    </div>
+                  </div>
+
+                  {sizes.length > 0 && (
+                    <div>
+                      <label className="block font-bold text-slate-800 dark:text-slate-200 text-xs mb-1.5">
+                        المقاس الافتراضي المحدد مسبقاً:
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {sizes.map((sz) => (
+                          <button
+                            key={sz}
+                            type="button"
+                            onClick={() => setNewSize(sz)}
+                            className={`px-3.5 py-2 rounded-xl font-bold text-xs border transition cursor-pointer ${
+                              newSize === sz
+                                ? 'bg-violet-600 text-white border-violet-600 shadow-xs'
+                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
+                            {sz}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {colors.length > 0 && (
+                    <div>
+                      <label className="block font-bold text-slate-800 dark:text-slate-200 text-xs mb-1.5">
+                        اللون الافتراضي المحدد مسبقاً:
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {colors.map((cl) => (
+                          <button
+                            key={cl}
+                            type="button"
+                            onClick={() => setNewColor(cl)}
+                            className={`px-3.5 py-2 rounded-xl font-bold text-xs border transition cursor-pointer ${
+                              newColor === cl
+                                ? 'bg-violet-600 text-white border-violet-600 shadow-xs'
+                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
+                            {cl}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-3">
                     <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedCustomizationLinkId(link.id);
-                        setActiveTab('customize');
-                      }}
-                      className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-amber-500/10 hover:from-purple-500/20 hover:to-amber-500/20 text-purple-800 dark:text-purple-300 font-black text-xs flex items-center justify-between border border-purple-200 dark:border-purple-800/60 transition cursor-pointer shadow-2xs"
+                      type="submit"
+                      className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-violet-600/30 transition cursor-pointer active:scale-95"
                     >
-                      <span className="flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                        <span>تخصيص وتمييز الصفحة (فيديو، تقييمات، واتساب، ألوان...)</span>
-                      </span>
-                      <span className="text-[10px] font-black bg-purple-600 text-white px-2 py-0.5 rounded-full">
-                        Differentiating 🚀
-                      </span>
+                      <Plus className="w-5 h-5" />
+                      <span>إنشاء وتفعيل رابط البيع فورياً</span>
                     </button>
-
-                    {/* URL Display Box */}
-                    <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono text-[10px] text-slate-600 dark:text-slate-300 truncate">
-                      {shareUrl}
-                    </div>
-
-                    {/* Quick Action Buttons */}
-                    <div className="grid grid-cols-4 gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleCopyLink(link)}
-                        className={`py-1.5 px-2 rounded-xl font-extrabold text-[10px] flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs ${
-                          isCopied
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 hover:border-violet-400'
-                        }`}
-                      >
-                        {isCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3 text-violet-500" />}
-                        <span>{isCopied ? 'تم النسخ' : 'نسخ'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleWhatsApp(link)}
-                        className="py-1.5 px-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-[10px] flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs"
-                      >
-                        <MessageSquare className="w-3 h-3" />
-                        <span>واتساب</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleFacebook(link)}
-                        className="py-1.5 px-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-[10px] flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs"
-                      >
-                        <Facebook className="w-3 h-3" />
-                        <span>فيسبوك</span>
-                      </button>
-
-                      {onPreviewCustomerView ? (
-                        <button
-                          type="button"
-                          onClick={() => onPreviewCustomerView(product, link.id)}
-                          className="py-1.5 px-2 rounded-xl bg-violet-100 dark:bg-violet-950/80 hover:bg-violet-200 dark:hover:bg-violet-900 text-violet-800 dark:text-violet-200 font-extrabold text-[10px] flex items-center justify-center gap-1 transition cursor-pointer border border-violet-200 dark:border-violet-800"
-                          title="معاينة صفحة الرابط في التطبيق"
-                        >
-                          <Eye className="w-3 h-3" />
-                          <span>معاينة</span>
-                        </button>
-                      ) : (
-                        <a
-                          href={shareUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
-                          className="py-1.5 px-2 rounded-xl bg-violet-100 dark:bg-violet-950/80 hover:bg-violet-200 dark:hover:bg-violet-900 text-violet-800 dark:text-violet-200 font-extrabold text-[10px] flex items-center justify-center gap-1 transition cursor-pointer border border-violet-200 dark:border-violet-800"
-                          title="معاينة صفحة الرابط في نافذة جديدة"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          <span>معاينة</span>
-                        </a>
-                      )}
-                    </div>
                   </div>
-                );
-              })}
-
-              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteProductConfirm(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-bold transition cursor-pointer border border-rose-200 dark:border-rose-900/50"
-                  title="حذف هذا المنتج من قائمة الروابط"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>حذف هذا المنتج من قائمة الروابط</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('create_link')}
-                  className="flex items-center gap-1 px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-bold text-xs hover:bg-purple-100 dark:hover:bg-purple-900/50 transition cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>إنشاء رابط جديد</span>
-                </button>
+                </form>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* TAB 2: CREATE NEW LINK */}
-          {activeTab === 'create_link' && (
-            <form onSubmit={handleCreateNewLink} className="space-y-4">
-              <div className="p-3 rounded-2xl bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-900/60 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-violet-600 shrink-0" />
-                <p className="text-[11px] text-violet-900 dark:text-violet-200 font-medium">
-                  يمكنك إنشاء رابط منفصل لكل حملة إعلانية (مثلاً رابط بسعر مخفض لحملة فيسبوك، ورابط آخر لتيكتوك).
-                </p>
-              </div>
-
-              {/* Title Input */}
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  اسم أو عنوان الرابط (اخاري):
-                </label>
-                <input
-                  type="text"
-                  placeholder="مثال: عرض خاص - 4500 دج"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-violet-500"
-                />
-              </div>
-
-              {/* Selling Price */}
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  سعر البيع لهذا الرابط (دج):
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={newSellingPrice}
-                    onChange={(e) => setNewSellingPrice(Number(e.target.value))}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-extrabold text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-violet-500"
-                  />
-                  <span className="absolute end-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">دج</span>
-                </div>
-                <div className="mt-1 flex items-center justify-between text-[11px]">
-                  <span className="text-slate-500">ربحك المقدر:</span>
-                  <span
-                    className={`font-black ${
-                      newProfit > 0 ? 'text-purple-600 dark:text-purple-400' : 'text-rose-500'
-                    }`}
-                  >
-                    +<MoneyText amount={newProfit} />
-                  </span>
-                </div>
-              </div>
-
-              {/* Size Selector */}
-              {sizes.length > 0 && (
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">المقاس الافتراضي:</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {sizes.map((sz) => (
-                      <button
-                        key={sz}
-                        type="button"
-                        onClick={() => setNewSize(sz)}
-                        className={`px-3 py-1.5 rounded-xl font-bold border transition cursor-pointer ${
-                          newSize === sz
-                            ? 'bg-violet-600 text-white border-violet-600'
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
-                        }`}
-                      >
-                        {sz}
-                      </button>
-                    ))}
+            {/* -------------------- TAB 3: UPSELLS DEDICATED VIEW -------------------- */}
+            {activeTab === 'upsells' && (
+              <div className="max-w-3xl mx-auto space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <Gift className="w-5 h-5 text-amber-500" />
+                      <span>عروض الكميات وباقات الـ Upsell</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      زيادة متوسط قيمة الطلب (AOV) ومضاعفة ربحك عند شراء الزبون لقطعتين أو 3 قطع
+                    </p>
                   </div>
-                </div>
-              )}
 
-              {/* Color Selector */}
-              {colors.length > 0 && (
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">اللون الافتراضي:</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {colors.map((cl) => (
-                      <button
-                        key={cl}
-                        type="button"
-                        onClick={() => setNewColor(cl)}
-                        className={`px-3 py-1.5 rounded-xl font-bold border transition cursor-pointer ${
-                          newColor === cl
-                            ? 'bg-violet-600 text-white border-violet-600'
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
-                        }`}
-                      >
-                        {cl}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Quantity */}
-              <div>
-                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">الكمية الافتراضية:</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={newQuantity}
-                  onChange={(e) => setNewQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-24 p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-900 dark:text-white"
-                />
-              </div>
-
-              {/* UpSells Attached to New Link */}
-              <div className="p-3.5 rounded-2xl bg-purple-50/60 dark:bg-purple-950/25 border border-purple-200 dark:border-purple-900/60 space-y-3">
-                <div className="flex items-center justify-between">
+                  {/* Target Link Selector */}
                   <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-purple-600 fill-current" />
-                    <h4 className="font-extrabold text-xs text-slate-900 dark:text-white">
-                      باقات وعروض UpSell المرتبطة بهذا الرابط:
-                    </h4>
+                    <span className="text-xs text-slate-500 font-bold">الرابط المستهدف:</span>
+                    <select
+                      value={upsellTargetLinkId}
+                      onChange={(e) => setUpsellTargetLinkId(e.target.value)}
+                      className="p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-xs text-slate-900 dark:text-white"
+                    >
+                      {links.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.title || 'رابط'} ({l.sellingPrice} دج)
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setNewLinkUpsells(generateSmartBundleOffers(newSellingPrice))}
-                    className="text-[10px] font-bold text-purple-600 hover:underline cursor-pointer"
-                  >
-                    إعادة توليد بناءً على {newSellingPrice} دج
-                  </button>
                 </div>
 
-                <div className="space-y-1.5">
-                  {newLinkUpsells.map((upsell, uIdx) => {
-                    const uWholesale = upsell.wholesalePrice || (product.wholesalePrice * (upsell.quantity || 1));
-                    const uProfit = Math.max(0, (upsell.price || 0) - uWholesale);
-
-                    return (
-                      <div
-                        key={upsell.id || uIdx}
-                        className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs"
+                {selectedLinkForUpsells && (
+                  <div className="space-y-3">
+                    <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between">
+                      <span>
+                        تظهر هذه الباقات كخيارات فورية في استمارة الطلب بالصفحة لترغيب المشتري بالتوفير.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleResetUpsellsToProduct(selectedLinkForUpsells)}
+                        className="font-bold underline cursor-pointer text-amber-800 dark:text-amber-300"
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-slate-900 dark:text-white">
-                            {upsell.title}
-                          </span>
-                          {upsell.badge && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300">
-                              {upsell.badge}
-                            </span>
-                          )}
-                        </div>
+                        إعادة تعيين الذكية
+                      </button>
+                    </div>
 
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-slate-500">سعر الزبون:</span>
-                            <div className="relative w-20">
-                              <input
-                                type="number"
-                                value={upsell.price}
-                                onChange={(e) => {
-                                  const val = Number(e.target.value) || 0;
-                                  const updated = [...newLinkUpsells];
-                                  const item = { ...updated[uIdx], price: val };
-                                  const cost = item.wholesalePrice || (product.wholesalePrice * (item.quantity || 1));
-                                  item.profit = Math.max(0, val - cost);
-                                  updated[uIdx] = item;
-                                  setNewLinkUpsells(updated);
-                                }}
-                                className="w-full p-1 ps-1.5 pe-5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-bold text-[11px] text-slate-900 dark:text-white"
-                              />
-                              <span className="absolute end-1 top-1/2 -translate-y-1/2 text-[9px] text-slate-400">
-                                دج
-                              </span>
+                    {/* Tiers List */}
+                    <div className="space-y-2.5">
+                      {handleGetLinkUpsells(selectedLinkForUpsells).map((upsell, uIdx) => {
+                        const uWholesale =
+                          upsell.wholesalePrice || product.wholesalePrice * (upsell.quantity || 1);
+                        const uProfit = Math.max(0, (upsell.price || 0) - uWholesale);
+
+                        return (
+                          <div
+                            key={upsell.id || uIdx}
+                            className="p-4 rounded-2xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-sm text-slate-900 dark:text-white">
+                                  {upsell.title}
+                                </span>
+                                {upsell.badge && (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-200">
+                                    {upsell.badge}
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteUpsellFromLink(selectedLinkForUpsells.id, uIdx)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                              <div>
+                                <span className="text-[10px] text-slate-400 block">سعر البيع للزبون:</span>
+                                <input
+                                  type="number"
+                                  value={upsell.price}
+                                  onChange={(e) =>
+                                    handleUpdateLinkUpsellField(
+                                      selectedLinkForUpsells.id,
+                                      uIdx,
+                                      'price',
+                                      Number(e.target.value)
+                                    )
+                                  }
+                                  className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold"
+                                />
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-400 block">تكلفة الجملة:</span>
+                                <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 font-mono font-bold text-slate-700 dark:text-slate-300">
+                                  <MoneyText amount={uWholesale} />
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-purple-600 dark:text-purple-400 block font-bold">
+                                  ربحك الصافي من هذه الباقة:
+                                </span>
+                                <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 font-mono font-black text-purple-700 dark:text-purple-300 text-sm">
+                                  +<MoneyText amount={uProfit} />
+                                </div>
+                              </div>
                             </div>
                           </div>
+                        );
+                      })}
+                    </div>
 
-                          <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 min-w-[70px] text-end">
-                            ربحك: +<MoneyText amount={uProfit} />
-                          </div>
+                    <div className="flex items-center justify-between pt-3">
+                      <button
+                        type="button"
+                        onClick={() => handleAddUpsellToLink(selectedLinkForUpsells.id)}
+                        className="px-4 py-2.5 rounded-xl border border-dashed border-purple-400 text-purple-700 dark:text-purple-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>إضافة باقة كميات جديدة</span>
+                      </button>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setNewLinkUpsells(newLinkUpsells.filter((_, idx) => idx !== uIdx));
-                            }}
-                            className="p-1 rounded text-slate-400 hover:text-rose-500 transition cursor-pointer"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveLinkUpsells(selectedLinkForUpsells)}
+                        className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black shadow-md cursor-pointer"
+                      >
+                        حفظ جميع التغييرات
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
-                <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500">
-                  <span>سيتم حفظ هذه الباقات تلقائياً وربطها بالرابط الجديد.</span>
+            {/* -------------------- TAB 4: CUSTOMIZE LANDING PAGE -------------------- */}
+            {activeTab === 'customize' && (
+              <div className="space-y-4">
+                {/* Link Selector Bar */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Palette className="w-4 h-4 text-violet-600" />
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      تخصيص وتنسيق صفحة الهبوط للرابط:
+                    </span>
+                    <select
+                      value={selectedCustomizationLinkId}
+                      onChange={(e) => setSelectedCustomizationLinkId(e.target.value)}
+                      className="p-1.5 ps-2 pe-6 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-xs text-slate-900 dark:text-white"
+                    >
+                      {links.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.title || 'رابط'} ({l.sellingPrice} دج)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => {
-                      const price = newSellingPrice;
-                      const wholesale = product.wholesalePrice || Math.round(price * 0.6);
-                      const newOffer: UpsellOffer = {
-                        id: `upsell-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-                        title: 'عرض مخصص',
-                        price: price,
-                        wholesalePrice: wholesale,
-                        profit: Math.max(0, price - wholesale),
-                        quantity: 1,
-                        badge: 'عرض خاص 🎁',
-                        isDefaultSelected: false,
-                      };
-                      setNewLinkUpsells([...newLinkUpsells, newOffer]);
+                      const targetLink =
+                        links.find((l) => l.id === selectedCustomizationLinkId) || links[0];
+                      if (targetLink) handlePreviewLink(targetLink);
                     }}
-                    className="flex items-center gap-1 font-bold text-purple-600 hover:underline cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs transition cursor-pointer self-start sm:self-auto"
                   >
-                    <Plus className="w-3 h-3" />
-                    <span>إضافة باقة</span>
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>معاينة النتيجة الحية للزبون</span>
                   </button>
                 </div>
-              </div>
 
-              {/* Create Submit Button */}
-              <button
-                type="submit"
-                className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-purple-600 to-purple-600 hover:from-purple-500 hover:to-purple-500 text-white font-extrabold text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>حفظ وإنشاء هذا الرابط الجديد</span>
-              </button>
-            </form>
-          )}
-
-          {/* TAB 3: CUSTOMIZE & DIFFERENTIATING ELEMENTS */}
-          {activeTab === 'customize' && (
-            <div className="space-y-4 animate-fade-in">
-              {/* Link Selector if multiple links exist */}
-              {links.length > 1 && (
-                <div className="p-3 bg-purple-50/60 dark:bg-purple-950/40 rounded-2xl border border-purple-200 dark:border-purple-800/60 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="text-xs">
-                    <span className="font-bold text-slate-700 dark:text-slate-200 block">
-                      اختر الرابط المراد تخصيصه:
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      يمكنك تخصيص كل رابط تسويقي على حدة لرفع التحويل
-                    </span>
-                  </div>
-                  <select
-                    value={selectedCustomizationLinkId}
-                    onChange={(e) => setSelectedCustomizationLinkId(e.target.value)}
-                    className="px-3 py-1.5 rounded-xl border border-purple-300 dark:border-purple-700 bg-white dark:bg-slate-900 font-bold text-xs outline-hidden"
-                  >
-                    {links.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.title || 'رابط'} ({l.sellingPrice} دج)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <MarketerPageCustomizer
-                product={product}
-                initialCustomization={
-                  links.find((l) => l.id === selectedCustomizationLinkId)?.customization ||
-                  getProductDefaultCustomization(product.id)
-                }
-                onSave={(newCustomization) => {
-                  const updated = updateShareLinkCustomization(
-                    product.id,
-                    selectedCustomizationLinkId,
-                    newCustomization,
-                    defaultSellingPrice
-                  );
-                  setLinks(updated);
-                  onShowToast('🎉 تم حفظ تخصيصات صفحة الرابط وتطبيقها بنجاح!');
-                }}
-                onPreview={() => {
-                  const targetLink =
-                    links.find((l) => l.id === selectedCustomizationLinkId) || links[0];
-                  if (targetLink) {
-                    if (onPreviewCustomerView) {
-                      onPreviewCustomerView(product, targetLink.id);
-                    } else {
-                      handlePreviewLink(targetLink);
-                    }
+                {/* Embedded Marketer Page Customizer */}
+                <MarketerPageCustomizer
+                  product={product}
+                  initialCustomization={
+                    links.find((l) => l.id === selectedCustomizationLinkId)?.customization ||
+                    getProductDefaultCustomization(product.id)
                   }
-                }}
-                onClose={() => setActiveTab('links_list')}
-              />
-            </div>
-          )}
+                  onSave={(customization) => {
+                    updateShareLinkCustomization(
+                      product.id,
+                      selectedCustomizationLinkId,
+                      customization,
+                      defaultSellingPrice
+                    );
+                    onShowToast('🎉 تم حفظ وتطبيق تخصيصات صفحة الرابط بنجاح!');
+                  }}
+                  onPreview={() => {
+                    const targetLink =
+                      links.find((l) => l.id === selectedCustomizationLinkId) || links[0];
+                    if (targetLink) handlePreviewLink(targetLink);
+                  }}
+                  onClose={() => setActiveTab('links_list')}
+                />
+              </div>
+            )}
+          </main>
         </div>
       </div>
 
-      {/* Confirmation Modal for Deleting Product completely from links */}
+      {/* Confirmation Modal for Deleting Product from Links */}
       {showDeleteProductConfirm && (
-        <div className="fixed inset-0 z-60 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-150 p-5 space-y-4">
+        <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-sm overflow-hidden p-5 space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-black text-sm">
               <AlertTriangle className="w-5 h-5" />
-              <span>حذف المنتج من قائمة الروابط</span>
+              <span>إزالة المنتج من تبويب الروابط</span>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
               هل أنت متأكد من رغبتك في إزالة منتج &quot;{product.nameAr}&quot; وكافة الروابط التسويقية التابعة له؟ لن يظهر هذا المنتج في تبويب الروابط بعد الآن.
@@ -1155,7 +1365,7 @@ export function ShareProductModal({
                 className="flex-1 py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>تأكيد الحذف</span>
+                <span>تأكيد الإزالة</span>
               </button>
               <button
                 type="button"
