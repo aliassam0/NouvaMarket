@@ -31,6 +31,7 @@ import {
   Filter,
   Palette,
   Gift,
+  ArrowRight,
 } from 'lucide-react';
 import { Product, UpsellOffer } from '../../types';
 import { MoneyText } from '../ui/MoneyText';
@@ -78,9 +79,15 @@ export function ShareProductModal({
 
   // Active vertical dashboard tab
   const [activeTab, setActiveTab] = useState<ShareDashboardTab>('links_list');
+  const [mobileShowWorkspace, setMobileShowWorkspace] = useState(false);
   const [selectedCustomizationLinkId, setSelectedCustomizationLinkId] = useState<string>(
     () => links[0]?.id || 'link-default'
   );
+
+  const handleSelectTab = (tab: ShareDashboardTab) => {
+    setActiveTab(tab);
+    setMobileShowWorkspace(true);
+  };
 
   // Filter for links tab: 'all' | 'active' | 'disabled'
   const [linksFilter, setLinksFilter] = useState<'all' | 'active' | 'disabled'>('all');
@@ -453,7 +460,11 @@ export function ShareProductModal({
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           
           {/* ==================== VERTICAL SIDEBAR ==================== */}
-          <aside className="w-full md:w-80 shrink-0 bg-slate-50/80 dark:bg-slate-900/90 border-b md:border-b-0 md:border-e border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between overflow-y-auto space-y-4">
+          <aside
+            className={`${
+              mobileShowWorkspace ? 'hidden md:flex' : 'flex'
+            } w-full md:w-80 shrink-0 bg-slate-50/80 dark:bg-slate-900/90 border-b md:border-b-0 md:border-e border-slate-200 dark:border-slate-800 p-4 flex-col justify-between overflow-y-auto space-y-4`}
+          >
             <div className="space-y-4">
               
               {/* Product Mini-Card */}
@@ -534,7 +545,7 @@ export function ShareProductModal({
 
                 <button
                   type="button"
-                  onClick={() => setActiveTab('links_list')}
+                  onClick={() => handleSelectTab('links_list')}
                   className={`w-full p-3 rounded-2xl font-bold text-xs flex items-center justify-between transition cursor-pointer ${
                     activeTab === 'links_list'
                       ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20'
@@ -558,7 +569,7 @@ export function ShareProductModal({
 
                 <button
                   type="button"
-                  onClick={() => setActiveTab('create_link')}
+                  onClick={() => handleSelectTab('create_link')}
                   className={`w-full p-3 rounded-2xl font-bold text-xs flex items-center justify-between transition cursor-pointer ${
                     activeTab === 'create_link'
                       ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20'
@@ -582,7 +593,7 @@ export function ShareProductModal({
 
                 <button
                   type="button"
-                  onClick={() => setActiveTab('upsells')}
+                  onClick={() => handleSelectTab('upsells')}
                   className={`w-full p-3 rounded-2xl font-bold text-xs flex items-center justify-between transition cursor-pointer ${
                     activeTab === 'upsells'
                       ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20'
@@ -606,7 +617,7 @@ export function ShareProductModal({
 
                 <button
                   type="button"
-                  onClick={() => setActiveTab('customize')}
+                  onClick={() => handleSelectTab('customize')}
                   className={`w-full p-3 rounded-2xl font-bold text-xs flex items-center justify-between transition cursor-pointer ${
                     activeTab === 'customize'
                       ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20'
@@ -661,7 +672,93 @@ export function ShareProductModal({
           </aside>
 
           {/* ==================== MAIN WORKSPACE ==================== */}
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-white dark:bg-slate-900">
+          <main
+            className={`${
+              !mobileShowWorkspace ? 'hidden md:block' : 'block'
+            } flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 bg-white dark:bg-slate-900 w-full`}
+          >
+            {/* Mobile Workspace Navigation Cockpit */}
+            <div className="md:hidden flex flex-col gap-2.5 p-3 bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-2xl mb-4 shrink-0 shadow-2xs">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMobileShowWorkspace(false)}
+                  className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1.5 shadow-2xs border border-slate-200 dark:border-slate-600 active:scale-95 transition cursor-pointer"
+                >
+                  <ArrowRight className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                  <span>« رجوع لقائمة الخيارات</span>
+                </button>
+
+                <div className="flex items-center gap-1.5">
+                  {links[0] && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetLink =
+                          links.find((l) => l.id === selectedCustomizationLinkId) || links[0];
+                        if (targetLink) handlePreviewLink(targetLink);
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-violet-600 text-white font-bold text-xs flex items-center gap-1 shadow-xs active:scale-95 cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-amber-300" />
+                      <span>معاينة الزبون</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Horizontal Tab Switcher Pills on Mobile */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('links_list')}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+                    activeTab === 'links_list'
+                      ? 'bg-violet-600 text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600'
+                  }`}
+                >
+                  <LinkIcon className="w-3.5 h-3.5" />
+                  <span>الروابط ({links.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('create_link')}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+                    activeTab === 'create_link'
+                      ? 'bg-violet-600 text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600'
+                  }`}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>رابط جديد</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('upsells')}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+                    activeTab === 'upsells'
+                      ? 'bg-violet-600 text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600'
+                  }`}
+                >
+                  <Gift className="w-3.5 h-3.5" />
+                  <span>الـ Upsell</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('customize')}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+                    activeTab === 'customize'
+                      ? 'bg-violet-600 text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600'
+                  }`}
+                >
+                  <Palette className="w-3.5 h-3.5" />
+                  <span>تخصيص الصفحة 🎨</span>
+                </button>
+              </div>
+            </div>
             
             {/* -------------------- TAB 1: LINKS LIST -------------------- */}
             {activeTab === 'links_list' && (
@@ -1339,7 +1436,10 @@ export function ShareProductModal({
                       links.find((l) => l.id === selectedCustomizationLinkId) || links[0];
                     if (targetLink) handlePreviewLink(targetLink);
                   }}
-                  onClose={() => setActiveTab('links_list')}
+                  onClose={() => {
+                    setActiveTab('links_list');
+                    setMobileShowWorkspace(false);
+                  }}
                 />
               </div>
             )}
