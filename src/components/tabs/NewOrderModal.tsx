@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Check, ArrowRight, ArrowLeft, Truck, User, ShoppingBag, ShieldCheck, Zap, Share2, Repeat, Code, Hash, Globe, FileText, Sparkles, Layers } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Check, ArrowRight, ArrowLeft, Truck, User, ShoppingBag, ShieldCheck, Zap, Share2, Repeat, Code, Hash, Globe, FileText, Sparkles, Layers, Package } from 'lucide-react';
 import { Product, ProductVariant, Order } from '../../types';
 import { MOCK_PRODUCTS } from '../../data/mockProducts';
 import { ALGERIA_WILAYAS, getWilayaByCode } from '../../data/algeriaLocations';
@@ -38,25 +38,44 @@ export function NewOrderModal({
   // Tab mode in Step 1: 'upsell' (tiered quantity offers) vs 'standard' (manual single qty)
   const [orderTab, setOrderTab] = useState<'upsell' | 'standard'>('upsell');
 
-  // Step 1: Product & Quantity Selection
-  const [selectedProduct, setSelectedProduct] = useState<Product>(initialProduct || MOCK_PRODUCTS[0]);
+  // Step 1: Product & Quantity Selection (strictly prioritize availableProducts when in supplier mode)
+  const initialBaseProduct = useMemo(() => {
+    if (availableProducts && availableProducts.length > 0) {
+      if (initialProduct && availableProducts.some((p) => p.id === initialProduct.id)) {
+        return initialProduct;
+      }
+      return availableProducts[0];
+    }
+    return initialProduct || MOCK_PRODUCTS[0];
+  }, [initialProduct, availableProducts]);
+
+  const [selectedProduct, setSelectedProduct] = useState<Product>(() => initialBaseProduct);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant>(
-    initialProduct?.variants[0] || MOCK_PRODUCTS[0].variants[0]
+    initialBaseProduct?.variants?.[0] || { id: 'v1', size: 'Standard', color: 'Original', colorHex: '#000', stockCount: 0 }
   );
   const [sellingPrice, setSellingPrice] = useState<number>(
-    initialProduct?.suggestedSellingPrice || MOCK_PRODUCTS[0].suggestedSellingPrice
+    initialBaseProduct?.suggestedSellingPrice || (initialBaseProduct?.wholesalePrice ? initialBaseProduct.wholesalePrice + 1000 : 2000)
   );
   const [quantity, setQuantity] = useState<number>(1);
 
   // Quantity Upsell Tiers state (1 piece, 2 pieces, 3 pieces, etc.)
   const [quantityTiers, setQuantityTiers] = useState<QuantityUpsellTier[]>(() =>
     generateDefaultTiers(
-      initialProduct || MOCK_PRODUCTS[0],
-      initialProduct?.suggestedSellingPrice || MOCK_PRODUCTS[0].suggestedSellingPrice,
-      (initialProduct || MOCK_PRODUCTS[0]).variants
+      initialBaseProduct,
+      initialBaseProduct?.suggestedSellingPrice || (initialBaseProduct?.wholesalePrice ? initialBaseProduct.wholesalePrice + 1000 : 2000),
+      initialBaseProduct?.variants || []
     )
   );
   const [selectedTierId, setSelectedTierId] = useState<string>('tier-2');
+
+  useEffect(() => {
+    if (initialBaseProduct && initialBaseProduct.id !== selectedProduct?.id) {
+      setSelectedProduct(initialBaseProduct);
+      setSelectedVariant(initialBaseProduct.variants?.[0] || { id: 'v1', size: 'Standard', color: 'Original', colorHex: '#000', stockCount: 0 });
+      setSellingPrice(initialBaseProduct.suggestedSellingPrice || (initialBaseProduct.wholesalePrice ? initialBaseProduct.wholesalePrice + 1000 : 2000));
+      setRefArticle(`REF-${initialBaseProduct.id.toUpperCase()}`);
+    }
+  }, [initialBaseProduct]);
 
   // Sync tiers when product changes
   useEffect(() => {
@@ -108,24 +127,34 @@ export function NewOrderModal({
   const activeWilaya = getWilayaByCode(selectedWilayaCode);
   const shippingFee = deliveryType === 'home' ? activeWilaya.homeFee : activeWilaya.officeFee;
 
-  // Calculations based on active tab
-  const itemProfitSingle = calculateProfit(selectedProduct.wholesalePrice, sellingPrice);
+  // Calculations based on active tab & mode
+  const feeSettings = getStoredMarketplaceFees();
+  const supplierFeeRate = feeSettings.supplierFeePercent || 5;
+  const baseWholesale = selectedProduct.supplierNetPrice || selectedProduct.wholesalePrice || 1000;
+  const platformFeePerUnit = selectedProduct.nouvaFeeAmount ?? Math.round((baseWholesale * supplierFeeRate) / 100);
+
+  // If isSupplierMode: The seller sells their own product directly!
+  // Seller gets full selling price minus platform fee (e.g. 2000 - 50 = 1950 DZD)
+  // If regular reseller: profit is (sellingPrice - catalogWholesale)
+  const itemProfitSingle = isSupplierMode
+    ? Math.max(0, sellingPrice - platformFeePerUnit)
+    : calculateProfit(selectedProduct.wholesalePrice, sellingPrice);
 
   const effectiveItemsTotal =
     orderTab === 'upsell' && activeTier
       ? activeTier.totalPrice
       : sellingPrice * quantity;
 
-  const effectiveItemsProfit =
-    orderTab === 'upsell' && activeTier
-      ? activeTier.netProfit
-      : itemProfitSingle * quantity;
+  const effectiveItemsProfit = isSupplierMode
+    ? Math.max(0, effectiveItemsTotal - (platformFeePerUnit * quantity))
+    : (orderTab === 'upsell' && activeTier
+        ? activeTier.netProfit
+        : itemProfitSingle * quantity);
 
   const grossProfit = effectiveItemsProfit + upsellsTotalProfit;
-  const feeSettings = getStoredMarketplaceFees();
-  const resellerFeeRate = feeSettings.resellerFeePercent || 0;
-  const platformResellerCut = Math.round((grossProfit * resellerFeeRate) / 100);
-  const totalProfit = Math.max(0, grossProfit - platformResellerCut);
+  const resellerFeeRate = isSupplierMode ? 0 : (feeSettings.resellerFeePercent || 0);
+  const platformResellerCut = isSupplierMode ? (platformFeePerUnit * quantity) : Math.round((grossProfit * resellerFeeRate) / 100);
+  const totalProfit = isSupplierMode ? effectiveItemsProfit : Math.max(0, grossProfit - platformResellerCut);
   const totalAmount = effectiveItemsTotal + upsellsTotalPrice;
 
   const toggleUpsell = (upsellId: string) => {
@@ -174,11 +203,13 @@ export function NewOrderModal({
         quantity: activeTier.quantity,
         supplierId: selectedProduct.supplierId || supplierId || '',
         supplierName: selectedProduct.supplierName || supplierName || '',
-        supplierEmail: selectedProduct.supplierEmail || '',
-        supplierNetPrice: selectedProduct.supplierNetPrice,
+        supplierNetPrice: selectedProduct.supplierNetPrice || selectedProduct.wholesalePrice,
+        nouvaFeeAmount: platformFeePerUnit,
         wholesalePrice: selectedProduct.wholesalePrice,
         sellingPrice: Math.round(activeTier.totalPrice / activeTier.quantity),
-        profit: Math.round(activeTier.netProfit / activeTier.quantity),
+        profit: isSupplierMode
+          ? Math.max(0, Math.round(activeTier.totalPrice / activeTier.quantity) - platformFeePerUnit)
+          : Math.round(activeTier.netProfit / activeTier.quantity),
         isUpsell: activeTier.quantity > 1,
         upsellOfferId: activeTier.id,
       };
@@ -193,7 +224,8 @@ export function NewOrderModal({
         supplierId: selectedProduct.supplierId || supplierId || '',
         supplierName: selectedProduct.supplierName || supplierName || '',
         supplierEmail: selectedProduct.supplierEmail || '',
-        supplierNetPrice: selectedProduct.supplierNetPrice,
+        supplierNetPrice: selectedProduct.supplierNetPrice || selectedProduct.wholesalePrice,
+        nouvaFeeAmount: platformFeePerUnit,
         wholesalePrice: selectedProduct.wholesalePrice,
         sellingPrice,
         profit: itemProfitSingle,
@@ -246,6 +278,8 @@ export function NewOrderModal({
       totalAmount,
       shippingFee,
       totalProfit,
+      isDirectSupplierSale: isSupplierMode,
+      supplierProfit: isSupplierMode ? totalProfit : undefined,
       grossProfit,
       platformResellerFee: platformResellerCut,
       resellerFeePercent: resellerFeeRate,
@@ -305,9 +339,9 @@ export function NewOrderModal({
                 <div className="p-3 rounded-2xl bg-gradient-to-r from-violet-600/10 via-purple-600/10 to-indigo-600/10 border border-purple-500/30 flex items-center gap-2.5 text-xs text-purple-900 dark:text-purple-200">
                   <ShieldCheck className="w-5 h-5 text-purple-600 shrink-0" />
                   <div>
-                    <span className="font-extrabold block">مبيعات مباشرة للمورد:</span>
+                    <span className="font-extrabold block">مبيعات مباشرة للبائع:</span>
                     <span className="text-[11px] text-slate-600 dark:text-slate-300">
-                      التغليف وقيد المراجعة والتأكيد مع الزبون والتوصيل مع الشركات كلها <strong>على حساب الإدارة</strong> تماماً مثل البائع!
+                      التغليف وقيد المراجعة والتأكيد مع الزبون والتوصيل مع الشركات كلها <strong>على حساب الإدارة</strong> تماماً مثل المسوق!
                     </span>
                   </div>
                 </div>
@@ -315,22 +349,28 @@ export function NewOrderModal({
 
               {/* Product Switcher if multiple products available */}
               {availableProducts && availableProducts.length > 1 && (
-                <div>
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    اختر المنتج المطلوب بيعه:
-                  </label>
+                <div className="p-3 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-purple-950 dark:text-purple-200">
+                    <span className="flex items-center gap-1.5">
+                      <Package className="w-4 h-4 text-purple-600" />
+                      <span>{isSupplierMode ? 'اختر المنتج من بين منتجاتك بالمخزن:' : 'اختر المنتج المطلوب بيعه:'}</span>
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-200 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
+                      {availableProducts.length} {isSupplierMode ? 'منتجات خاصة بك' : 'منتج متاح'}
+                    </span>
+                  </div>
                   <select
                     value={selectedProduct.id}
                     onChange={(e) => {
                       const prod = availableProducts.find((p) => p.id === e.target.value);
                       if (prod) {
                         setSelectedProduct(prod);
-                        setSelectedVariant(prod.variants[0] || { id: 'v1', size: 'Standard', color: 'Original', colorHex: '#000', stockCount: 0 });
-                        setSellingPrice(prod.suggestedSellingPrice || prod.wholesalePrice + 1000);
+                        setSelectedVariant(prod.variants?.[0] || { id: 'v1', size: 'Standard', color: 'Original', colorHex: '#000', stockCount: 0 });
+                        setSellingPrice(prod.suggestedSellingPrice || (prod.wholesalePrice ? prod.wholesalePrice + 1000 : 2000));
                         setRefArticle(`REF-${prod.id.toUpperCase()}`);
                       }
                     }}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-purple-300 dark:border-purple-700 text-xs font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer shadow-2xs"
                   >
                     {availableProducts.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -575,15 +615,21 @@ export function NewOrderModal({
                   </div>
                   <div className="p-2.5 rounded-xl bg-purple-500/10 dark:bg-purple-950/60 border border-purple-500/30">
                     <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300 block mb-0.5">
-                      ربحك الصافي:
+                      {isSupplierMode ? 'صافي مستحقاتك وأرباحك كبائع:' : 'ربحك الصافي (كمسوق):'}
                     </span>
                     <span className="text-sm font-black text-purple-600 dark:text-purple-400">
                       +<MoneyText amount={totalProfit} />
                     </span>
-                    {platformResellerCut > 0 && (
-                      <span className="text-[9px] text-purple-500 dark:text-purple-400 block mt-0.5 font-bold">
-                        (صافي بعد اقتطاع عمولة المنصة {resellerFeeRate}%: -{platformResellerCut} دج)
+                    {isSupplierMode ? (
+                      <span className="text-[9px] text-purple-600 dark:text-purple-400 block mt-0.5 font-bold">
+                        (كامل سعر البيع {effectiveItemsTotal.toLocaleString()} دج - عمولة المنصة {platformResellerCut.toLocaleString()} دج = {totalProfit.toLocaleString()} دج يدخل حسابك فور التسليم)
                       </span>
+                    ) : (
+                      platformResellerCut > 0 && (
+                        <span className="text-[9px] text-purple-500 dark:text-purple-400 block mt-0.5 font-bold">
+                          (صافي بعد اقتطاع عمولة المنصة {resellerFeeRate}%: -{platformResellerCut} دج)
+                        </span>
+                      )
                     )}
                   </div>
                 </div>
@@ -680,8 +726,8 @@ export function NewOrderModal({
                     onChange={(e) => setCommune(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
                   >
-                    {activeWilaya.communes.map((c) => (
-                      <option key={c} value={c}>
+                    {activeWilaya.communes.map((c, cIdx) => (
+                      <option key={`${c}-${cIdx}`} value={c}>
                         {c}
                       </option>
                     ))}
@@ -772,7 +818,7 @@ export function NewOrderModal({
               {/* NoteFournisseur */}
               <div>
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                  ملاحظة المورد (NoteFournisseur)
+                  ملاحظة البائع (NoteFournisseur)
                 </label>
                 <input
                   type="text"
@@ -795,11 +841,16 @@ export function NewOrderModal({
                 </div>
                 <div className="p-2.5 rounded-xl bg-purple-500/10 dark:bg-purple-950/60 border border-purple-500/30">
                   <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300 block mb-0.5">
-                    ربحك الصافي:
+                    {isSupplierMode ? 'صافي مستحقاتك كبائع:' : 'ربحك الصافي:'}
                   </span>
                   <span className="text-sm font-black text-purple-600 dark:text-purple-400">
                     +<MoneyText amount={totalProfit} />
                   </span>
+                  {isSupplierMode && (
+                    <span className="text-[9px] text-purple-600 dark:text-purple-400 block mt-0.5 font-bold">
+                      (كامل سعر البيع ناقص عمولة المنصة)
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

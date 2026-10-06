@@ -28,9 +28,11 @@ import {
   Users,
   Lock,
   ShieldCheck,
+  Info,
 } from 'lucide-react';
 import { Product, ProductVariant, AgeGroup, Gender, UpsellOffer } from '../../types';
 import { useCategories } from '../../context/CategoryContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   generateProductNameSmart,
   generateProductDescriptionSmart,
@@ -62,6 +64,7 @@ export function ProductEditModal({
   isPlatformWarehouse,
   currentSupplier,
 }: ProductEditModalProps) {
+  const { user } = useAuth();
   const { categories: ctxCategories } = useCategories();
   const categories = categoriesProp || ctxCategories;
 
@@ -78,10 +81,19 @@ export function ProductEditModal({
   const initialNet = editingProduct.supplierNetPrice ||
     (editingProduct.wholesalePrice ? Math.round(editingProduct.wholesalePrice / (1 + activeFeePercent / 100)) : 3000);
 
-  const isSpecificSupplier = !isPlatformWarehouse && userRole !== 'admin';
-  const fixedSupplierName = currentSupplier?.name || editingProduct.supplierName || 'حساب المورد المعتمد';
-  const fixedSupplierId = currentSupplier?.id || editingProduct.supplierId || 'sup-custom';
-  const fixedSupplierWilaya = currentSupplier?.wilaya;
+  // Strict check: Only Admin (when in Admin mode and without a specific supplier pinned) can choose from the suppliers list.
+  // Any supplier adding or editing a product CANNOT see other suppliers and has their name locked.
+  const isActualAdmin =
+    (userRole === 'admin' || user?.role === 'admin') &&
+    !currentSupplier &&
+    !isPlatformWarehouse &&
+    userRole !== 'warehouse' &&
+    user?.role !== 'warehouse';
+
+  const isSpecificSupplier = !isActualAdmin;
+  const fixedSupplierName = currentSupplier?.name || editingProduct.supplierName || user?.storeName || user?.fullName || 'حساب البائع المعتمد';
+  const fixedSupplierId = currentSupplier?.id || editingProduct.supplierId || user?.id || 'sup-custom';
+  const fixedSupplierWilaya = currentSupplier?.wilaya || user?.wilaya;
 
   const suppliersList = getStoredSuppliers();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>(() => {
@@ -449,8 +461,12 @@ export function ProductEditModal({
     const finalWholesalePrice = calculatedWholesalePrice || Math.max(0, Number(productData.wholesalePrice) || 0);
 
     const matchedSup = suppliersList.find((s) => s.id === selectedSupplierId) || suppliersList[0];
-    const finalSupplierId = matchedSup ? matchedSup.id : (productData.supplierId || 'sup-01');
-    const finalSupplierName = matchedSup ? (matchedSup.companyName || matchedSup.fullName) : (productData.supplierName || 'مورد الجزائر');
+    const finalSupplierId = isSpecificSupplier
+      ? fixedSupplierId
+      : (matchedSup ? matchedSup.id : (productData.supplierId || 'sup-01'));
+    const finalSupplierName = isSpecificSupplier
+      ? fixedSupplierName
+      : (matchedSup ? (matchedSup.companyName || matchedSup.fullName) : (productData.supplierName || 'مورد الجزائر'));
 
     // Clean and sanitize upsells
     const sanitizedUpsells: UpsellOffer[] = (productData.upsells || [])
@@ -499,8 +515,8 @@ export function ProductEditModal({
       upsells: sanitizedUpsells,
       approvalStatus: userRole === 'admin'
         ? (productData.approvalStatus || 'APPROVED')
-        : (isAddingNewProduct ? 'PENDING' : (productData.approvalStatus || 'PENDING')),
-      allowAffiliate,
+        : (productData.approvalStatus === 'REJECTED' ? 'REJECTED' : 'APPROVED'),
+      allowAffiliate: Boolean(allowAffiliate),
       isSupplierExclusive: !allowAffiliate,
     };
 
@@ -838,17 +854,17 @@ export function ProductEditModal({
               <label className="text-[10px] text-purple-400 font-extrabold flex items-center justify-between mb-1">
                 <span className="flex items-center gap-1">
                   <Building className="w-3.5 h-3.5 text-purple-400" />
-                  <span>المورد (Supplier):</span>
+                  <span>البائع (صاحب السلعة):</span>
                 </span>
                 <span className="text-[8px] text-purple-300 font-normal">
-                  {isSpecificSupplier ? '🔒 مثبت باسم حسابك' : 'مطلوب'}
+                  {isSpecificSupplier ? '🔒 مثبت باسم حسابك حصرياً' : 'اختر البائع المسؤول'}
                 </span>
               </label>
 
               {isSpecificSupplier ? (
-                <div className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-purple-500/50 flex items-center justify-between gap-2 shadow-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-base shrink-0">🏭</span>
+                <div className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-purple-500/60 flex items-center justify-between gap-2 shadow-xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-lg shrink-0">🏭</span>
                     <div className="min-w-0">
                       <span className="font-black text-xs text-white truncate block">
                         {fixedSupplierName}
@@ -860,9 +876,9 @@ export function ProductEditModal({
                       )}
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-black border border-purple-500/40 flex items-center gap-1 shrink-0">
+                  <span className="px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-black border border-purple-500/40 flex items-center gap-1 shrink-0">
                     <Lock className="w-3 h-3 text-purple-400" />
-                    <span>مورد معتمد</span>
+                    <span>حسابك المعتمد</span>
                   </span>
                 </div>
               ) : (
@@ -1237,7 +1253,7 @@ export function ProductEditModal({
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-black text-purple-300 flex items-center gap-1.5">
                       <Users className="w-3.5 h-3.5 text-purple-400" />
-                      <span>1. إتاحة لجميع البائعين في الأفلييت</span>
+                      <span>1. إتاحة لجميع المسوقين في الأفلييت</span>
                     </span>
                     {allowAffiliate && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
                   </div>
@@ -1266,17 +1282,17 @@ export function ProductEditModal({
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
                       <Lock className="w-3.5 h-3.5 text-amber-400" />
-                      <span>2. بيعه وحدي فقط (منتج حصري للمورد)</span>
+                      <span>2. بيعه وحدي فقط (منتج حصري للبائع)</span>
                     </span>
                     {!allowAffiliate && <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />}
                   </div>
                   <p className="text-[10px] text-slate-300 leading-relaxed">
-                    لا يظهر المنتج للمسوقين في الأفلييت نهائياً. تبيعه وحدك حصرياً عبر روابطك وطلبياتك المباشرة لزبائنك.
+                    لا يظهر المنتج للمسوقين في الكتالوج. تبيعه وحدك حصرياً عبر روابطك وطلبياتك المباشرة لزبائنك.
                   </p>
                 </div>
                 <div className="pt-2 mt-2 border-t border-amber-900/40 flex items-center justify-between">
                   <span className="text-[9px] font-black text-amber-400">
-                    🔒 مخفي عن البائعين (حصري لك)
+                    🔒 مخفي عن المسوقين (حصري لك)
                   </span>
                   <span className="text-[9px] text-slate-400">حصرية تامة</span>
                 </div>
@@ -1287,7 +1303,7 @@ export function ProductEditModal({
             <div className="p-2.5 rounded-xl bg-violet-950/40 border border-violet-800/40 flex items-center gap-2.5 text-[10px] text-violet-200">
               <ShieldCheck className="w-4 h-4 text-violet-400 shrink-0" />
               <span>
-                💡 <strong>ضمان المنصة والإدارة:</strong> التغليف، وقيد المراجعة (التأكيد الهاتفي مع الزبون)، والشحن والتوصيل مع الشركات كلها <strong>على حساب وعاتق الإدارة</strong> تماماً مثل البائع في كلا الخيارين!
+                💡 <strong>ضمان المنصة والإدارة:</strong> التأكيد الهاتفي مع الزبون، والشحن والتوصيل مع الشركات كلها <strong>على حساب وعاتق الإدارة</strong> تماماً مثل المسوق في كلا الخيارين!
               </span>
             </div>
           </div>
@@ -1311,7 +1327,7 @@ export function ProductEditModal({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
                   <label className="text-[10px] text-amber-300 font-black block mb-1">
-                    سعر المنتج للمورد (صافي):
+                    سعر المنتج للبائع (صافي المستحقات):
                   </label>
                   <div className="relative">
                     <input
@@ -1323,7 +1339,7 @@ export function ProductEditModal({
                     />
                     <span className="absolute end-2 top-1.5 text-[10px] text-slate-500 font-bold">دج</span>
                   </div>
-                  <span className="text-[8px] text-slate-400 block mt-0.5">الصافي للمورد عند التوصيل</span>
+                  <span className="text-[8px] text-slate-400 block mt-0.5">الصافي للبائع عند التوصيل</span>
                 </div>
 
                 <div>
@@ -1334,12 +1350,14 @@ export function ProductEditModal({
                     <span>+{nouvaFeeAmount}</span>
                     <span className="text-[10px] text-slate-500 font-bold">دج</span>
                   </div>
-                  <span className="text-[8px] text-slate-400 block mt-0.5">Marketplace Fee للمنصة</span>
+                  <span className="text-[8.5px] text-purple-300 font-bold block mt-1 leading-snug">
+                    شاملة: التسويق + تأكيد الطلبية + توصيلها وتتكفل بالإرجاع
+                  </span>
                 </div>
 
                 <div>
                   <label className="text-[10px] text-purple-300 font-black block mb-1">
-                    سعر البيع للبائع (Wholesale):
+                    سعر البيع للمسوق (Wholesale):
                   </label>
                   <div className="px-2.5 py-1.5 rounded-lg bg-purple-950/80 border border-purple-500/60 text-purple-300 font-mono font-black text-xs flex justify-between items-center">
                     <span>{calculatedWholesalePrice}</span>
@@ -1347,6 +1365,29 @@ export function ProductEditModal({
                   </div>
                   <span className="text-[8px] text-purple-400/80 block mt-0.5">السعر الذي يظهر للمسوقين</span>
                 </div>
+              </div>
+
+              {/* Comprehensive Breakdown Banner: Proves commission is not pure profit */}
+              <div className="mt-2.5 p-3 rounded-xl bg-gradient-to-r from-purple-950/60 via-slate-900 to-indigo-950/60 border border-purple-800/40 text-[10.5px] text-purple-200 space-y-1.5">
+                <div className="flex items-center gap-1.5 font-black text-purple-300">
+                  <Info className="w-4 h-4 text-purple-400 shrink-0" />
+                  <span>توضيح هام للبائع حول عمولة المنصة ({activeFeePercent}%):</span>
+                </div>
+                <p className="text-slate-300 leading-relaxed text-[10px]">
+                  نسبة الـ <strong className="text-white font-black">{activeFeePercent}%</strong> ليست ربحاً صافياً للمنصة، بل هي <strong className="text-purple-300 font-extrabold">شاملة بالكامل للخدمات التشغيلية واللوجستية</strong> التالية:
+                </p>
+                <div className="p-2 rounded-lg bg-slate-950/90 border border-purple-900/60 text-[9.5px] text-amber-300 font-black flex items-center gap-2 flex-wrap">
+                  <span className="flex items-center gap-1">📢 التسويق وجلب المبيعات</span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">📞 تأكيد الطلبية هاتفياً بالكول سنتر</span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">🚚 الشحن والتوصيل للزبون</span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1 text-emerald-400">🔄 التكفل التام بمصاريف الإرجاع</span>
+                </div>
+                <span className="text-[9.5px] text-emerald-400 font-bold block pt-0.5">
+                  ✔ سعرك الصافي المذكور أعلاه ({supplierNetPrice} دج) مضمون لك 100% ويصل لحسابك بالكامل عن كل قطعة مسلّمة دون أي اقتطاعات أو خسائر عند الارتجاع!
+                </span>
               </div>
             </div>
 

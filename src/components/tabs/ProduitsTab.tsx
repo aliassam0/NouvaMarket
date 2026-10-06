@@ -61,13 +61,13 @@ export function ProduitsTab({
   ];
 
   const filteredProducts = products.filter((p) => {
-    // Hide supplier-exclusive products that supplier chose to sell alone
+    // 1. Hide supplier-exclusive products that supplier chose to sell alone (Option 2: بيعه وحدي فقط)
     if (p.allowAffiliate === false || p.isSupplierExclusive === true) {
       return false;
     }
 
-    // Hide unapproved products from resellers
-    if (p.approvalStatus && p.approvalStatus !== 'APPROVED') {
+    // 2. Hide rejected or suspended products from affiliate catalog
+    if (p.approvalStatus === 'REJECTED') {
       return false;
     }
 
@@ -113,7 +113,7 @@ export function ProduitsTab({
               className="px-2.5 py-1.5 rounded-xl bg-violet-50 hover:bg-violet-100 dark:bg-violet-950/80 text-violet-700 dark:text-violet-300 font-extrabold text-[11px] border border-violet-200 dark:border-violet-800 flex items-center gap-1.5 transition shadow-xs"
             >
               <Store className="w-3.5 h-3.5" />
-              <span>متاجري (Shopify / YouCan)</span>
+              <span>المتاجر</span>
             </button>
           )}
           <span className="text-xs text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
@@ -122,7 +122,7 @@ export function ProduitsTab({
         </div>
       </div>
 
-      {/* 1-Click Sync & Store Integration Prompt Banner */}
+      {/* Store Integration Prompt Banner */}
       {onOpenStoreManager && (
         <div className="p-3.5 rounded-2xl bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 text-white shadow-md flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -131,10 +131,10 @@ export function ProduitsTab({
             </div>
             <div className="min-w-0">
               <h4 className="text-xs font-black truncate">
-                تصدير إلى متجري بنقرة واحدة (1-Click Sync) 🚀
+                الربط مع المتاجر
               </h4>
               <p className="text-[11px] text-purple-100 truncate">
-                اربط شوبيفاي أو يوكان أو ووكومرس، وانقل المنتجات والمخزون الحي واسحب الطلبيات أوتوماتيكياً!
+                مزامنة فورية للمنتجات والمخزون وسحب تلقائي للطلبات من متجرك.
               </p>
             </div>
           </div>
@@ -142,7 +142,7 @@ export function ProduitsTab({
             onClick={onOpenStoreManager}
             className="px-3 py-1.5 rounded-xl bg-white text-violet-700 hover:bg-purple-50 active:scale-95 font-black text-[11px] shrink-0 shadow-sm transition"
           >
-            إدارة المتاجر
+            ربط متجر
           </button>
         </div>
       )}
@@ -161,9 +161,9 @@ export function ProduitsTab({
 
       {/* Category Filter Chips Horizontal Scroll */}
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {categoryChips.map((chip) => (
+        {categoryChips.map((chip, chipIdx) => (
           <button
-            key={chip.id}
+            key={`${chip.id}-${chipIdx}`}
             onClick={() => setSelectedCategory(chip.id)}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${
               selectedCategory === chip.id
@@ -265,7 +265,7 @@ export function ProduitsTab({
                     onClick={() => onOpenSyncToStore(product)}
                     className="w-full py-1.5 px-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 active:scale-98 text-white font-black text-[10px] flex items-center justify-center gap-1 shadow-xs transition"
                   >
-                    <span>🚀 تصدير لمتجري (1-Click Sync)</span>
+                    <span>تصدير لمتجري</span>
                   </button>
                 )}
 

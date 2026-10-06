@@ -33,6 +33,36 @@ export const INITIAL_SYSTEM_USERS: SystemUser[] = [
     status: 'ACTIVE',
     createdAt: '2025-06-15',
   },
+  {
+    id: 'usr-4',
+    fullName: 'سارة مراد (الدعم الفني للمسوقين)',
+    email: 'support@nouvamarket.com',
+    password: 'Aliass@m1989',
+    role: 'RESELLER_SUPPORT',
+    permissions: ['RESELLER_SUPPORT', 'ORDERS_MANAGE', 'STORE_SYNC_ASSIST'],
+    status: 'ACTIVE',
+    createdAt: '2025-06-20',
+  },
+  {
+    id: 'usr-5',
+    fullName: 'كريم بن عمار (الدعم الفني واللوجستي)',
+    email: 'karim.support@nouvamarket.com',
+    password: 'Aliass@m1989',
+    role: 'RESELLER_SUPPORT',
+    permissions: ['RESELLER_SUPPORT', 'ORDERS_MANAGE', 'STORE_SYNC_ASSIST'],
+    status: 'ACTIVE',
+    createdAt: '2025-07-01',
+  },
+  {
+    id: 'usr-6',
+    fullName: 'ياسمين بلحاج (دعم البائعين والمتاجر)',
+    email: 'yasmine.support@nouvamarket.com',
+    password: 'Aliass@m1989',
+    role: 'RESELLER_SUPPORT',
+    permissions: ['RESELLER_SUPPORT', 'ORDERS_MANAGE', 'STORE_SYNC_ASSIST'],
+    status: 'ACTIVE',
+    createdAt: '2025-07-10',
+  },
 ];
 
 let cachedSystemUsers: SystemUser[] | null = null;
@@ -220,12 +250,13 @@ export function verifySystemUserCredentials(email: string, pass: string): System
 /**
  * Map SystemUserRole to platform user role
  */
-export function mapSystemUserToAppRole(role: SystemUserRole): 'admin' | 'warehouse' | 'reseller' | 'confirmer' {
+export function mapSystemUserToAppRole(role: SystemUserRole): 'admin' | 'warehouse' | 'reseller' | 'confirmer' | 'support' {
   switch (role) {
     case 'ADMIN':
     case 'FINANCE_MANAGER':
-    case 'RESELLER_SUPPORT':
       return 'admin';
+    case 'RESELLER_SUPPORT':
+      return 'support';
     case 'WAREHOUSE':
       return 'warehouse';
     case 'ORDER_CONFIRMER':

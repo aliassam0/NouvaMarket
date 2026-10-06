@@ -5,6 +5,7 @@ import {
   PhoneForwarded,
   PhoneOff,
   MessageCircle,
+  MessageSquare,
   CheckCircle2,
   Clock,
   Truck,
@@ -196,6 +197,7 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
     // Pending confirmation orders accessible to this agent (their own orders + unassigned orders)
     const accessiblePendingOrders = orders.filter((o) => {
       if (
+        o.status === 'LINK_ORDER' ||
         o.adminConfirmed ||
         o.confirmedBy ||
         o.confirmedByRole === 'SUPPLIER' ||
@@ -338,6 +340,7 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
       if (activeTab === 'pending') {
         // Must be unconfirmed
         if (
+          o.status === 'LINK_ORDER' ||
           o.adminConfirmed ||
           o.confirmedBy ||
           o.confirmedByRole === 'SUPPLIER' ||
@@ -924,7 +927,7 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
               {stats.globalPendingCount}
             </span>
             <span className="text-[10px] text-amber-700 dark:text-amber-300 font-medium">
-              كل الموردين
+              كل البائعين
             </span>
           </div>
         </div>
@@ -1083,6 +1086,23 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
           <BarChart3 className="w-4 h-4" />
           <span>إحصائيات أدائي التفصيلية ⭐</span>
         </button>
+
+        {/* Quick Team Coordination Button */}
+        <button
+          type="button"
+          onClick={() => {
+            window.dispatchEvent(
+              new CustomEvent('open_internal_team_chat', {
+                detail: { channelId: 'channel_urgent_orders' },
+              })
+            );
+          }}
+          className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 text-purple-900 dark:text-purple-200 border border-purple-200 dark:border-purple-800 transition-all whitespace-nowrap cursor-pointer font-black ms-auto shrink-0 shadow-xs"
+          title="فتح قنوات المحادثة والتنسيق الداخلي مع عمال المستودع والإدارة"
+        >
+          <MessageSquare className="w-4 h-4 text-purple-600" />
+          <span>تنسيق المستودع والفريق (#Team)</span>
+        </button>
       </div>
 
       {/* 4. SEARCH & FILTERS ROW (For order lists) */}
@@ -1138,7 +1158,7 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
                 onChange={(e) => setSelectedSupplier(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 outline-none"
               >
-                <option value="all">🏭 جميع الموردين والمصانع</option>
+                <option value="all">🏭 جميع البائعين والمصانع</option>
                 {suppliersList.map((s, idx) => (
                   <option key={idx} value={s}>
                     {s}
@@ -1220,7 +1240,7 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
               <p className="text-xs max-w-sm mx-auto">
                 {activeTab === 'pending'
                   ? 'رائع! لا توجد طلبيات قيد الانتظار حالياً، كل الطلبيات تم الاتصال بها وتأكيدها.'
-                  : 'جرّب تغيير فلاتر البحث أو الولاية أو المورد.'}
+                  : 'جرّب تغيير فلاتر البحث أو الولاية أو البائع.'}
               </p>
             </div>
           ) : (
@@ -1261,6 +1281,25 @@ export function ConfirmerDashboard({ onShowToast }: ConfirmerDashboardProps) {
                         >
                           <Clock className="w-3 h-3 text-violet-600 dark:text-violet-400" />
                           <span>المسار اللحظي ⚡</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.dispatchEvent(
+                              new CustomEvent('open_internal_team_chat', {
+                                detail: {
+                                  channelId: 'channel_urgent_orders',
+                                  orderId: order.id,
+                                },
+                              })
+                            );
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[10px] font-black flex items-center gap-1 transition cursor-pointer"
+                          title="تنسيق عاجل مع المستودع بخصوص مقاس، عنوان، أو إيقاف شحن هذه الطلبية"
+                        >
+                          <Zap className="w-3 h-3 text-rose-600 dark:text-rose-400" />
+                          <span>تنسيق عاجل مع المستودع ⚡</span>
                         </button>
 
                         {/* Confirmer Lock / Exclusivity Badge */}

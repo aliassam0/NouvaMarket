@@ -10,7 +10,7 @@ export interface UserProfile {
   phone: string;
   email?: string;
   password?: string;
-  role?: 'reseller' | 'admin' | 'warehouse' | 'confirmer' | 'platform_warehouse';
+  role?: 'reseller' | 'admin' | 'warehouse' | 'confirmer' | 'platform_warehouse' | 'support';
   wilaya: string;
   rank: UserRank;
   rankAr: string;
@@ -26,6 +26,8 @@ export interface UserProfile {
   metaPixelId?: string;
   tiktokPixelId?: string;
   snapchatPixelId?: string;
+  assignedSupportAgentId?: string;
+  assignedSupportAgentName?: string;
 }
 
 export type SupplierStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
@@ -55,6 +57,9 @@ export interface SupplierProfile {
   paidAmountDzd?: number;
   remainingBalanceDzd?: number;
   lastPaymentDate?: string;
+  metaPixelId?: string;
+  tiktokPixelId?: string;
+  snapchatPixelId?: string;
 }
 
 export interface SupplierSettlement {
@@ -175,6 +180,7 @@ export interface Product {
   supplierEmail?: string;
   supplierNetPrice?: number; // Net price requested by supplier
   nouvaFeePercent?: number;  // Marketplace fee percentage from supplier (default 5%)
+  nouvaFeeAmount?: number;   // Calculated fixed fee amount in DZD
   resellerFeePercent?: number; // Optional platform fee percentage from reseller for this product
   wholesalePrice: number;    // Price charged to reseller in DZD (supplierNetPrice + Nouva fee)
   suggestedSellingPrice: number; // Recommended retail price
@@ -242,7 +248,9 @@ export interface Order {
   items: OrderItem[];
   totalAmount: number;
   shippingFee: number;
-  totalProfit: number; // صافي الربح المستحق للمسوق
+  totalProfit: number; // صافي الربح المستحق للمسوق (أو صافي مستحقات البائع في البيع المباشر)
+  isDirectSupplierSale?: boolean; // هل الطلبية مبيعات مباشرة للبائع نفسه (كامل سعر البيع ناقص عمولة المنصة)
+  supplierProfit?: number; // صافي مستحقات وأرباح البائع في البيع المباشر (سعر البيع - عمولة المنصة)
   grossProfit?: number; // إجمالي ربح المسوق قبل اقتطاع عمولة المنصة
   platformResellerFee?: number; // مبلغ عمولة المنصة المقتطع من أرباح المسوق
   resellerFeePercent?: number; // نسبة عمولة المنصة المقتطعة من المسوق المطبقة
@@ -385,6 +393,7 @@ export interface SystemUser {
   id: string;
   fullName: string;
   email: string;
+  phone?: string;
   password?: string;
   role: SystemUserRole;
   permissions: string[];

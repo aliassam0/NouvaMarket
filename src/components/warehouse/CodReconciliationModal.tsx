@@ -134,7 +134,7 @@ export const CodReconciliationModal: React.FC<CodReconciliationModalProps> = ({
     setPastBatches(getStoredCodRemittances());
     setSelectedOrderIds([]);
     onShowToast(
-      `🎉 تمت التسوية والمطابقة بنجاح! تم توزيع أرباح المسوقين ومستحقات الموردين لـ ${targetOrders.length} طلبية.`,
+      `🎉 تمت التسوية والمطابقة بنجاح! تم توزيع أرباح المسوقين ومستحقات البائعين لـ ${targetOrders.length} طلبية.`,
       'success'
     );
   };
@@ -159,7 +159,7 @@ export const CodReconciliationModal: React.FC<CodReconciliationModalProps> = ({
                 </span>
               </div>
               <p className="text-slate-500 text-xs">
-                مطابقة حوالات استرجاع أموال الدفع عند الاستلام من شركات التوصيل وتوزيع أرباح المسوقين ومستحقات الموردين آلياً.
+                مطابقة حوالات استرجاع أموال الدفع عند الاستلام من شركات التوصيل وتوزيع أرباح المسوقين ومستحقات البائعين آلياً.
               </p>
             </div>
           </div>
@@ -311,7 +311,7 @@ export const CodReconciliationModal: React.FC<CodReconciliationModalProps> = ({
               </div>
 
               <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 shadow-xs space-y-1">
-                <span className="text-[10px] text-amber-700 dark:text-amber-300 font-bold block">مستحقات سلع الموردين</span>
+                <span className="text-[10px] text-amber-700 dark:text-amber-300 font-bold block">مستحقات سلع البائعين</span>
                 <span className="text-base font-black text-amber-600 dark:text-amber-400 font-mono block">
                   <MoneyText amount={totalSupplierWholesale} />
                 </span>
@@ -359,7 +359,7 @@ export const CodReconciliationModal: React.FC<CodReconciliationModalProps> = ({
                       <th className="p-2.5 text-start">المسوق</th>
                       <th className="p-2.5 text-end">كاش الـ COD</th>
                       <th className="p-2.5 text-end">أرباح المسوق</th>
-                      <th className="p-2.5 text-end">مستحقات المورد</th>
+                      <th className="p-2.5 text-end">مستحقات البائع</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -416,7 +416,7 @@ export const CodReconciliationModal: React.FC<CodReconciliationModalProps> = ({
             {/* EXECUTE BAR */}
             <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800 flex flex-wrap justify-between items-center gap-3">
               <div className="text-xs text-emerald-900 dark:text-emerald-200">
-                ⚡ <strong>التوزيع الآلي الذكي:</strong> عند الضغط على تأكيد التسوية، سيتم إيداع أرباح المسوقين بمحافظهم تلقائياً، وإضافة مستحقات الموردين للرصيد القابل للسحب، وتغيير حالة الطرود إلى "تمت المطابقة مع شركة الشحن".
+                ⚡ <strong>التوزيع الآلي الذكي:</strong> عند الضغط على تأكيد التسوية، سيتم إيداع أرباح المسوقين بمحافظهم تلقائياً، وإضافة مستحقات البائعين للرصيد القابل للسحب، وتغيير حالة الطرود إلى "تمت المطابقة مع شركة الشحن".
               </div>
 
               <button
@@ -486,7 +486,7 @@ export const CodReconciliationModal: React.FC<CodReconciliationModalProps> = ({
                       <strong><MoneyText amount={batch.totalResellerProfitsDzd} /></strong>
                     </div>
                     <div className="p-2 bg-amber-50 dark:bg-amber-950/20 rounded-xl text-amber-700 dark:text-amber-300">
-                      <span className="block text-[10px]">مستحقات الموردين:</span>
+                      <span className="block text-[10px]">مستحقات البائعين:</span>
                       <strong><MoneyText amount={batch.totalSupplierWholesaleDzd} /></strong>
                     </div>
                   </div>

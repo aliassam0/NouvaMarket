@@ -268,12 +268,24 @@ export async function pollOrderStatusesFromDeliveryApis(
 
         if (newStatus === 'DELIVERED' && previousStatus !== 'DELIVERED') {
           deliveredCount++;
-          const resellerProfit = order.totalProfit || 0;
-          if (resellerProfit > 0) {
+          const isDirectSale =
+            order.isDirectSupplierSale ||
+            order.source === 'SUPPLIER_DIRECT' ||
+            order.source === 'SUPPLIER_LINK';
+
+          const profitToCredit = order.totalProfit !== undefined
+            ? order.totalProfit
+            : (isDirectSale ? (order.supplierProfit || 1950) : 0);
+
+          const targetUserId = isDirectSale
+            ? (order.supplierId || order.resellerId || 'supplier-demo')
+            : (order.resellerId || 'reseller-demo');
+
+          if (profitToCredit > 0) {
             creditResellerCommission(
               order.id,
-              resellerProfit,
-              order.resellerId || 'reseller-demo'
+              profitToCredit,
+              targetUserId
             );
           }
         }

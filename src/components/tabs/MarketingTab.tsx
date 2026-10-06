@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AutoResizeTextarea } from '../ui/AutoResizeTextarea';
 import { Sparkles, Copy, Share2, Check, Send, RefreshCw, Wand2, ShoppingBag, Image as ImageIcon } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
@@ -31,8 +31,14 @@ export function MarketingTab({ initialProduct, onShowToast, onReturnToOrder }: M
     };
   }, []);
 
+  const affiliateProducts = useMemo(() => {
+    return productsList.filter(
+      (p) => p.allowAffiliate !== false && p.isSupplierExclusive !== true && p.approvalStatus !== 'REJECTED'
+    );
+  }, [productsList]);
+
   const [selectedProduct, setSelectedProduct] = useState<Product>(
-    initialProduct || productsList[0] || getStoredProducts()[0]
+    initialProduct || affiliateProducts[0] || productsList[0] || getStoredProducts()[0]
   );
   const [platform, setPlatform] = useState<'WhatsApp' | 'Instagram' | 'TikTok' | 'Facebook' | 'LandingPage_AIDA'>('WhatsApp');
   const [tone, setTone] = useState('أنيقة وجذابة مع إيموجي وتأكيد التوصيل 58 ولاية');
@@ -148,7 +154,7 @@ export function MarketingTab({ initialProduct, onShowToast, onReturnToOrder }: M
         <select
           value={selectedProduct.id}
           onChange={(e) => {
-            const p = productsList.find((item) => item.id === e.target.value);
+            const p = affiliateProducts.find((item) => item.id === e.target.value) || productsList.find((item) => item.id === e.target.value);
             if (p) {
               setSelectedProduct(p);
               setSellingPrice(p.suggestedSellingPrice);
@@ -156,7 +162,7 @@ export function MarketingTab({ initialProduct, onShowToast, onReturnToOrder }: M
           }}
           className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
         >
-          {productsList.map((p, pIdx) => (
+          {affiliateProducts.map((p, pIdx) => (
             <option key={`${p.id}-${pIdx}`} value={p.id}>
               {p.nameAr} ({p.suggestedSellingPrice}دج)
             </option>

@@ -3,6 +3,7 @@ import {
   ShoppingBag,
   Boxes,
   Headphones,
+  LifeBuoy,
   ShieldCheck,
   ChevronDown,
   Check,
@@ -11,7 +12,7 @@ import {
   Package,
 } from 'lucide-react';
 
-export type DashboardRole = 'reseller' | 'warehouse' | 'platform_warehouse' | 'confirmer' | 'admin';
+export type DashboardRole = 'reseller' | 'warehouse' | 'platform_warehouse' | 'confirmer' | 'support' | 'admin';
 
 interface DashboardConfig {
   id: DashboardRole;
@@ -29,9 +30,9 @@ interface DashboardConfig {
 const DASHBOARDS: DashboardConfig[] = [
   {
     id: 'reseller',
-    label: 'لوحة المسوّق',
+    label: 'المسوّق',
     shortLabel: 'المسوّق',
-    tagline: 'الكتالوج، المتاجر والعمولات',
+    tagline: 'الكتالوج والمبيعات',
     icon: ShoppingBag,
     accentColor: 'purple',
     activeBg: 'bg-purple-600 text-white shadow-md shadow-purple-500/20',
@@ -41,9 +42,9 @@ const DASHBOARDS: DashboardConfig[] = [
   },
   {
     id: 'warehouse',
-    label: 'بوابة المورّد',
-    shortLabel: 'المورّد',
-    tagline: 'إضافة السلع، شحنات التوريد والأرباح',
+    label: 'البائع',
+    shortLabel: 'البائع',
+    tagline: 'المنتجات والمخزون',
     icon: Package,
     accentColor: 'amber',
     activeBg: 'bg-amber-600 text-white shadow-md shadow-amber-500/20',
@@ -54,8 +55,8 @@ const DASHBOARDS: DashboardConfig[] = [
   {
     id: 'platform_warehouse',
     label: 'مستودع المنصة',
-    shortLabel: 'مستودع المنصة',
-    tagline: 'التجهيز، التغليف، الباركود وتسليم الشحن',
+    shortLabel: 'المستودع',
+    tagline: 'التحضير واللوجستيات',
     icon: WarehouseIcon,
     accentColor: 'violet',
     activeBg: 'bg-violet-600 text-white shadow-md shadow-violet-500/20',
@@ -65,9 +66,9 @@ const DASHBOARDS: DashboardConfig[] = [
   },
   {
     id: 'confirmer',
-    label: 'واجهة المؤكد',
+    label: 'فريق التأكيد',
     shortLabel: 'المؤكد',
-    tagline: 'تأكيد الطلبيات وتتبع الشحن',
+    tagline: 'تأكيد الطلبات',
     icon: Headphones,
     accentColor: 'emerald',
     activeBg: 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20',
@@ -76,10 +77,22 @@ const DASHBOARDS: DashboardConfig[] = [
     badgeBg: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
   },
   {
+    id: 'support',
+    label: 'الدعم الفني',
+    shortLabel: 'الدعم',
+    tagline: 'مرافقة المسوقين والبائعين',
+    icon: LifeBuoy,
+    accentColor: 'teal',
+    activeBg: 'bg-teal-600 text-white shadow-md shadow-teal-500/20',
+    activeText: 'text-teal-600 dark:text-teal-400',
+    activeBorder: 'border-teal-200 dark:border-teal-800',
+    badgeBg: 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300',
+  },
+  {
     id: 'admin',
-    label: 'لوحة الأدمن',
-    shortLabel: 'الأدمن',
-    tagline: 'الرقابة الشاملة وإدارة النظام',
+    label: 'الإدارة',
+    shortLabel: 'الإدارة',
+    tagline: 'إدارة المنصة',
     icon: ShieldCheck,
     accentColor: 'indigo',
     activeBg: 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20',
@@ -131,7 +144,9 @@ export const DashboardSwitcher: React.FC<DashboardSwitcherProps> = ({
       >
         <div className={`w-2 h-2 rounded-full ${
           currentRole === 'admin' ? 'bg-indigo-500' :
+          currentRole === 'support' ? 'bg-teal-500' :
           currentRole === 'confirmer' ? 'bg-emerald-500' :
+          currentRole === 'platform_warehouse' ? 'bg-violet-500' :
           currentRole === 'warehouse' ? 'bg-amber-500' : 'bg-purple-500'
         } animate-pulse`} />
         <ActiveIcon className="w-3.5 h-3.5" />

@@ -119,7 +119,7 @@ export function OrderAuditTimeline({ order, compact = false }: OrderAuditTimelin
       isCompleted: isDelivered,
       isCurrent: isDelivered,
       details: isDelivered
-        ? `تم التحصيل بنجاح - إيداع عمولة المسوق (${(order.totalProfit || 0).toLocaleString()} دج) ومستحقات المورد`
+        ? `تم التحصيل بنجاح - إيداع عمولة المسوق (${(order.totalProfit || 0).toLocaleString()} دج) ومستحقات البائع`
         : isCancelled
         ? `تعذر التسليم: ${order.failureReason || order.cancellationReason || 'الطلب ملغي/راجع'}`
         : 'بانتظار تسليم الطرد يد بيد للزبون',
@@ -305,7 +305,7 @@ export function OrderAuditTimeline({ order, compact = false }: OrderAuditTimelin
             </div>
           </div>
           <div className="p-2 rounded-lg bg-white border border-slate-200">
-            <div className="font-bold text-slate-500">لوحة المورّد</div>
+            <div className="font-bold text-slate-500">لوحة البائع</div>
             <div className="font-black text-slate-900 mt-0.5">
               {isDelivered ? 'تم التسليم والأرباح' : isShipped ? 'في الطريق مع الموزع' : isConfirmed ? 'قيد تجهيز المستودع' : 'قيد التأكيد'}
             </div>

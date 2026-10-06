@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X,
   Share2,
@@ -36,6 +36,7 @@ import {
 import { Product, UpsellOffer } from '../../types';
 import { MoneyText } from '../ui/MoneyText';
 import { calculateProfit } from '../../lib/formatters';
+import { getStoredSuppliers } from '../../lib/supplierHelper';
 import {
   getProductShareLinks,
   saveSingleShareLink,
@@ -55,6 +56,7 @@ import { MarketerPageCustomizer } from './MarketerPageCustomizer';
 
 interface ShareProductModalProps {
   product: Product;
+  isSupplier?: boolean;
   onClose: () => void;
   onShowToast: (msg: string) => void;
   onPreviewCustomerView?: (product: Product, linkId?: string) => void;
@@ -64,6 +66,7 @@ type ShareDashboardTab = 'links_list' | 'create_link' | 'upsells' | 'customize';
 
 export function ShareProductModal({
   product,
+  isSupplier = false,
   onClose,
   onShowToast,
   onPreviewCustomerView,
@@ -71,6 +74,31 @@ export function ShareProductModal({
   const { user } = useAuth();
   const initialVariant = product.variants[0] || { size: 'Standard', color: 'Standard', colorHex: '#000' };
   const defaultSellingPrice = product.suggestedSellingPrice || product.wholesalePrice + 1000;
+
+  const isSupplierUser = Boolean(
+    isSupplier ||
+    user?.role === 'warehouse' ||
+    (product.supplierId && (user?.id === product.supplierId || user?.email?.toLowerCase() === product.supplierEmail?.toLowerCase()))
+  );
+
+  const activeSupplier = useMemo(() => {
+    if (!isSupplierUser) return null;
+    const suppliers = getStoredSuppliers();
+    return (
+      suppliers.find(
+        (s) =>
+          (user?.id && s.id === user.id) ||
+          (product.supplierId && s.id === product.supplierId) ||
+          (user?.email && s.email && s.email.toLowerCase() === user.email.toLowerCase()) ||
+          (product.supplierEmail && s.email && s.email.toLowerCase() === product.supplierEmail.toLowerCase())
+      ) || null
+    );
+  }, [isSupplierUser, user, product.supplierId, product.supplierEmail]);
+
+  const activePixelOwner = isSupplierUser && activeSupplier ? activeSupplier : user;
+
+  const supplierPlatformFee = product.nouvaFeeAmount ?? Math.round((product.supplierNetPrice || product.wholesalePrice || 1000) * 0.05);
+  const sellerDirectProfit = Math.max(0, defaultSellingPrice - supplierPlatformFee);
 
   // Load existing links for this product
   const [links, setLinks] = useState<ProductShareLink[]>(() =>
@@ -178,7 +206,9 @@ export function ShareProductModal({
   const sizes = Array.from(new Set(product.variants.map((v) => v.size))).filter((s) => !isStandardSize(s));
   const colors = Array.from(new Set(product.variants.map((v) => v.color))).filter((c) => !isStandardColor(c));
 
-  const newProfit = calculateProfit(product.wholesalePrice, newSellingPrice);
+  const newProfit = isSupplierUser
+    ? Math.max(0, newSellingPrice - supplierPlatformFee)
+    : calculateProfit(product.wholesalePrice, newSellingPrice);
 
   // Helper to get active upsells for a specific link
   const handleGetLinkUpsells = (link: ProductShareLink): UpsellOffer[] => {
@@ -279,11 +309,14 @@ export function ShareProductModal({
   const getShareUrlForLink = (linkId: string) => {
     const origin = window.location.origin;
     const pathname = window.location.pathname;
-    const sellerParams = user
-      ? `&sellerId=${encodeURIComponent(user.id)}&sellerName=${encodeURIComponent(user.storeName || user.fullName || '')}&sellerPhone=${encodeURIComponent(user.phone || '')}&sellerEmail=${encodeURIComponent(user.email || '')}`
-      : '';
-    const pixelParams = user
-      ? `${user.metaPixelId ? `&fbPixel=${encodeURIComponent(user.metaPixelId)}` : ''}${user.tiktokPixelId ? `&ttPixel=${encodeURIComponent(user.tiktokPixelId)}` : ''}${user.snapchatPixelId ? `&snapPixel=${encodeURIComponent(user.snapchatPixelId)}` : ''}`
+    const effectiveSellerId = user?.id || (isSupplierUser ? product.supplierId : '');
+    const effectiveSellerName = user?.storeName || user?.fullName || (isSupplierUser ? product.supplierName : '');
+    const effectiveSellerEmail = user?.email || (isSupplierUser ? product.supplierEmail : '');
+    const effectiveSellerPhone = user?.phone || '';
+    const roleParam = isSupplierUser ? '&sellerRole=supplier&isSupplier=true' : '';
+    const sellerParams = `&sellerId=${encodeURIComponent(effectiveSellerId || '')}&sellerName=${encodeURIComponent(effectiveSellerName || '')}&sellerPhone=${encodeURIComponent(effectiveSellerPhone || '')}&sellerEmail=${encodeURIComponent(effectiveSellerEmail || '')}${roleParam}`;
+    const pixelParams = activePixelOwner
+      ? `${activePixelOwner.metaPixelId ? `&fbPixel=${encodeURIComponent(activePixelOwner.metaPixelId)}` : ''}${activePixelOwner.tiktokPixelId ? `&ttPixel=${encodeURIComponent(activePixelOwner.tiktokPixelId)}` : ''}${activePixelOwner.snapchatPixelId ? `&snapPixel=${encodeURIComponent(activePixelOwner.snapchatPixelId)}` : ''}`
       : '';
     return `${origin}${pathname}?share=${product.id}&linkId=${linkId}${sellerParams}${pixelParams}`;
   };
@@ -397,7 +430,16 @@ export function ShareProductModal({
   const activeLinksCount = links.filter((l) => l.active).length;
   const disabledLinksCount = links.filter((l) => !l.active).length;
   const averageProfit = links.length > 0
-    ? Math.round(links.reduce((acc, l) => acc + calculateProfit(product.wholesalePrice, l.sellingPrice), 0) / links.length)
+    ? Math.round(
+        links.reduce(
+          (acc, l) =>
+            acc +
+            (isSupplierUser
+              ? Math.max(0, l.sellingPrice - supplierPlatformFee)
+              : calculateProfit(product.wholesalePrice, l.sellingPrice)),
+          0
+        ) / links.length
+      )
     : 0;
 
   const filteredLinks = links.filter((l) => {
@@ -497,9 +539,11 @@ export function ShareProductModal({
                     </span>
                   </div>
                   <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300">
-                    <span className="block text-[10px] text-emerald-600 dark:text-emerald-400">ربحك المقترح:</span>
+                    <span className="block text-[10px] text-emerald-600 dark:text-emerald-400">
+                      {isSupplierUser ? 'مستحقاتك كبائع:' : 'ربحك المقترح:'}
+                    </span>
                     <span className="font-black font-mono text-xs text-emerald-600 dark:text-emerald-400">
-                      +<MoneyText amount={calculateProfit(product.wholesalePrice, defaultSellingPrice)} />
+                      +<MoneyText amount={isSupplierUser ? sellerDirectProfit : calculateProfit(product.wholesalePrice, defaultSellingPrice)} />
                     </span>
                   </div>
                 </div>
@@ -530,7 +574,7 @@ export function ShareProductModal({
                   </span>
                 </div>
                 <div className="p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-300">
-                  <span className="text-[10px] block">متوسط الربح</span>
+                  <span className="text-[10px] block">{isSupplierUser ? 'متوسط المستحقات' : 'متوسط الربح'}</span>
                   <span className="text-xs font-black font-mono">
                     <MoneyText amount={averageProfit} />
                   </span>
@@ -648,14 +692,14 @@ export function ShareProductModal({
                   ربط البيكسل الإعلاني:
                 </span>
                 <div className="flex items-center gap-2 text-[10px]">
-                  <span className={user?.metaPixelId ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
-                    • Meta Pixel {user?.metaPixelId ? '✔' : ''}
+                  <span className={activePixelOwner?.metaPixelId ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
+                    • Meta Pixel {activePixelOwner?.metaPixelId ? '✔' : ''}
                   </span>
-                  <span className={user?.tiktokPixelId ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
-                    • TikTok {user?.tiktokPixelId ? '✔' : ''}
+                  <span className={activePixelOwner?.tiktokPixelId ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
+                    • TikTok {activePixelOwner?.tiktokPixelId ? '✔' : ''}
                   </span>
-                  <span className={user?.snapchatPixelId ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
-                    • Snap {user?.snapchatPixelId ? '✔' : ''}
+                  <span className={activePixelOwner?.snapchatPixelId ? 'text-emerald-600 font-bold' : 'text-slate-400'}>
+                    • Snap {activePixelOwner?.snapchatPixelId ? '✔' : ''}
                   </span>
                 </div>
               </div>
@@ -837,7 +881,9 @@ export function ShareProductModal({
                       const currentPrice = editedPrices[link.id] ?? link.sellingPrice;
                       const isPriceModified =
                         editedPrices[link.id] !== undefined && editedPrices[link.id] !== link.sellingPrice;
-                      const linkProfit = calculateProfit(product.wholesalePrice, currentPrice);
+                      const linkProfit = isSupplierUser
+                        ? Math.max(0, currentPrice - supplierPlatformFee)
+                        : calculateProfit(product.wholesalePrice, currentPrice);
                       const shareUrl = getShareUrlForLink(link.id);
                       const isCopied = copiedLinkId === link.id;
                       const linkUpsells = handleGetLinkUpsells(link);
@@ -953,7 +999,9 @@ export function ShareProductModal({
 
                               {/* Calculated Net Profit Indicator */}
                               <div className="flex items-center gap-2 text-xs">
-                                <span className="text-slate-500 dark:text-slate-400">صافي ربحك في القطعة:</span>
+                                <span className="text-slate-500 dark:text-slate-400">
+                                  {isSupplierUser ? 'مستحقاتك كبائع في القطعة:' : 'صافي ربحك في القطعة:'}
+                                </span>
                                 <span
                                   className={`font-black font-mono text-sm px-2.5 py-1 rounded-xl ${
                                     linkProfit > 0

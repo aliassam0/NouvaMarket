@@ -59,20 +59,38 @@ export function executeCodRemittanceReconciliation(params: {
     const orderShipping = Number(ord.shippingFee) || defaultFee;
     const orderProfit = Number(ord.totalProfit) || 0;
 
-    // Wholesale due calculation for items
+    const isDirectSale =
+      ord.isDirectSupplierSale ||
+      ord.source === 'SUPPLIER_DIRECT' ||
+      ord.source === 'SUPPLIER_LINK';
+
+    // Wholesale due calculation for items (In direct sale: seller receives selling price minus platform fee)
     const orderWholesale = ord.items.reduce((sum, item) => {
-      const price = item.wholesalePrice || (item.sellingPrice ? Math.round(item.sellingPrice * 0.7) : 2000);
+      if (isDirectSale) {
+        const baseWholesale = item.supplierNetPrice || item.wholesalePrice || 1000;
+        const fee = item.nouvaFeeAmount ?? Math.round(baseWholesale * 0.05);
+        const sellerNet = Math.max(0, item.sellingPrice - fee);
+        return sum + sellerNet * (Number(item.quantity) || 1);
+      }
+      const price = item.supplierNetPrice || item.wholesalePrice || (item.sellingPrice ? Math.round(item.sellingPrice * 0.7) : 2000);
       return sum + price * (Number(item.quantity) || 1);
     }, 0);
 
     totalCodCollectedDzd += orderCod;
     totalCourierShippingFeesDzd += orderShipping;
-    totalResellerProfitsDzd += orderProfit;
+    totalResellerProfitsDzd += isDirectSale ? 0 : orderProfit;
     totalSupplierWholesaleDzd += orderWholesale;
 
     // 1. Credit reseller profit wallet if not yet credited
-    if (!ord.commissionCredited && ord.resellerId) {
-      creditResellerCommission(ord.id, orderProfit, ord.resellerId);
+    if (!ord.commissionCredited) {
+      if (isDirectSale) {
+        const supId = ord.supplierId || ord.resellerId;
+        if (supId) {
+          creditResellerCommission(ord.id, orderWholesale, supId);
+        }
+      } else if (ord.resellerId) {
+        creditResellerCommission(ord.id, orderProfit, ord.resellerId);
+      }
     }
 
     return {
@@ -236,13 +254,13 @@ export function inspectAndProcessReturnedOrder(params: {
     packagingStatus: params.packagingStatus,
     itemStatus: params.itemStatus,
     inspectorName: params.inspectorName || 'أمين فحص المرتجعات والجودة QC',
-    restockedToShelf: isResellable ? (params.shelfLocation || 'مستودع العاصمة - رف A1') : undefined,
+    restockedToShelf: undefined,
     itemsCount: totalItemsCount,
     compensationClaimNeeded: claimNeeded,
     carrierClaimAmountDzd: claimNeeded ? (params.carrierClaimAmountDzd || params.order.totalAmount) : 0,
     claimStatus: claimNeeded ? 'CLAIM_FILED' : 'NOT_APPLICABLE',
     claimReference: claimRef,
-    notes: params.notes || (isResellable ? 'تم الفحص بنجاح والسلعة سليمة وأعيدت للمخزون الحي' : 'السلعة متضررة بسبب الشحن وتستوجب التعويض'),
+    notes: params.notes || (isResellable ? 'تم الفحص بنجاح والسلعة سليمة وأعيدت للمخزون الحي المتاح' : 'السلعة متضررة بسبب الشحن وتستوجب التعويض'),
     inspectedAt: new Date().toISOString(),
   };
 
@@ -254,7 +272,7 @@ export function inspectAndProcessReturnedOrder(params: {
     type: 'stock_update',
     titleAr: isResellable ? '📦 تم فحص وإعادة طرد مرتجع للمخزون الحي' : '⚠️ تم تسجيل محضر طرد مرتجع تالف',
     bodyAr: isResellable
-      ? `تم فحص الطرد #${params.order.id} وإعادة ${totalItemsCount} قطعة للمخزون بالرف (${report.restockedToShelf}).`
+      ? `تم فحص الطرد #${params.order.id} وإعادة ${totalItemsCount} قطعة للمخزون المتاح للبيع بنجاح.`
       : `تم تسجيل مطالبة تعويض (${claimRef}) ضد شركة التوصيل بمبلغ ${report.carrierClaimAmountDzd} دج عن الطلب #${params.order.id}.`,
   });
 
@@ -274,11 +292,11 @@ function getDefaultReturnInspections(): ReturnInspectionReport[] {
       packagingStatus: 'SEALED_INTACT',
       itemStatus: 'RESELLABLE',
       inspectorName: 'أمين مراقبة الجودة QC',
-      restockedToShelf: 'مستودع العاصمة - رف A2',
+      restockedToShelf: undefined,
       itemsCount: 1,
       compensationClaimNeeded: false,
       claimStatus: 'NOT_APPLICABLE',
-      notes: 'تم فحص الكرتونة، غير مفتوحة وسليمة 100%. أعيدت للرف A2.',
+      notes: 'تم فحص الكرتونة، غير مفتوحة وسليمة 100%. أودعت بالمخزون.',
       inspectedAt: new Date(Date.now() - 3600000 * 48).toISOString(),
     },
   ];

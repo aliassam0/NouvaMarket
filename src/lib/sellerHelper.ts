@@ -4,6 +4,8 @@ export interface ExtendedSeller extends UserProfile {
   approvalStatus: 'APPROVED' | 'PENDING' | 'REJECTED' | 'SUSPENDED';
 }
 
+export type SellerProfile = ExtendedSeller;
+
 const STORAGE_KEY_SELLERS = 'nouva_sellers_v2';
 
 export const INITIAL_SELLERS: ExtendedSeller[] = [

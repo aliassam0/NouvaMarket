@@ -12,6 +12,7 @@ import { triggerSaleNotification } from './pwaNotificationManager';
 import { fetchDriverInfoFromCourierApi } from './deliveryApiManager';
 import { addSyncLog, SyncLogItem } from './deliverySyncManager';
 import { getStoredCouriers } from './courierHelper';
+import { recordSupplierOrderDelivered } from './supplierHelper';
 
 export type DashboardRole = 'admin' | 'warehouse' | 'confirmer' | 'reseller' | 'delivery' | 'supplier' | 'system';
 
@@ -428,39 +429,69 @@ export async function syncOrderStatus(
     updatedOrder.deliveredAt = updatedOrder.deliveredAt || new Date().toISOString();
     updatedOrder.coordinationStatus = 'delivered';
 
-    // Automatic wallet commission credit to reseller
+    // Automatic wallet commission credit to reseller or seller
     if (!updatedOrder.commissionCredited) {
-      const resellerProfit = updatedOrder.totalProfit || 1000;
-      if (resellerProfit > 0) {
+      const isDirectSale =
+        updatedOrder.isDirectSupplierSale ||
+        updatedOrder.source === 'SUPPLIER_DIRECT' ||
+        updatedOrder.source === 'SUPPLIER_LINK';
+
+      const sellerOrResellerProfit = updatedOrder.totalProfit !== undefined
+        ? updatedOrder.totalProfit
+        : (isDirectSale ? (updatedOrder.supplierProfit || 1950) : 1000);
+
+      const beneficiaryId = isDirectSale
+        ? (updatedOrder.supplierId || updatedOrder.resellerId || 'supplier-demo')
+        : (updatedOrder.resellerId || 'reseller-demo');
+
+      if (sellerOrResellerProfit > 0) {
         creditResellerCommission(
           updatedOrder.id,
-          resellerProfit,
-          updatedOrder.resellerId || 'reseller-demo'
+          sellerOrResellerProfit,
+          beneficiaryId
         );
         updatedOrder.commissionCredited = true;
         commissionCredited = true;
 
         triggerSaleNotification({
-          profit: resellerProfit,
+          profit: sellerOrResellerProfit,
           orderId: updatedOrder.trackingCode || updatedOrder.id,
-          productName: updatedOrder.items?.[0]?.productName || 'منتج مسوق',
+          productName: updatedOrder.items?.[0]?.productName || (isDirectSale ? 'مبيعات مباشرة للبائع' : 'منتج مسوق'),
           customerName: updatedOrder.customerName || 'زبون',
           wilaya: (updatedOrder as any).wilayaName || updatedOrder.wilayaCode,
         });
       }
 
-      // Notify warehouse of COD collection and wholesale dues release
+      // Notify warehouse/seller of COD collection and dues release
       const orderWholesale = updatedOrder.items?.reduce((acc, item) => {
-        const cost = item.wholesalePrice || (item.sellingPrice ? Math.max(0, item.sellingPrice - (item.profit || 0)) : 0);
+        if (isDirectSale) {
+          const baseWholesale = item.supplierNetPrice || item.wholesalePrice || 1000;
+          const fee = item.nouvaFeeAmount ?? Math.round(baseWholesale * 0.05);
+          const sellerNet = Math.max(0, item.sellingPrice - fee);
+          return acc + sellerNet * (item.quantity || 1);
+        }
+        const cost = item.supplierNetPrice || item.wholesalePrice || (item.sellingPrice ? Math.max(0, item.sellingPrice - (item.profit || 0)) : 0);
         return acc + cost * (item.quantity || 1);
       }, 0) || 0;
 
       if (orderWholesale > 0) {
         addWarehouseNotification({
-          titleAr: 'تحصيل كاش COD ومستحقات مبيعات الجملة 💵',
-          bodyAr: `تم تسليم الطلبية #${updatedOrder.id} للزبون (${updatedOrder.customerName}) بنجاح وإضافة ${orderWholesale.toLocaleString()} دج لرصيدك المتاح للسحب.`,
+          titleAr: isDirectSale ? 'إيداع صافي مبيعاتك المباشرة 💰' : 'تحصيل كاش COD ومستحقات مبيعات الجملة 💵',
+          bodyAr: isDirectSale
+            ? `تم تسليم طلبيتك المباشرة #${updatedOrder.id} للزبون (${updatedOrder.customerName}) بنجاح وإيداع ${orderWholesale.toLocaleString()} دج في رصيدك المتاح للسحب!`
+            : `تم تسليم الطلبية #${updatedOrder.id} للزبون (${updatedOrder.customerName}) بنجاح وإضافة ${orderWholesale.toLocaleString()} دج لرصيدك المتاح للسحب.`,
           type: 'wallet',
         });
+
+        const supTarget =
+          updatedOrder.supplierId ||
+          updatedOrder.items?.[0]?.supplierId ||
+          updatedOrder.supplierName ||
+          updatedOrder.items?.[0]?.supplierName;
+
+        if (supTarget) {
+          recordSupplierOrderDelivered(supTarget, orderWholesale, updatedOrder.totalAmount || 0);
+        }
       }
 
       // Notify admin of full COD reconciliation

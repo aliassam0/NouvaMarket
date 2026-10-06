@@ -41,7 +41,6 @@ export const ReturnsQCModal: React.FC<ReturnsQCModalProps> = ({
   const [selectedOrderId, setSelectedOrderId] = useState<string>(returnedOrders[0]?.id || '');
   const [packagingStatus, setPackagingStatus] = useState<'SEALED_INTACT' | 'OPENED_GOOD' | 'TORN_DAMAGED'>('SEALED_INTACT');
   const [itemStatus, setItemStatus] = useState<'RESELLABLE' | 'DAMAGED_CARRIER' | 'WRONG_ITEM' | 'CUSTOMER_USED'>('RESELLABLE');
-  const [shelfLocation, setShelfLocation] = useState('مستودع العاصمة - رف A1');
   const [claimAmount, setClaimAmount] = useState<number>(3000);
   const [notes, setNotes] = useState('');
   const [reports, setReports] = useState<ReturnInspectionReport[]>(() => getStoredReturnInspections());
@@ -56,7 +55,6 @@ export const ReturnsQCModal: React.FC<ReturnsQCModalProps> = ({
       order: selectedOrder,
       packagingStatus,
       itemStatus,
-      shelfLocation,
       carrierClaimAmountDzd: claimAmount,
       notes,
     });
@@ -66,7 +64,7 @@ export const ReturnsQCModal: React.FC<ReturnsQCModalProps> = ({
 
     if (itemStatus === 'RESELLABLE') {
       onShowToast(
-        `✔ تم فحص الطرد #${selectedOrder.id} بنجاح، وإعادة سلع الطرد للمخزون الحي بالرف (${shelfLocation})!`,
+        `✔ تم فحص الطرد #${selectedOrder.id} بنجاح، وإعادة سلع الطرد للمخزون الحي المتاح للبيع!`,
         'success'
       );
     } else if (itemStatus === 'DAMAGED_CARRIER') {
@@ -107,7 +105,7 @@ export const ReturnsQCModal: React.FC<ReturnsQCModalProps> = ({
                 </span>
               </div>
               <p className="text-slate-500 text-xs">
-                فحص جودة الطرود المرتجعة من شركات التوصيل، إعادة السلع السليمة للأرفف فوراً، وتوليد محاضر مطالبات التعويض للطرود المتضررة.
+                فحص جودة الطرود المرتجعة من شركات التوصيل، إعادة السلع السليمة للمخزون فوراً، وتوليد محاضر مطالبات التعويض للطرود المتضررة.
               </p>
             </div>
           </div>
@@ -286,7 +284,7 @@ export const ReturnsQCModal: React.FC<ReturnsQCModalProps> = ({
                       {
                         id: 'CUSTOMER_USED',
                         label: '🔄 استعمله الزبون أو ينقصه ملحقات',
-                        desc: 'تخفيض السعر أو إرجاع إلى المورد',
+                        desc: 'تخفيض السعر أو إرجاع إلى البائع',
                         accent: 'border-purple-500 bg-purple-50/40 text-purple-900 dark:text-purple-200',
                       },
                     ].map((opt) => (
@@ -309,21 +307,12 @@ export const ReturnsQCModal: React.FC<ReturnsQCModalProps> = ({
 
                 {/* Conditional Fields: Shelf for Resellable vs Claim for Damaged */}
                 {itemStatus === 'RESELLABLE' && (
-                  <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-800/60 space-y-2 text-xs">
-                    <label className="font-bold text-emerald-900 dark:text-emerald-200 block">
-                      موقع الرف في المستودع لإعادة تخزين القطع:
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={shelfLocation}
-                        onChange={(e) => setShelfLocation(e.target.value)}
-                        className="flex-1 p-2 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-900 font-mono font-bold"
-                        placeholder="مستودع العاصمة - رف A2"
-                      />
-                    </div>
-                    <span className="text-[10px] text-emerald-700 dark:text-emerald-300 block">
-                      💡 فور اعتماد الفحص، ستزداد كمية المنتج في المخزون تلقائياً وسيتم إشعار المورد.
+                  <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-800/60 space-y-1.5 text-xs">
+                    <span className="font-bold text-emerald-900 dark:text-emerald-200 block">
+                      ✔ سلع سليمة وجاهزة لإعادة البيع:
+                    </span>
+                    <span className="text-[11px] text-emerald-700 dark:text-emerald-300 block">
+                      💡 فور اعتماد الفحص، ستزداد كمية المنتج في المخزون تلقائياً وسيتم إشعار البائع.
                     </span>
                   </div>
                 )}
@@ -419,7 +408,7 @@ export const ReturnsQCModal: React.FC<ReturnsQCModalProps> = ({
                         <span className="text-slate-400 block text-[10px]">حالة الفحص والسلع:</span>
                         <strong>
                           {rep.itemStatus === 'RESELLABLE'
-                            ? `سليم بالرف (${rep.restockedToShelf || 'A1'})`
+                            ? 'سليم بالمخزون الحي'
                             : 'تالف بسبب النقل'}
                         </strong>
                       </div>

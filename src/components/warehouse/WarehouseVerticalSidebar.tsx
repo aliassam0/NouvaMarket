@@ -22,6 +22,8 @@ import {
   Radio,
   Bell,
   Boxes,
+  ShoppingBag,
+  Target,
 } from 'lucide-react';
 import { MoneyText } from '../ui/MoneyText';
 
@@ -37,7 +39,9 @@ export type WarehouseTab =
   | 'tracking'
   | 'financial'
   | 'analytics'
-  | 'profile';
+  | 'profile'
+  | 'my_orders'
+  | 'pixels';
 
 
 interface WarehouseVerticalSidebarProps {
@@ -55,6 +59,9 @@ interface WarehouseVerticalSidebarProps {
     returnedCount: number;
     productsCount: number;
     pipelineCount?: number;
+    myOrdersCount?: number;
+    supplierLinkOrdersCount?: number;
+    activePixelsCount?: number;
   };
   availableBalance: number;
   supplierName: string;
@@ -82,36 +89,36 @@ export function WarehouseVerticalSidebar({
   const navGroups = isPlatformWarehouse
     ? [
         {
-          groupTitle: 'تجهيز الشحنات والعمليات اللوجستية',
+          groupTitle: 'العمليات اللوجستية',
           items: [
             {
               id: 'preparation' as WarehouseTab,
-              label: '1. بيان تحضير الطلبيات',
-              shortLabel: 'بيان التحضير',
+              label: 'تحضير الطلبيات',
+              shortLabel: 'التحضير',
               icon: Package,
               badge: counts.preparationCount > 0 ? `${counts.preparationCount} طرد` : undefined,
               badgeColor: 'bg-violet-100 text-violet-800 border border-violet-200 font-bold',
             },
             {
               id: 'delivery' as WarehouseTab,
-              label: '2. وصل تسليم الناقل (Bordereau)',
-              shortLabel: 'وصل الناقل',
+              label: 'الشحن والتوصيل',
+              shortLabel: 'الشحن',
               icon: Truck,
               badge: counts.deliveryCount > 0 ? `${counts.deliveryCount}` : undefined,
               badgeColor: 'bg-blue-100 text-blue-800 border border-blue-200 font-semibold',
             },
             {
               id: 'completed' as WarehouseTab,
-              label: '3. مطابقة كاش الـ COD',
-              shortLabel: 'مطابقة COD',
+              label: 'مطابقة التحصيل',
+              shortLabel: 'التحصيل',
               icon: CheckCircle2,
               badge: `${counts.completedCount}`,
               badgeColor: 'bg-emerald-100 text-emerald-800 border border-emerald-200 font-semibold',
             },
             {
               id: 'returned' as WarehouseTab,
-              label: '4. فحص جودة المرتجعات QC',
-              shortLabel: 'فحص المرتجعات',
+              label: 'المرتجعات',
+              shortLabel: 'المرتجعات',
               icon: RotateCcw,
               badge: counts.returnedCount > 0 ? `${counts.returnedCount}` : undefined,
               badgeColor: 'bg-rose-100 text-rose-800 border border-rose-200 font-semibold',
@@ -119,28 +126,28 @@ export function WarehouseVerticalSidebar({
           ],
         },
         {
-          groupTitle: 'المخزون ومعدلات التوصيل بالولايات',
+          groupTitle: 'المخزون والتوريد',
           items: [
             {
               id: 'inbound' as WarehouseTab,
-              label: 'استقبال كراتين التوريد',
-              shortLabel: 'كراتين التوريد',
+              label: 'استقبال الشحنات',
+              shortLabel: 'الاستقبال',
               icon: Boxes,
               badge: 'توريد',
               badgeColor: 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold',
             },
             {
               id: 'products' as WarehouseTab,
-              label: 'مواقع الأرفف والمخزون',
-              shortLabel: 'الأرفف والمخزون',
+              label: 'المخزون',
+              shortLabel: 'المخزون',
               icon: Box,
               badge: `${counts.productsCount} صنف`,
               badgeColor: 'bg-purple-100 text-purple-800 border border-purple-200 font-semibold',
             },
             {
               id: 'tracking' as WarehouseTab,
-              label: 'معدلات التوصيل بالولايات',
-              shortLabel: 'معدلات التوصيل',
+              label: 'نسب التوصيل',
+              shortLabel: 'التوصيل',
               icon: Search,
               badge: '58 ولاية',
               badgeColor: 'bg-cyan-100 text-cyan-800 border border-cyan-200 font-semibold',
@@ -148,26 +155,24 @@ export function WarehouseVerticalSidebar({
           ],
         },
         {
-          groupTitle: 'المالية وأتعاب التغليف والسحب',
+          groupTitle: 'المالية والحساب',
           items: [
             {
               id: 'financial' as WarehouseTab,
-              label: 'التحصيلات وأتعاب التغليف والسحب (Card 4)',
-              shortLabel: 'أتعاب التغليف والتحصيلات',
+              label: 'التحصيلات والرسوم',
+              shortLabel: 'التحصيلات',
               icon: DollarSign,
-              badge: 'Pick & Pack 📦',
-              badgeColor: 'bg-amber-100 text-amber-800 border border-amber-300 font-black',
             },
             {
               id: 'analytics' as WarehouseTab,
-              label: 'إحصائيات الأداء ومعدلات التوصيل',
-              shortLabel: 'الإحصائيات',
+              label: 'التحليلات والأداء',
+              shortLabel: 'التحليلات',
               icon: BarChart3,
             },
             {
               id: 'profile' as WarehouseTab,
-              label: 'بيانات المستودع وحسابات الدفع',
-              shortLabel: 'الملف والحساب',
+              label: 'إعدادات الحساب',
+              shortLabel: 'الإعدادات',
               icon: Building2,
             },
           ],
@@ -175,44 +180,60 @@ export function WarehouseVerticalSidebar({
       ]
     : [
         {
-          groupTitle: 'متابعة حركة الطلبيات والسلع (مزامنة فورية)',
+          groupTitle: 'الطلبات والمنتجات',
           items: [
             {
+              id: 'my_orders' as WarehouseTab,
+              label: 'طلباتي',
+              shortLabel: 'طلباتي',
+              icon: ShoppingBag,
+              badge:
+                counts.supplierLinkOrdersCount && counts.supplierLinkOrdersCount > 0
+                  ? `${counts.supplierLinkOrdersCount} طلب رابط`
+                  : counts.myOrdersCount && counts.myOrdersCount > 0
+                  ? `${counts.myOrdersCount} طلب`
+                  : undefined,
+              badgeColor:
+                counts.supplierLinkOrdersCount && counts.supplierLinkOrdersCount > 0
+                  ? 'bg-amber-100 text-amber-900 border border-amber-300 font-extrabold animate-pulse'
+                  : 'bg-purple-100 text-purple-800 border border-purple-200 font-bold',
+            },
+            {
               id: 'pipeline' as WarehouseTab,
-              label: 'متابعة حركة الطلبيات (المزامنة الحية)',
-              shortLabel: 'حركة الطلبيات',
+              label: 'حركة الطلبات',
+              shortLabel: 'الطلبات',
               icon: Package,
               badge: counts.pipelineCount && counts.pipelineCount > 0 ? `${counts.pipelineCount} طلب` : undefined,
               badgeColor: 'bg-violet-100 text-violet-800 border border-violet-200 font-bold',
             },
             {
               id: 'products' as WarehouseTab,
-              label: '1. منتجاتي وأسعار الجملة',
-              shortLabel: '1. المنتجات',
+              label: 'منتجاتي',
+              shortLabel: 'المنتجات',
               icon: Box,
               badge: `${counts.productsCount} صنف`,
               badgeColor: 'bg-purple-100 text-purple-800 border border-purple-200 font-semibold',
             },
             {
               id: 'inbound' as WarehouseTab,
-              label: '2. شحنات التوريد لمستودع المنصة',
-              shortLabel: '2. إرسال شحنة',
+              label: 'الاستيراد والتوريد',
+              shortLabel: 'التوريد',
               icon: Boxes,
-              badge: 'إرسال توريد 🚚',
+              badge: 'توريد',
               badgeColor: 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold',
             },
             {
               id: 'completed' as WarehouseTab,
-              label: '3. مبيعات الجملة المحققة',
-              shortLabel: '3. مبيعات الجملة',
+              label: 'المبيعات المكتملة',
+              shortLabel: 'المكتملة',
               icon: CheckCircle2,
               badge: `${counts.completedCount}`,
               badgeColor: 'bg-emerald-100 text-emerald-800 border border-emerald-200 font-semibold',
             },
             {
               id: 'returned' as WarehouseTab,
-              label: '4. سجل السلع المرتجعة للمخزون',
-              shortLabel: '4. المرتجعات',
+              label: 'المرتجعات',
+              shortLabel: 'المرتجعات',
               icon: RotateCcw,
               badge: counts.returnedCount > 0 ? `${counts.returnedCount}` : undefined,
               badgeColor: 'bg-rose-100 text-rose-800 border border-rose-200 font-semibold',
@@ -220,26 +241,37 @@ export function WarehouseVerticalSidebar({
           ],
         },
         {
-          groupTitle: 'الأرباح وسحب المستحقات والملف',
+          groupTitle: 'المالية والحساب',
           items: [
             {
               id: 'financial' as WarehouseTab,
-              label: isPlatformWarehouse ? 'التحصيلات وأتعاب التغليف والسحب' : 'مستحقات مبيعات الجملة والسحب',
-              shortLabel: isPlatformWarehouse ? 'التحصيلات والأتعاب' : 'مستحقات الجملة',
+              label: isPlatformWarehouse ? 'التحصيلات والرسوم' : 'الأرباح والتسويات',
+              shortLabel: isPlatformWarehouse ? 'التحصيلات' : 'الأرباح',
               icon: DollarSign,
               badge: availableBalance > 0 ? `${Math.round(availableBalance / 1000)}k دج` : undefined,
               badgeColor: 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-black',
             },
             {
               id: 'analytics' as WarehouseTab,
-              label: 'إحصائيات المبيعات والأداء',
-              shortLabel: 'الإحصائيات',
+              label: 'التحليلات والتقارير',
+              shortLabel: 'التحليلات',
               icon: BarChart3,
             },
             {
+              id: 'pixels' as WarehouseTab,
+              label: 'ربط البيكسل (Pixel)',
+              shortLabel: 'البيكسل',
+              icon: Target,
+              badge:
+                counts.activePixelsCount && counts.activePixelsCount > 0
+                  ? `${counts.activePixelsCount} نشط`
+                  : undefined,
+              badgeColor: 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold',
+            },
+            {
               id: 'profile' as WarehouseTab,
-              label: 'الملف وحسابات الدفع CCP / BaridiMob',
-              shortLabel: 'الملف والحساب',
+              label: 'إعدادات الحساب',
+              shortLabel: 'الحساب',
               icon: Building2,
             },
           ],
@@ -283,14 +315,14 @@ export function WarehouseVerticalSidebar({
                   <h2 className="font-black text-sm text-slate-900 tracking-tight truncate">
                     {isPlatformWarehouse
                       ? 'مستودع المنصة'
-                      : supplierName || 'بوابة المورّد'}
+                      : supplierName || 'بوابة البائع'}
                   </h2>
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                 </div>
                 <p className="text-[11px] text-slate-500 font-medium truncate">
                   {isPlatformWarehouse
                     ? 'مركز التجهيز والشحن اللوجستي'
-                    : 'حساب توريد السلع بالجملة'}
+                    : 'حساب سلع البائع بالجملة'}
                 </p>
               </div>
             )}
@@ -339,7 +371,7 @@ export function WarehouseVerticalSidebar({
             </div>
             {isPlatformWarehouse && (
               <div className="mt-1.5 pt-1.5 border-t border-violet-200/60 text-[9px] text-slate-500 flex items-center justify-between font-medium">
-                <span>عوائد السلع + رسوم التغليف</span>
+                <span>عوائد مبيعات السلع المكتملة</span>
                 <span className="text-violet-700 font-black">خزينة المنصة 🏛️</span>
               </div>
             )}

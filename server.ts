@@ -35,16 +35,25 @@ const AI_CONFIG_FILE = path.join(process.cwd(), "ai-config.json");
 let aiConfig: ServerAiConfig = {
   provider: "gemini",
   geminiApiKey: "",
-  geminiModel: "gemini-2.5-flash",
+  geminiModel: "gemini-3.8-flash",
   temperature: 0.3,
   isEnabled: true,
 };
 
 function getValidGeminiModel(model?: string): string {
-  if (!model) return "gemini-2.5-flash";
+  if (!model) return "gemini-3.8-flash";
   const m = model.trim();
-  if (m === "gemini-3.8-flash" || m === "gemini-3.6-flash" || m === "gemini-1.5-flash" || !m) {
-    return "gemini-2.5-flash";
+  if (m.startsWith("gemini-2.5-flash-lite") || m.startsWith("gemini-2.0-flash-lite")) {
+    return "gemini-3.5-flash-lite";
+  }
+  if (
+    m.startsWith("gemini-2.5") ||
+    m.startsWith("gemini-2.0") ||
+    m.startsWith("gemini-1.5") ||
+    m === "gemini-flash" ||
+    !m
+  ) {
+    return "gemini-3.8-flash";
   }
   return m;
 }
@@ -133,7 +142,7 @@ function processOpenRouterMessages(
   });
 
   if (hasImages && !targetModel.includes("gemini")) {
-    targetModel = "google/gemini-2.5-flash";
+    targetModel = "google/gemini-3.8-flash";
   }
 
   return { processedMessages, hasImages, targetModel };
@@ -141,7 +150,7 @@ function processOpenRouterMessages(
 
 async function callOpenRouter(
   messages: Array<{ role: string; content: string | Array<any>; reasoning_details?: any }>,
-  model = "google/gemini-2.5-flash",
+  model = "google/gemini-3.8-flash",
   options?: { reasoning?: { enabled: boolean }; stream?: boolean }
 ): Promise<any> {
   const customKey = process.env.OPENROUTER_API_KEY?.trim();
@@ -275,8 +284,8 @@ async function generateMultimodalAI(
   const ai = getGeminiClient();
   const candidateModels = [
     getValidGeminiModel(aiConfig.geminiModel),
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
+    "gemini-3.8-flash",
+    "gemini-3.5-flash-lite",
   ].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
 
   if (ai) {
@@ -362,7 +371,7 @@ async function generateMultimodalAI(
         content: userMessageContent.length > 1 ? userMessageContent : prompt,
       });
 
-      const resMsg = await callOpenRouter(messages, "google/gemini-2.5-flash");
+      const resMsg = await callOpenRouter(messages, "google/gemini-3.8-flash");
       return resMsg?.content?.trim() || "";
     } catch (openRouterErr: any) {
       console.warn("OpenRouter fallback failed:", openRouterErr.message);
@@ -400,6 +409,7 @@ const DELETED_WITHDRAWALS_FILE = path.join(DATA_DIR, "deleted_withdrawals.json")
 const DELETED_SETTLEMENTS_FILE = path.join(DATA_DIR, "deleted_settlements.json");
 const EXTERNAL_STORES_FILE = path.join(DATA_DIR, "server_external_stores.json");
 const SYNCED_PRODUCTS_FILE = path.join(DATA_DIR, "server_synced_products.json");
+const DIRECT_CHAT_FILE = path.join(DATA_DIR, "server_direct_chat_conversations.json");
 
 function loadJsonFile<T>(filePath: string, fallback: T): T {
   try {
@@ -427,6 +437,25 @@ function saveJsonFile(filePath: string, data: any): void {
 }
 
 const SEED_SELLERS = [
+  {
+    id: "seller-54839",
+    fullName: "Ali Assam",
+    storeName: "متجر Ali Assam",
+    phone: "05555555",
+    email: "ali.assam.geo@gmail.com",
+    password: "aliassam",
+    wilaya: "16 - الجزائر",
+    role: "reseller",
+    rank: "BRONZE",
+    rankAr: "المستوى البرونزي",
+    rankFr: "Niveau Bronze",
+    kycStatus: "APPROVED",
+    approvalStatus: "APPROVED",
+    totalOrdersCount: 0,
+    deliveredOrdersCount: 0,
+    totalEarnedDzd: 0,
+    joinDate: "2026-09-22",
+  },
   {
     id: "seller-101",
     fullName: "كريم بوزيد",
@@ -468,6 +497,45 @@ const SEED_SELLERS = [
 ];
 
 const SEED_SUPPLIERS = [
+  {
+    id: "usr-2",
+    fullName: "أمين المستودع والمورد (Warehouse)",
+    companyName: "مستودع Nouva",
+    phone: "0550123456",
+    email: "warehouse@nouvamarket.com",
+    password: "123",
+    wilaya: "16 - الجزائر",
+    activityType: "ألبسة ونسيج",
+    status: "APPROVED",
+    ccpOrRip: "CCP / BaridiMob Pending",
+    totalSalesDzd: 0,
+    nouvaCommissionDzd: 0,
+    resellerCommissionsDzd: 0,
+    paidAmountDzd: 0,
+    remainingBalanceDzd: 0,
+    totalProductsCount: 0,
+    totalDeliveredOrders: 0,
+    createdAt: "2026-09-25",
+  },
+  {
+    id: "sup-09329",
+    fullName: "Ali",
+    companyName: "Ali store",
+    phone: "055555555",
+    email: "ali.assam.geo@gmail.com",
+    password: "aliassam",
+    wilaya: "16 - الجزائر",
+    activityType: "ألبسة ونسيج",
+    status: "APPROVED",
+    ccpOrRip: "CCP / BaridiMob Pending",
+    createdAt: "2026-09-22",
+    totalProductsCount: 0,
+    totalDeliveredOrders: 0,
+    totalSalesDzd: 0,
+    nouvaCommissionDzd: 0,
+    resellerCommissionsDzd: 0,
+    paidAmountDzd: 0,
+  },
   {
     id: "sup-201",
     fullName: "أحمد بن قاسم",
@@ -532,17 +600,31 @@ let serverDeletedSettlements: string[] = loadJsonFile(DELETED_SETTLEMENTS_FILE, 
 let serverSettlements: any[] = initialLoadedSettlements.filter((s: any) => s && s.id && !serverDeletedSettlements.includes(s.id));
 
 // Smart merge to preserve accounts, respecting deletions
-let serverSellers: any[] = initialLoadedSellers.length > 0 
-  ? initialLoadedSellers.filter((s: any) => !serverDeletedSellers.includes(s.id))
-  : SEED_SELLERS.filter((s: any) => !serverDeletedSellers.includes(s.id));
+const sellerMap = new Map<string, any>();
+SEED_SELLERS.forEach((seed) => {
+  if (!serverDeletedSellers.includes(seed.id)) sellerMap.set(seed.id, seed);
+});
+initialLoadedSellers.forEach((s) => {
+  if (s && s.id && !serverDeletedSellers.includes(s.id)) {
+    sellerMap.set(s.id, { ...sellerMap.get(s.id), ...s });
+  }
+});
+let serverSellers: any[] = Array.from(sellerMap.values());
 
-let serverSuppliers: any[] = initialLoadedSuppliers.length > 0 
-  ? initialLoadedSuppliers.filter((s: any) => !serverDeletedSuppliers.includes(s.id))
-  : SEED_SUPPLIERS.filter((s: any) => !serverDeletedSuppliers.includes(s.id));
+const supplierMap = new Map<string, any>();
+SEED_SUPPLIERS.forEach((seed) => {
+  if (!serverDeletedSuppliers.includes(seed.id)) supplierMap.set(seed.id, seed);
+});
+initialLoadedSuppliers.forEach((s) => {
+  if (s && s.id && !serverDeletedSuppliers.includes(s.id)) {
+    supplierMap.set(s.id, { ...supplierMap.get(s.id), ...s });
+  }
+});
+let serverSuppliers: any[] = Array.from(supplierMap.values());
 
-// Save initially if newly seeded
-if (initialLoadedSellers.length === 0) saveJsonFile(SELLERS_FILE, serverSellers);
-if (initialLoadedSuppliers.length === 0) saveJsonFile(SUPPLIERS_FILE, serverSuppliers);
+// Save to disk to ensure immediate persistence
+saveJsonFile(SELLERS_FILE, serverSellers);
+saveJsonFile(SUPPLIERS_FILE, serverSuppliers);
 
 const SEED_EXTERNAL_STORES = [
   {
@@ -1010,6 +1092,70 @@ app.delete("/api/reseller/settlements/:id", (req, res) => {
   res.json({ success: true, message: "تم حذف التسوية بنجاح" });
 });
 
+// ============================================================================
+// Real-Time Direct Support Chat Endpoints (Preserving all history permanently)
+// ============================================================================
+app.get("/api/support/direct-chat", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  const conversations = loadJsonFile<Record<string, any>>(DIRECT_CHAT_FILE, {});
+  res.json({ success: true, conversations, count: Object.keys(conversations).length });
+});
+
+app.get("/api/support/direct-chat/party/:partyId", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  const partyId = req.params.partyId;
+  const conversations = loadJsonFile<Record<string, any>>(DIRECT_CHAT_FILE, {});
+  const conv = conversations[`conv_${partyId}`] || null;
+  res.json({ success: true, conversation: conv, messagesCount: conv?.messages?.length || 0 });
+});
+
+app.post("/api/support/direct-chat/sync", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  const clientConvs = req.body?.conversations || {};
+  let serverConvs = loadJsonFile<Record<string, any>>(DIRECT_CHAT_FILE, {});
+
+  // Smart Merge to ensure NO message or conversation history is EVER lost
+  const merged: Record<string, any> = { ...serverConvs };
+
+  for (const [convId, clientConv] of Object.entries(clientConvs as Record<string, any>)) {
+    if (!clientConv) continue;
+
+    if (!merged[convId]) {
+      merged[convId] = clientConv;
+    } else {
+      // Merge messages by ID to guarantee 0 message loss and 0 duplicates
+      const existingMsgs = Array.isArray(merged[convId].messages) ? merged[convId].messages : [];
+      const incomingMsgs = Array.isArray(clientConv.messages) ? clientConv.messages : [];
+      const msgMap = new Map<string, any>();
+
+      existingMsgs.forEach((m: any) => {
+        if (m && m.id) msgMap.set(m.id, m);
+      });
+      incomingMsgs.forEach((m: any) => {
+        if (m && m.id) msgMap.set(m.id, { ...(msgMap.get(m.id) || {}), ...m });
+      });
+
+      // Sort messages chronologically by timestamp
+      const allMsgs = Array.from(msgMap.values()).sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+
+      merged[convId] = {
+        ...merged[convId],
+        ...clientConv,
+        messages: allMsgs,
+        lastMessage: allMsgs.length > 0 ? allMsgs[allMsgs.length - 1].text : merged[convId].lastMessage,
+        lastMessageAt: allMsgs.length > 0 ? allMsgs[allMsgs.length - 1].timestamp : merged[convId].lastMessageAt,
+      };
+    }
+  }
+
+  saveJsonFile(DIRECT_CHAT_FILE, merged);
+  res.json({ success: true, conversations: merged, count: Object.keys(merged).length });
+});
+
 // Dedicated Pending Approvals endpoint for Admin
 app.get(["/api/admin/pending-approvals", "/api/admin/pending-registrations"], (req, res) => {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -1114,14 +1260,21 @@ app.post("/api/reseller/auth/login", (req, res) => {
     if (cleanPass === expectedPass) {
       const isWarehouse = matchedSysUser.role === "WAREHOUSE";
       const isConfirmer = matchedSysUser.role === "ORDER_CONFIRMER";
+      const isSupport = matchedSysUser.role === "RESELLER_SUPPORT";
       const userObj = {
         id: matchedSysUser.id,
         fullName: matchedSysUser.fullName,
-        storeName: isWarehouse ? "مستودع Nouva" : isConfirmer ? "فريق تأكيد الطلبيات Nouva" : "الإدارة العامة Nouva",
+        storeName: isWarehouse
+          ? "مستودع Nouva"
+          : isConfirmer
+          ? "فريق تأكيد الطلبيات Nouva"
+          : isSupport
+          ? "الدعم الفني للمسوقين والبائعين Nouva"
+          : "الإدارة العامة Nouva",
         phone: "0550123456",
         email: matchedSysUser.email,
         password: matchedSysUser.password,
-        role: isWarehouse ? "warehouse" : isConfirmer ? "confirmer" : "admin",
+        role: isWarehouse ? "warehouse" : isConfirmer ? "confirmer" : isSupport ? "support" : "admin",
         systemRole: matchedSysUser.role,
         permissions: matchedSysUser.permissions,
         wilaya: "16 - الجزائر",
@@ -4606,26 +4759,26 @@ app.get("/api/admin/ai/config", (req, res) => {
     isEnvKey,
     hasCustomKey: Boolean(aiConfig.geminiApiKey),
     geminiKeyMasked: maskedKey,
-    geminiModel: aiConfig.geminiModel || "gemini-3.6-flash",
+    geminiModel: aiConfig.geminiModel || "gemini-3.8-flash",
     temperature: aiConfig.temperature ?? 0.3,
     supportedModels: [
       {
-        id: "gemini-2.5-flash",
-        name: "Gemini 2.5 Flash (الرسمي المعتمد - موصى به)",
+        id: "gemini-3.8-flash",
+        name: "Gemini 3.8 Flash (الرسمي المعتمد - موصى به)",
         speed: "فائق السرعة",
         quality: "عالية جداً",
-        description: "النموذج الرسمي الموصى به لإنشاء نصوص الإعلانات، أوصاف المنتجات AIDA، والتعرف البصري على الصور.",
+        description: "النموذج الرسمي الأحدث لإنشاء نصوص الإعلانات، أوصاف المنتجات AIDA، والتعرف البصري على الصور.",
       },
       {
-        id: "gemini-2.5-flash-lite",
-        name: "Gemini 2.5 Flash Lite (فائق السرعة واقتصادي)",
+        id: "gemini-3.5-flash-lite",
+        name: "Gemini 3.5 Flash Lite (فائق السرعة واقتصادي)",
         speed: "فائق السرعة (أقل من ثانية)",
         quality: "جيدة جداً",
         description: "نموذج خفيف وسريع جداً مخصص للاستجابات اللحظية وتوليد الأسماء.",
       },
       {
-        id: "gemini-2.5-pro",
-        name: "Gemini 2.5 Pro (الأقوى تحليلياً والتفكير المتعمق)",
+        id: "gemini-3.1-pro-preview",
+        name: "Gemini 3.1 Pro (الأقوى تحليلياً والتفكير المتعمق)",
         speed: "متوسط",
         quality: "الأعلى ذكاءً",
         description: "نموذج التفكير المتقدم لأدق المهام التحليلية وصياغة المحتوى المتعمق.",
@@ -4655,7 +4808,7 @@ app.post("/api/admin/ai/config", (req, res) => {
     }
 
     if (geminiModel && typeof geminiModel === "string") {
-      aiConfig.geminiModel = geminiModel.trim();
+      aiConfig.geminiModel = getValidGeminiModel(geminiModel.trim());
     }
 
     if (typeof temperature === "number") {
@@ -4716,12 +4869,11 @@ app.post("/api/admin/ai/test-connection", async (req, res) => {
     });
 
     const candidateModels = [
-      model && typeof model === "string" ? model.trim() : "",
-      aiConfig.geminiModel || "",
-      "gemini-3.6-flash",
-      "gemini-2.5-flash",
-      "gemini-2.5-flash-lite",
-    ].filter((m, i, arr) => m && arr.indexOf(m) === i && m !== "gemini-3.8-flash");
+      model && typeof model === "string" ? getValidGeminiModel(model) : "",
+      getValidGeminiModel(aiConfig.geminiModel),
+      "gemini-3.8-flash",
+      "gemini-3.5-flash-lite",
+    ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
     const startTime = Date.now();
     const testPrompt =
@@ -4783,10 +4935,10 @@ app.post("/api/admin/ai/test-connection", async (req, res) => {
   }
 });
 
-// OpenRouter Direct / Proxy AI Chat endpoint supporting google/gemini-2.5-flash-lite, reasoning_details, and SSE streaming
+// OpenRouter Direct / Proxy AI Chat endpoint supporting google/gemini-3.8-flash, reasoning_details, and SSE streaming
 app.post("/api/ai/chat/completions", async (req, res) => {
   try {
-    const { messages, model = "google/gemini-2.5-flash-lite", reasoning, stream } = req.body;
+    const { messages, model = "google/gemini-3.8-flash", reasoning, stream } = req.body;
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: "messages array is required" });
     }

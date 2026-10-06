@@ -124,8 +124,8 @@ export function MarketedProductsTab({
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               {language === 'ar'
-                ? 'المنتجات التي قمت بإنشاء روابط تسويقية لها'
-                : 'Produits avec des liens de partage actifs'}
+                ? 'منتجاتك النشطة عبر روابط البيع.'
+                : 'Produits avec liens de vente actifs.'}
             </p>
           </div>
           {marketedProducts.length > 0 && (

@@ -46,11 +46,11 @@ export function AccueilTab({
   const { orders, pendingLinkOrdersCount } = useOrders();
   const { t, language } = useLanguage();
 
-  const [unreadNotifCount, setUnreadNotifCount] = useState<number>(getUnreadNotificationsCount);
+  const [unreadNotifCount, setUnreadNotifCount] = useState<number>(() => getUnreadNotificationsCount('seller'));
 
   useEffect(() => {
     const handleUpdate = () => {
-      setUnreadNotifCount(getUnreadNotificationsCount());
+      setUnreadNotifCount(getUnreadNotificationsCount('seller'));
     };
     window.addEventListener('seller_notifications_updated', handleUpdate);
     return () => window.removeEventListener('seller_notifications_updated', handleUpdate);
@@ -102,7 +102,7 @@ export function AccueilTab({
             <button
               onClick={onOpenNotifications}
               className="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition relative cursor-pointer"
-              title="إشعارات البائعين"
+              title="إشعارات المسوقين"
             >
               <Bell className="w-5 h-5 text-violet-600 dark:text-violet-400" />
               {unreadNotifCount > 0 && (
@@ -191,7 +191,7 @@ export function AccueilTab({
         </div>
       </div>
 
-      {/* Detailed Profit Breakdown: Delivered & Ready vs In-Transit */}
+      {/* Detailed Profit Breakdown */}
       <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -200,25 +200,25 @@ export function AccueilTab({
             </div>
             <div>
               <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
-                تفصيل دورة الأرباح (المحررة vs قيد التوزيع)
+                توزيع الأرباح
               </h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                مقارنة واضحة بين أرباح الطرود المسلّمة الجاهزة للسحب والطرود التي خرجت مع الناقل
+                متابعة الأرباح المتاحة للسحب والأرباح قيد التوصيل.
               </p>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Card 1: أرباح الطرود التي سُلّمت وأصبحت جاهزة للسحب */}
+          {/* Card 1: أرباح جاهزة للسحب */}
           <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border-2 border-emerald-500/30 dark:border-emerald-500/20 space-y-2">
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-xs font-black text-emerald-800 dark:text-emerald-300">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>أرباح جاهزة للسحب (مسلّمة)</span>
+                <span>أرباح متاحة للسحب</span>
               </span>
               <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                {deliveredOrdersCount} طرد مسلّم
+                {deliveredOrdersCount} مسلّم
               </span>
             </div>
 
@@ -236,19 +236,19 @@ export function AccueilTab({
             </div>
 
             <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed border-t border-emerald-500/10 pt-2">
-              أموال محصلة نقدياً ومطابقة آلياً بحسابك، محررة ومتاحة للتحويل الفوري إلى CCP أو BaridiMob.
+              أموال محصلة ومتاحة للتحويل الفوري إلى حسابك.
             </p>
           </div>
 
-          {/* Card 2: أرباح الطرود التي خرجت مع الناقل وقيد التوزيع حالياً (In-Transit) */}
+          {/* Card 2: أرباح قيد التوصيل */}
           <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-500/10 via-indigo-500/5 to-transparent border-2 border-blue-500/30 dark:border-blue-500/20 space-y-2">
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-xs font-black text-blue-800 dark:text-blue-300">
                 <Truck className="w-4 h-4 text-blue-600" />
-                <span>أرباح مع الناقل (In-Transit)</span>
+                <span>أرباح قيد التوصيل</span>
               </span>
               <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                {inTransitOrders.length} طرد مع الناقل
+                {inTransitOrders.length} مع الناقل
               </span>
             </div>
 
@@ -264,7 +264,7 @@ export function AccueilTab({
             </div>
 
             <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed border-t border-blue-500/10 pt-2">
-              خرجت مع موزعي شركات التوصيل وقيد التسليم، وتتحول تلقائياً إلى رصيدك فور استلام الزبون للطلب.
+              تُضاف إلى رصيدك المتاح فور استلام الزبون للطلب.
             </p>
           </div>
         </div>
@@ -277,7 +277,7 @@ export function AccueilTab({
           className="flex items-center justify-center gap-2 p-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-98 text-slate-950 font-black text-xs transition shadow-md cursor-pointer"
         >
           <Flame className="w-4 h-4 fill-current" />
-          <span>المنتجات الأكثر مبيعاً 🔥</span>
+          <span>المنتجات الرائجة</span>
         </button>
 
         <button
@@ -285,7 +285,7 @@ export function AccueilTab({
           className="flex items-center justify-center gap-2 p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-50 text-slate-800 dark:text-slate-100 font-bold text-xs transition shadow-xs"
         >
           <Wallet className="w-4 h-4 text-violet-600" />
-          <span>سجل المحفظة</span>
+          <span>المحفظة</span>
         </button>
       </div>
 

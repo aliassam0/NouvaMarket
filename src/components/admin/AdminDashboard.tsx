@@ -69,6 +69,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { AdminAiProviderSettings } from './AdminAiProviderSettings';
+import { AdminWarehouseAddressAndSourcingTab } from './AdminWarehouseAddressAndSourcingTab';
 import { ProductUrlImportModal } from '../common/ProductUrlImportModal';
 import { useOrders } from '../../context/OrderContext';
 import { useAuth } from '../../context/AuthContext';
@@ -122,6 +123,7 @@ import { getStoredCouriers, saveStoredCouriers, CourierPartner } from '../../lib
 import { LowStockBanner, LowStockModal, getLowStockProducts } from '../common/LowStockAlerts';
 import {
   addSellerNotification,
+  addWarehouseNotification,
   addAdminNotification,
   addNotification,
   getStoredNotifications,
@@ -135,6 +137,7 @@ import {
 } from '../../lib/notificationHelper';
 import { NotificationsModal } from '../tabs/NotificationsModal';
 import { AdminConfirmersAuditTab } from './AdminConfirmersAuditTab';
+import { AdminSupportManagementTab } from './AdminSupportManagementTab';
 import { AdminVerticalSidebar } from './AdminVerticalSidebar';
 import {
   getStoredInboundRequests,
@@ -153,6 +156,7 @@ interface AdminDashboardProps {
   onSwitchToSellerDashboard?: (seller: UserProfile) => void;
   onImpersonateSupplier?: (supplier: any) => void;
   onSwitchToConfirmerDashboard?: (confirmer?: any) => void;
+  onSwitchToSupportDashboard?: (agent?: any) => void;
 }
 
 // ---------------------- TYPES & INITIAL DATA ----------------------
@@ -166,6 +170,7 @@ type AdminTabKey =
   | 'inventory'
   | 'couriers'
   | 'suppliers'
+  | 'support'
   | 'categories'
   | 'coupons'
   | 'rewards'
@@ -246,6 +251,7 @@ export function AdminDashboard({
   onSwitchToSellerDashboard,
   onImpersonateSupplier,
   onSwitchToConfirmerDashboard,
+  onSwitchToSupportDashboard,
 }: AdminDashboardProps) {
   const { orders, confirmAndShipOrder, updateOrder, updateOrderStatus, deleteOrder } = useOrders();
   const { switchUser } = useAuth();
@@ -401,44 +407,44 @@ export function AdminDashboard({
 
   const getCurrentTabTitle = (tab: AdminTabKey) => {
     switch (tab) {
-      case 'orders': return 'إدارة ومزامنة الطلبيات الموحدة (التحكم الكامل)';
-      case 'approvals': return 'طلبات الانضمام والاعتماد الفوري';
-      case 'products': return 'كتالوج وإدارة المنتجات';
-      case 'sellers': return 'شبكة البائعين والمسوقين';
-      case 'suppliers': return 'الموردين والمستودعات';
-      case 'confirmers': return 'مؤكدو الطلبيات (المراقبة)';
-      case 'couriers': return 'شركات التوصيل وربط API';
-      case 'wallet': return 'الخزينة وسحوبات الأموال';
-      case 'inventory': return 'المخزون وتنبيهات النفاذ';
-      case 'categories': return 'فئات وتصنيفات المنتجات';
-      case 'coupons': return 'الكوبونات والخصومات';
-      case 'rewards': return 'رتب ومكافآت المسوقين';
-      case 'users': return 'المستخدمين والصلاحيات';
-      case 'notifications': return 'سجل إشعارات الإدارة';
-      case 'ai_provider': return 'مزود الذكاء الاصطناعي (Gemini)';
-      case 'settings': return 'إعدادات المنصة العامة';
+      case 'orders': return 'الطلبات';
+      case 'approvals': return 'طلبات الانضمام';
+      case 'products': return 'المنتجات';
+      case 'sellers': return 'المسوقين';
+      case 'suppliers': return 'البائعين';
+      case 'confirmers': return 'فريق التأكيد';
+      case 'couriers': return 'شركات التوصيل';
+      case 'wallet': return 'الخزينة';
+      case 'inventory': return 'المستودع';
+      case 'categories': return 'الفئات';
+      case 'coupons': return 'الكوبونات';
+      case 'rewards': return 'الرتب والمكافآت';
+      case 'users': return 'فريق العمل';
+      case 'notifications': return 'الإشعارات';
+      case 'ai_provider': return 'الذكاء الاصطناعي';
+      case 'settings': return 'الإعدادات';
       default: return 'لوحة الإدارة';
     }
   };
 
   const getCurrentTabSubtitle = (tab: AdminTabKey) => {
     switch (tab) {
-      case 'orders': return 'المزامنة الحية لجميع مراحل الطلبات: من الروابط والمراجعة إلى التجهيز والشحن والتسليم مع كامل الصلاحيات';
-      case 'approvals': return 'مراجعة واعتماد طلبات تسجيل البائعين والموردين الجدد في الوقت الفعلي';
-      case 'products': return 'تعديل الأسعار والكميات والمخزون الحي والصور واستيراد المنتجات';
-      case 'sellers': return 'إدارة شبكة المسوقين، رتبهم، معلومات الدفع وتعديل كلمات المرور';
-      case 'suppliers': return 'إدارة مستودعات الموردين والشراكات والمنتجات الموردة';
-      case 'confirmers': return 'متابعة أداء فريق تأكيد المكالمات ونسب النجاح اللحظية';
-      case 'couriers': return 'ربط شركات التوصيل (Yalidine, ZR, Maystro, Ecom) عبر الـ API';
-      case 'wallet': return 'مراجعة طلبات السحب للبائعين وتحصيلات الموردين وإدارتها';
-      case 'inventory': return 'مراقبة كميات المخزون وتنبيهات النفاذ ومواقع الرفوف';
-      case 'categories': return 'إضافة وتعديل التصنيفات والفئات لمنتجات المتجر';
-      case 'coupons': return 'إنشاء قسائم التخفيض والخصومات الترويجية';
-      case 'rewards': return 'نظام الحوافز والنقاط والمستويات التنافسية للبائعين';
-      case 'users': return 'إدارة حسابات طاقم العمل وتوزيع الصلاحيات الإدارية';
-      case 'notifications': return 'بث الإشعارات الجماعية وسجل التنبيهات الإدارية';
-      case 'ai_provider': return 'تكوين وضبط نماذج Google Gemini API للوصف والمبيعات';
-      case 'settings': return 'إعدادات المنصة العامة وعمولات السوق والروابط';
+      case 'orders': return 'متابعة وإدارة مسار الطلبات';
+      case 'approvals': return 'مراجعة واعتماد الحسابات';
+      case 'products': return 'إدارة المنتجات والأسعار';
+      case 'sellers': return 'إدارة المسوقين والعمولات';
+      case 'suppliers': return 'إدارة البائعين والمخزون';
+      case 'confirmers': return 'متابعة أداء التأكيد';
+      case 'couriers': return 'إدارة شركات الشحن';
+      case 'wallet': return 'إدارة الخزينة والسحوبات';
+      case 'inventory': return 'إدارة المخزون والتوريد';
+      case 'categories': return 'تصنيفات وفئات الكتالوج';
+      case 'coupons': return 'قسائم التخفيض';
+      case 'rewards': return 'نظام الرتب والمكافآت';
+      case 'users': return 'إدارة صلاحيات الفريق';
+      case 'notifications': return 'مركز التنبيهات';
+      case 'ai_provider': return 'إعدادات الذكاء الاصطناعي';
+      case 'settings': return 'إعدادات المنصة';
       default: return '';
     }
   };
@@ -483,7 +489,7 @@ export function AdminDashboard({
     if (onSwitchToSellerDashboard) {
       onSwitchToSellerDashboard(seller);
     }
-    onShowToast(`🚀 تم الدخول بنجاح إلى داشبورد البائع: ${seller.fullName} (${seller.storeName})`, 'success');
+    onShowToast(`🚀 تم الدخول بنجاح إلى داشبورد المسوق: ${seller.fullName} (${seller.storeName})`, 'success');
   };
 
   // 1. Products State
@@ -557,7 +563,7 @@ export function AdminDashboard({
       initialStatus: 'APPROVED',
     });
 
-    onShowToast(`✔ تم إضافة وتسجيل المورد (${created.companyName}) بنجاح!`, 'success');
+    onShowToast(`✔ تم إضافة وتسجيل البائع (${created.companyName}) بنجاح!`, 'success');
   };
 
   // Admin Password & Profile Reset State for Sellers & Suppliers
@@ -688,16 +694,16 @@ export function AdminDashboard({
       }).catch(() => {});
       
       const statusLabels = {
-        APPROVED: 'تمت الموافقة وتفعيل حساب المورد بنجاح ✔',
-        REJECTED: 'تم رفض طلب انضمام المورد ✖',
-        SUSPENDED: 'تم تعليق حساب المورد ⛔',
+        APPROVED: 'تمت الموافقة وتفعيل حساب البائع بنجاح ✔',
+        REJECTED: 'تم رفض طلب انضمام البائع ✖',
+        SUSPENDED: 'تم تعليق حساب البائع ⛔',
       };
       onShowToast(statusLabels[status], status === 'APPROVED' ? 'success' : 'info');
       
       addNotification({
         recipientRole: 'warehouse',
         type: 'system',
-        titleAr: `تحديث حالة حساب المورد: ${list[idx].companyName}`,
+        titleAr: `تحديث حالة حساب البائع: ${list[idx].companyName}`,
         bodyAr: `تم تغير حالة حسابك إلى: ${status === 'APPROVED' ? 'معتمد' : status === 'REJECTED' ? 'مرفوض' : 'معلق'}`,
       });
     }
@@ -746,7 +752,7 @@ export function AdminDashboard({
     saveStoredMarketplaceFees(normalized);
     setFeeSettings(normalized);
     onShowToast(
-      `✔ تم حفظ إعدادات الرسوم: عمولة المورد ${normalized.supplierFeePercent}%، عمولة المسوق ${normalized.resellerFeePercent}%، رسوم التغليف ${normalized.pickAndPackFeeDzd} دج، وأتعاب المؤكد ${normalized.confirmerFeeDzd} دج/طرد بنجاح!`,
+      `✔ تم حفظ إعدادات الرسوم: عمولة البائع ${normalized.supplierFeePercent}%، عمولة المسوق ${normalized.resellerFeePercent}%، وأتعاب المؤكد ${normalized.confirmerFeeDzd} دج/طرد بنجاح!`,
       'success'
     );
   };
@@ -1014,7 +1020,7 @@ export function AdminDashboard({
       ]);
       setSellers(newSellers);
       setSupplierList(newSuppliers);
-      onShowToast('✔ تم تحديث ومزامنة جميع تسجيلات البائعين والموردين بنجاح!', 'success');
+      onShowToast('✔ تم تحديث ومزامنة جميع تسجيلات المسوقين والبائعين بنجاح!', 'success');
     } catch (e) {
       onShowToast('حدث خطأ أثناء المزامنة', 'error');
     } finally {
@@ -1090,12 +1096,8 @@ export function AdminDashboard({
     };
   }, []);
 
-  // 5. Inventory Bins State
-  const [inventoryLocation, setInventoryLocation] = useState<{ [productId: string]: string }>({
-    'p-1': 'المستودع الرئيسي - رف A1-04',
-    'p-2': 'المستودع الرئيسي - رف B2-01',
-    'p-3': 'مستودع وهران - رف C3-09',
-  });
+  // 5. Inventory Bins State (Shelves removed)
+  const [inventoryLocation, setInventoryLocation] = useState<{ [productId: string]: string }>({});
 
   // 6. Couriers State & Modal
   const [couriers, setCouriersState] = useState<CourierPartner[]>(getStoredCouriers);
@@ -1345,15 +1347,7 @@ export function AdminDashboard({
     });
   };
 
-  // Clear Bin Location
-  const handleClearBinLocation = (productId: string) => {
-    setInventoryLocation((prev) => {
-      const next = { ...prev };
-      delete next[productId];
-      return next;
-    });
-    onShowToast('✔ تم إخلاء ومسح موقع الرف لهذا المنتج!', 'info');
-  };
+
 
   // Add Customer
   const handleAddCustomerSubmit = () => {
@@ -1418,7 +1412,7 @@ export function AdminDashboard({
       }
     }
 
-    onShowToast('✔ تم تأكيد انضمام وتفعيل حساب البائع بنجاح!', 'success');
+    onShowToast('✔ تم تأكيد انضمام وتفعيل حساب المسوق بنجاح!', 'success');
   };
 
   // Reject Seller Join
@@ -1435,7 +1429,7 @@ export function AdminDashboard({
       body: JSON.stringify({ type: 'seller', id: sellerId, action: 'REJECTED' }),
     }).catch(() => {});
 
-    onShowToast('✖ تم رفض طلب انضمام البائع', 'info');
+    onShowToast('✖ تم رفض طلب انضمام المسوق', 'info');
   };
 
   // Suspend Seller
@@ -1451,27 +1445,27 @@ export function AdminDashboard({
       body: JSON.stringify({ type: 'seller', id: sellerId, action: 'SUSPENDED' }),
     }).catch(() => {});
 
-    onShowToast('⛔ تم تعليق حساب البائع', 'info');
+    onShowToast('⛔ تم تعليق حساب المسوق', 'info');
   };
 
   // Delete Seller
   const handleDeleteSeller = (sellerId: string) => {
-    if (window.confirm('هل أنت تأكد من حذف حساب هذا البائع نهائياً من المنصة؟')) {
+    if (window.confirm('هل أنت تأكد من حذف حساب هذا المسوق نهائياً من المنصة؟')) {
       deleteSellerRegistration(sellerId);
       const updated = getStoredSellers();
       setSellers(updated);
-      onShowToast('🗑️ تم حذف حساب البائع بنجاح', 'info');
+      onShowToast('🗑️ تم حذف حساب المسوق بنجاح', 'info');
     }
   };
 
   // Delete Supplier
   const handleDeleteSupplier = (id: string) => {
-    if (window.confirm('هل أنت تأكد من حذف حساب هذا المورد نهائياً من النظام؟')) {
+    if (window.confirm('هل أنت تأكد من حذف حساب هذا البائع نهائياً من النظام؟')) {
       deleteSupplierRegistration(id);
       const updated = getStoredSuppliers();
       setSupplierList(updated);
       setSuppliers(updated as any);
-      onShowToast('🗑️ تم حذف حساب المورد بنجاح', 'info');
+      onShowToast('🗑️ تم حذف حساب البائع بنجاح', 'info');
     }
   };
 
@@ -1560,22 +1554,28 @@ export function AdminDashboard({
 
     addAdminNotification({
       type: 'wallet',
-      titleAr: '💰 تم تحويل مستحقات المورد بنجاح',
-      bodyAr: `تمت الموافقة وتأكيد تحويل مستحقات مبيعات الجملة بمبلغ ${targetSt.amountDzd.toLocaleString()} دج للمورد (${targetSt.supplierName}).`,
+      titleAr: '💰 تم تحويل مستحقات البائع بنجاح',
+      bodyAr: `تمت الموافقة وتأكيد تحويل مستحقات مبيعات الجملة بمبلغ ${targetSt.amountDzd.toLocaleString()} دج للبائع (${targetSt.supplierName}).`,
     });
 
-    onShowToast('✔ تم تأكيد تحويل مستحقات المورد بنجاح وتوثيق العملية!', 'success');
+    addWarehouseNotification({
+      type: 'wallet',
+      titleAr: '💰 تم تأكيد تحويل مستحقاتك بنجاح!',
+      bodyAr: `قامت الإدارة بتأكيد تحويل مستحقات مبيعات الجملة بمبلغ ${targetSt.amountDzd.toLocaleString()} دج إلى حسابك (${targetSt.accountDetails || targetSt.payoutMethod}).`,
+    });
+
+    onShowToast('✔ تم تأكيد تحويل مستحقات البائع بنجاح وتوثيق العملية!', 'success');
   };
 
   const handleRejectSettlement = (settlementId: string) => {
-    const reason = prompt('سبب رفض وصل إثبات دفع المورد:') || 'وصل الدفع غير مكتمل أو رقم الحوالة غير صحيح';
+    const reason = prompt('سبب رفض وصل إثبات دفع البائع:') || 'وصل الدفع غير مكتمل أو رقم الحوالة غير صحيح';
     const allSt = getStoredSettlements();
     const updated = allSt.map((st) =>
       st.id === settlementId ? { ...st, status: 'REJECTED' as const, notes: reason } : st
     );
     saveStoredSettlements(updated);
     setSettlements(updated);
-    onShowToast('✖ تم رفض إثبات دفع المورد وتنبيهه بإعادة الرفع', 'info');
+    onShowToast('✖ تم رفض إثبات دفع البائع وتنبيهه بإعادة الرفع', 'info');
   };
 
   // Zero Balances Handlers (تصفير مبالغ السحوبات والخزينة)
@@ -1598,7 +1598,7 @@ export function AdminDashboard({
       const success = zeroSettlementAmount(id);
       if (success) {
         setSettlements(getStoredSettlements());
-        onShowToast(`✔ تم تصفير مبلغ تحصيل المورد #${id} إلى 0 دج بنجاح`, 'success');
+        onShowToast(`✔ تم تصفير مبلغ تحصيل البائع #${id} إلى 0 دج بنجاح`, 'success');
       }
     }
   };
@@ -1647,7 +1647,7 @@ export function AdminDashboard({
       const res = zeroAllSettlementsAmounts('ALL');
       setSettlements(getStoredSettlements());
       setIsZeroBalancesModalOpen(false);
-      onShowToast(`✔ تم تصفير مبالغ تحصيلات الموردين بنجاح (${res.count} عملية بمجموع ${res.totalZeroed.toLocaleString()} دج أصبح 0 دج)`, 'success');
+      onShowToast(`✔ تم تصفير مبالغ تحصيلات البائعين بنجاح (${res.count} عملية بمجموع ${res.totalZeroed.toLocaleString()} دج أصبح 0 دج)`, 'success');
     } else if (zeroBalancesTarget === 'ALL_TREASURY') {
       const resWth = zeroAllWithdrawals();
       const resStl = zeroAllSettlementsAmounts('ALL');
@@ -1662,7 +1662,7 @@ export function AdminDashboard({
       clearAllWithdrawals();
       setWithdrawals([]);
       setIsZeroBalancesModalOpen(false);
-      onShowToast('✔ تم مسح سجل طلبات السحب مع الحفاظ التام على حسابات البائعين والموردين', 'info');
+      onShowToast('✔ تم مسح سجل طلبات السحب مع الحفاظ التام على حسابات المسوقين والبائعين', 'info');
     }
   };
 
@@ -2051,7 +2051,7 @@ export function AdminDashboard({
                 </div>
                 <div>
                   <span className="font-extrabold text-amber-950">
-                    تنبيه اعتماد الحسابات: يوجد {totalPendingApprovals} طلب تسجيل جديد بانتظار الموافقة (بائعين وموردين)
+                    تنبيه اعتماد الحسابات: يوجد {totalPendingApprovals} طلب تسجيل جديد بانتظار الموافقة (مسوقين وبائعين)
                   </span>
                   <p className="text-[11px] text-amber-800">
                     انقر هنا لمراجعة طلبات الانضمام والموافقة الفورية عليها لتفعيل نشاطهم في المنصة
@@ -2082,15 +2082,15 @@ export function AdminDashboard({
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="font-black text-sm sm:text-base text-slate-900 dark:text-white">
-                    إدارة ومزامنة الطلبيات الموحدة (التحكم الكامل للأدمن)
+                    إدارة الطلبات
                   </h2>
                   <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-black flex items-center gap-1 border border-emerald-300">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    مباشر ولحظي
+                    مباشر
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                  تحكم شامل في جميع مراحل الطلبات: من الروابط والمراجعة، والتأكيد الهاتفي، إلى التجهيز والشحن والتسليم مع كامل الصلاحيات الإدارية.
+                  متابعة وتحديث مسار الشحنات والطلبيات.
                 </p>
               </div>
             </div>
@@ -2098,7 +2098,7 @@ export function AdminDashboard({
             <div className="flex items-center gap-2">
               <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-violet-200 dark:border-violet-700 text-xs font-bold text-violet-800 dark:text-violet-300 flex items-center gap-1.5 shadow-2xs">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>صلاحية كاملة (Full Control)</span>
+                <span>تحكم إداري</span>
               </div>
             </div>
           </div>
@@ -2107,13 +2107,13 @@ export function AdminDashboard({
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             {[
               { id: 'ALL', labelAr: 'الكل', count: orders.length, color: 'bg-slate-100 text-slate-800' },
-              { id: 'LINK_ORDER', labelAr: '🔗 طلب من الرابط', count: adminLinkCount, color: 'bg-amber-100 text-amber-900 font-black' },
-              { id: 'REVIEW', labelAr: '🔍 قيد المراجعة', count: adminReviewCount, color: 'bg-amber-100 text-amber-800' },
-              { id: 'CONFIRMED', labelAr: '📞 تم التأكيد', count: adminConfirmedCount, color: 'bg-blue-100 text-blue-800' },
-              { id: 'PROCESSING', labelAr: '📦 قيد التحضير', count: adminProcessingCount, color: 'bg-purple-100 text-purple-800' },
-              { id: 'SHIPPED', labelAr: '🚚 قيد التوصيل', count: adminShippedCount, color: 'bg-indigo-100 text-indigo-800' },
-              { id: 'DELIVERED', labelAr: '🎉 تم التسليم', count: adminDeliveredCount, color: 'bg-emerald-100 text-emerald-800' },
-              { id: 'FAILED', labelAr: '❌ فشل التسليم / مرتجع', count: adminFailedCount, color: 'bg-rose-100 text-rose-800' },
+              { id: 'LINK_ORDER', labelAr: 'طلبات الروابط', count: adminLinkCount, color: 'bg-amber-100 text-amber-900 font-black' },
+              { id: 'REVIEW', labelAr: 'قيد المراجعة', count: adminReviewCount, color: 'bg-amber-100 text-amber-800' },
+              { id: 'CONFIRMED', labelAr: 'تم التأكيد', count: adminConfirmedCount, color: 'bg-blue-100 text-blue-800' },
+              { id: 'PROCESSING', labelAr: 'قيد التحضير', count: adminProcessingCount, color: 'bg-purple-100 text-purple-800' },
+              { id: 'SHIPPED', labelAr: 'قيد التوصيل', count: adminShippedCount, color: 'bg-indigo-100 text-indigo-800' },
+              { id: 'DELIVERED', labelAr: 'تم التسليم', count: adminDeliveredCount, color: 'bg-emerald-100 text-emerald-800' },
+              { id: 'FAILED', labelAr: 'فشل / مرتجع', count: adminFailedCount, color: 'bg-rose-100 text-rose-800' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -2362,22 +2362,22 @@ export function AdminDashboard({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm font-black text-slate-900 dark:text-white">
-                  مركز طلبات الانضمام والموافقة الفورية (بائعين وموردين)
+                  طلبات الانضمام
                 </h3>
                 {totalPendingApprovals > 0 ? (
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 animate-pulse">
-                    {totalPendingApprovals} طلب بانتظار الاعتماد
+                    {totalPendingApprovals} معلق
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    جميع الحسابات معتمدة ومفعلة ✔
+                    لا توجد طلبات معلقة
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 {totalPendingApprovals > 0
-                  ? `يوجد ${pendingSellers.length} بائعين و ${pendingSuppliers.length} موردين مسجلين بانتظار مراجعتك واعتمادهم لبدء النشاط.`
-                  : 'لا توجد طلبات معلقة حالياً. يتم فحص ومزامنة التسجيلات الجديدة تلقائياً كل 4 ثوانٍ.'}
+                  ? 'طلبات انضمام جديدة بانتظار المراجعة والاعتماد.'
+                  : 'تم اعتماد وتفعيل جميع الحسابات المسجلة.'}
               </p>
             </div>
           </div>
@@ -2403,7 +2403,7 @@ export function AdminDashboard({
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  بائعين ({pendingSellers.length})
+                  مسوقين ({pendingSellers.length})
                 </button>
                 <button
                   onClick={() => setApprovalsFilter('SUPPLIERS')}
@@ -2413,7 +2413,7 @@ export function AdminDashboard({
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  موردين ({pendingSuppliers.length})
+                  بائعين ({pendingSuppliers.length})
                 </button>
               </div>
             )}
@@ -2483,16 +2483,16 @@ export function AdminDashboard({
                     <div className="flex items-center gap-2 pt-2 border-t border-amber-500/20 flex-wrap">
                       <button
                         onClick={() => handleApproveSeller(seller.id)}
-                        className="flex-1 min-w-[120px] py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                        className="flex-1 min-w-[100px] py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
                       >
                         <Check className="w-3.5 h-3.5" />
-                        <span>قبول واعتماد البائع ✔</span>
+                        <span>قبول</span>
                       </button>
 
                       <a
                         href={getWhatsAppUrl(
                           seller.phone,
-                          `مرحباً ${seller.fullName}، نحييك من إدارة منصة Nouva Market بشأن طلب انضمامك كبائع ومسوق.`
+                          `مرحباً ${seller.fullName}، نحييك من إدارة منصة Nouva Market بشأن طلب انضمامك كمسوق بالعمولة.`
                         )}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -2526,14 +2526,14 @@ export function AdminDashboard({
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-600 text-white">
-                            مورد / مصنع
+                            بائع
                           </span>
                           <span className="text-[10px] text-slate-400 font-mono">
-                            {supplier.activityType || 'مورد بضاعة'}
+                            {supplier.activityType || 'بائع منتجات'}
                           </span>
                         </div>
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                          ⏳ قيد المراجعة
+                          معلق
                         </span>
                       </div>
 
@@ -2562,16 +2562,16 @@ export function AdminDashboard({
                     <div className="flex items-center gap-2 pt-2 border-t border-purple-500/20 flex-wrap">
                       <button
                         onClick={() => handleUpdateSupplierStatus(supplier.id, 'APPROVED')}
-                        className="flex-1 min-w-[120px] py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                        className="flex-1 min-w-[100px] py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
                       >
                         <Check className="w-3.5 h-3.5" />
-                        <span>قبول واعتماد المورد ✔</span>
+                        <span>قبول</span>
                       </button>
 
                       <a
                         href={getWhatsAppUrl(
                           supplier.phone,
-                          `مرحباً ${supplier.companyName || supplier.fullName}، نحييك من إدارة منصة Nouva Market بخصوص حساب المورد الخاص بك.`
+                          `مرحباً ${supplier.companyName || supplier.fullName}، نحييك من إدارة منصة Nouva Market بخصوص حساب البائع الخاص بك.`
                         )}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -2601,10 +2601,10 @@ export function AdminDashboard({
               <CheckCheck className="w-6 h-6" />
             </div>
             <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-              جميع طلبات البائعين والموردين معتمدة ومفعلة حالياً!
+              لا توجد طلبات معلقة
             </h4>
             <p className="text-xs text-slate-500 max-w-md mx-auto">
-              لديك <strong className="text-slate-800 dark:text-slate-200">{sellers.length} بائع</strong> و <strong className="text-slate-800 dark:text-slate-200">{supplierList.length} مورد</strong> نشط في المنصة. عند تسجيل أي بائع أو مورد جديد سيظهر طلبه هنا فوراً للموافقة عليه.
+              جميع حسابات المسوقين ({sellers.length}) والبائعين ({supplierList.length}) معتمدة ونشطة.
             </p>
             <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
               <button
@@ -2612,14 +2612,14 @@ export function AdminDashboard({
                 className="px-3.5 py-1.5 rounded-xl bg-purple-600/15 hover:bg-purple-600/25 text-purple-700 dark:text-purple-300 font-bold text-xs flex items-center gap-1.5 transition border border-purple-500/30 cursor-pointer"
               >
                 <Users className="w-3.5 h-3.5" />
-                <span>عرض قائمة البائعين ({sellers.length})</span>
+                <span>المسوقين ({sellers.length})</span>
               </button>
               <button
                 onClick={() => setActiveAdminTab('suppliers')}
                 className="px-3.5 py-1.5 rounded-xl bg-purple-600/15 hover:bg-purple-600/25 text-purple-700 dark:text-purple-300 font-bold text-xs flex items-center gap-1.5 transition border border-purple-500/30 cursor-pointer"
               >
                 <Building className="w-3.5 h-3.5" />
-                <span>عرض قائمة الموردين ({supplierList.length})</span>
+                <span>البائعين ({supplierList.length})</span>
               </button>
             </div>
           </div>
@@ -2632,11 +2632,11 @@ export function AdminDashboard({
         <div className="space-y-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
             <div>
-              <h3 className="text-xs font-extrabold text-slate-800 dark:text-white uppercase">
-                إدارة المنتجات، التصنيف (Catégorie)، الكميات، وتحميل الصور
+              <h3 className="text-sm font-black text-slate-800 dark:text-white">
+                كتالوج المنتجات
               </h3>
-              <p className="text-[10px] text-slate-500">
-                تحديد سعر الجملة، أدنى وأعلى سعر، السعر المقترح، الكميات لكل مقاس، والصور
+              <p className="text-xs text-slate-500">
+                إدارة المنتجات، الأسعار، والمخزون
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -2655,14 +2655,14 @@ export function AdminDashboard({
                 className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer transition"
               >
                 <Send className="w-4 h-4 rotate-45" />
-                <span>📥 استيراد من تلغرام</span>
+                <span>استيراد من تلغرام</span>
               </button>
               <button
                 onClick={() => setIsUrlImportModalOpen(true)}
                 className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-purple-600 hover:from-purple-500 hover:to-purple-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md whitespace-nowrap cursor-pointer transition"
               >
                 <LinkIcon className="w-4 h-4 text-amber-300" />
-                <span>🔗 استيراد منتجات من رابط</span>
+                <span>استيراد من رابط</span>
               </button>
               <button
                 onClick={() => {
@@ -2735,7 +2735,7 @@ export function AdminDashboard({
                       </span>
                       <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 dark:bg-purple-950/80 dark:text-purple-300 text-[10px] font-bold flex items-center gap-1 border border-purple-200 dark:border-purple-800/50">
                         <Building className="w-3 h-3 text-purple-600 dark:text-purple-400" />
-                        <span>المورد: {p.supplierName || 'مستودع الجزائر الأوراس للألبسة'}</span>
+                        <span>البائع: {p.supplierName || 'مستودع الجزائر الأوراس للألبسة'}</span>
                       </span>
                     </div>
 
@@ -2853,250 +2853,6 @@ export function AdminDashboard({
           categories={categories}
           onShowToast={onShowToast}
         />
-      )}
-
-      {/* ---------------- 1.5. APPROVALS & NEW REGISTRATIONS TAB (طلبات الانضمام والتفعيل) ---------------- */}
-      {activeAdminTab === 'approvals' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-amber-500/10 border border-amber-500/30">
-            <div>
-              <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <UserCheck className="w-5 h-5 text-amber-500" />
-                <span>إدارة ومراجعة طلبات التسجيل والانضمام (بائعين وموردين)</span>
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                تأكيد واعتماد الحسابات الجديدة لتبدأ في البيع أو توريد البضاعة، والتواصل المباشر معهم عبر الواتساب.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1 bg-slate-200 dark:bg-slate-800 p-1 rounded-xl text-xs font-bold">
-                <button
-                  onClick={() => setApprovalsFilter('ALL')}
-                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                    approvalsFilter === 'ALL'
-                      ? 'bg-purple-600 text-white font-black shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                  }`}
-                >
-                  الكل ({totalPendingApprovals})
-                </button>
-                <button
-                  onClick={() => setApprovalsFilter('SELLERS')}
-                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                    approvalsFilter === 'SELLERS'
-                      ? 'bg-purple-600 text-white font-black shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                  }`}
-                >
-                  بائعين معلقين ({pendingSellers.length})
-                </button>
-                <button
-                  onClick={() => setApprovalsFilter('SUPPLIERS')}
-                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                    approvalsFilter === 'SUPPLIERS'
-                      ? 'bg-purple-600 text-white font-black shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                  }`}
-                >
-                  موردين معلقين ({pendingSuppliers.length})
-                </button>
-              </div>
-
-              <button
-                onClick={handleForceRefreshRegistrations}
-                disabled={isRefreshingRegistrations}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingRegistrations ? 'animate-spin text-purple-500' : ''}`} />
-                <span>تحديث فوري</span>
-              </button>
-            </div>
-          </div>
-
-          {totalPendingApprovals === 0 ? (
-            <div className="p-8 text-center space-y-3 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 mb-2">
-                <CheckCheck className="w-8 h-8" />
-              </div>
-              <h4 className="text-base font-black text-slate-900 dark:text-white">
-                رائع! لا توجد طلبات معلقة حالياً
-              </h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                تم اعتماد وتفعيل جميع حسابات البائعين والموردين المسجلين في المنصة بنجاح.
-              </p>
-              <div className="flex items-center justify-center gap-3 pt-2 flex-wrap">
-                <button
-                  onClick={() => setActiveAdminTab('sellers')}
-                  className="px-4 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs flex items-center gap-1.5 hover:bg-purple-500 transition cursor-pointer"
-                >
-                  <Users className="w-4 h-4" />
-                  <span>استعراض البائعين المعتمدين ({sellers.length})</span>
-                </button>
-                <button
-                  onClick={() => setActiveAdminTab('suppliers')}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 hover:bg-slate-700 transition cursor-pointer"
-                >
-                  <Building className="w-4 h-4" />
-                  <span>استعراض الموردين المعتمدين ({supplierList.length})</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Sellers cards */}
-              {(approvalsFilter === 'ALL' || approvalsFilter === 'SELLERS') &&
-                pendingSellers.map((seller) => (
-                  <div
-                    key={`tab-pending-${seller.id}`}
-                    className="p-4 rounded-2xl border-2 border-amber-500/40 bg-white dark:bg-slate-900 hover:border-amber-500 transition shadow-sm flex flex-col justify-between gap-3.5"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-black bg-purple-600 text-white">
-                          طلب بائع / مسوق
-                        </span>
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                          ⏳ بانتظار الاعتماد
-                        </span>
-                      </div>
-
-                      <div>
-                        <h4 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                          <span>{seller.fullName}</span>
-                          {seller.storeName && (
-                            <span className="text-xs text-purple-600 dark:text-purple-400 font-bold">
-                              • متجر {seller.storeName}
-                            </span>
-                          )}
-                        </h4>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2">
-                          <span>📍 الولاية: <strong className="text-slate-700 dark:text-slate-200">{seller.wilaya || 'غير محددة'}</strong></span>
-                          <span>📞 هاتف: <strong className="text-slate-700 dark:text-slate-200 font-mono">{seller.phone}</strong></span>
-                          <span>✉️ بريد: <strong className="text-slate-700 dark:text-slate-200 font-mono">{seller.email}</strong></span>
-                        </div>
-                        {seller.password && (
-                          <div className="mt-2 flex items-center gap-1.5 text-xs font-mono bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg w-fit border border-slate-200 dark:border-slate-700">
-                            <Lock className="w-3.5 h-3.5 text-amber-500" />
-                            <span className="text-slate-500 dark:text-slate-400">كلمة المرور:</span>
-                            <span className="font-bold text-amber-600 dark:text-amber-400 select-all">{seller.password}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 flex-wrap">
-                      <button
-                        onClick={() => handleApproveSeller(seller.id)}
-                        className="flex-1 min-w-[130px] py-2.5 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
-                      >
-                        <Check className="w-4 h-4" />
-                        <span>قبول واعتماد البائع ✔</span>
-                      </button>
-
-                      <a
-                        href={getWhatsAppUrl(
-                          seller.phone,
-                          `مرحباً ${seller.fullName}، نحييك من إدارة منصة Nouva Market بشأن طلب انضمامك كبائع ومسوق.`
-                        )}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="py-2.5 px-3.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
-                        title="مراسلة عبر الواتساب"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                        <span>واتساب</span>
-                      </a>
-
-                      <button
-                        onClick={() => handleRejectSeller(seller.id)}
-                        className="py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center justify-center gap-1 transition cursor-pointer"
-                        title="رفض الطلب"
-                      >
-                        <X className="w-4 h-4" />
-                        <span>رفض</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-              {/* Suppliers cards */}
-              {(approvalsFilter === 'ALL' || approvalsFilter === 'SUPPLIERS') &&
-                pendingSuppliers.map((supplier) => (
-                  <div
-                    key={`tab-pending-${supplier.id}`}
-                    className="p-4 rounded-2xl border-2 border-purple-500/40 bg-white dark:bg-slate-900 hover:border-purple-500 transition shadow-sm flex flex-col justify-between gap-3.5"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-black bg-purple-700 text-white">
-                          طلب مورد / مصنع
-                        </span>
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                          ⏳ بانتظار الاعتماد
-                        </span>
-                      </div>
-
-                      <div>
-                        <h4 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                          <span>{supplier.companyName || supplier.fullName}</span>
-                          <span className="text-xs text-slate-400 font-normal">
-                            ({supplier.fullName})
-                          </span>
-                        </h4>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2">
-                          <span>📍 الولاية: <strong className="text-slate-700 dark:text-slate-200">{supplier.wilaya || 'غير محددة'}</strong></span>
-                          <span>🏭 النشاط: <strong className="text-slate-700 dark:text-slate-200">{supplier.activityType || 'توريد عام'}</strong></span>
-                          <span>📞 هاتف: <strong className="text-slate-700 dark:text-slate-200 font-mono">{supplier.phone}</strong></span>
-                          <span>✉️ بريد: <strong className="text-slate-700 dark:text-slate-200 font-mono">{supplier.email}</strong></span>
-                        </div>
-                        {supplier.password && (
-                          <div className="mt-2 flex items-center gap-1.5 text-xs font-mono bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg w-fit border border-slate-200 dark:border-slate-700">
-                            <Lock className="w-3.5 h-3.5 text-amber-500" />
-                            <span className="text-slate-500 dark:text-slate-400">كلمة المرور:</span>
-                            <span className="font-bold text-amber-600 dark:text-amber-400 select-all">{supplier.password}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 flex-wrap">
-                      <button
-                        onClick={() => handleUpdateSupplierStatus(supplier.id, 'APPROVED')}
-                        className="flex-1 min-w-[130px] py-2.5 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
-                      >
-                        <Check className="w-4 h-4" />
-                        <span>قبول واعتماد المورد ✔</span>
-                      </button>
-
-                      <a
-                        href={getWhatsAppUrl(
-                          supplier.phone,
-                          `مرحباً ${supplier.companyName || supplier.fullName}، نحييك من إدارة منصة Nouva Market بخصوص حساب المورد الخاص بك.`
-                        )}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="py-2.5 px-3.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
-                        title="مراسلة عبر الواتساب"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                        <span>واتساب</span>
-                      </a>
-
-                      <button
-                        onClick={() => handleUpdateSupplierStatus(supplier.id, 'REJECTED')}
-                        className="py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center justify-center gap-1 transition cursor-pointer"
-                        title="رفض الطلب"
-                      >
-                        <X className="w-4 h-4" />
-                        <span>رفض</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
       )}
 
       {/* ---------------- 2. SELLERS & APPROVALS (اضافة وتأكيد البائعين) ---------------- */}
@@ -3554,13 +3310,13 @@ export function AdminDashboard({
                   </div>
                   <div>
                     <h3 className="text-base font-black text-white flex items-center gap-2">
-                      <span>الخزينة المركزية وإدارة مقاصة الأموال (Admin Central Treasury)</span>
+                      <span>الخزينة المركزية</span>
                       <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-mono border border-purple-500/30">
-                        Unified 3-Tier Clearing
+                        مقاصة موحدة
                       </span>
                     </h3>
                     <p className="text-xs text-slate-300 leading-relaxed mt-0.5">
-                      التنسيق المالي الموحد والتلقائي بين <strong>مستحقات الموردين</strong>، <strong>محفظة أرباح البائعين</strong>، و<strong>الخزينة المركزية للآدمن</strong>.
+                      إدارة السيولة النقدية، مستحقات البائعين، وأرباح المسوقين.
                     </p>
                   </div>
                 </div>
@@ -3573,10 +3329,10 @@ export function AdminDashboard({
                       setIsZeroBalancesModalOpen(true);
                     }}
                     className="px-3.5 py-2 rounded-xl text-xs font-black bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 transition cursor-pointer flex items-center gap-1.5 shadow-sm"
-                    title="تصفير المبالغ في خانة السحوبات والخزينة"
+                    title="تصفير الأرصدة في خانة السحوبات والخزينة"
                   >
                     <RotateCcw className="w-3.5 h-3.5 text-rose-400 group-hover:text-white" />
-                    <span>تصفير المبالغ</span>
+                    <span>تصفير الأرصدة</span>
                   </button>
 
                   <div className="flex items-center gap-1.5 p-1.5 bg-slate-950/80 rounded-2xl border border-slate-800">
@@ -3589,7 +3345,7 @@ export function AdminDashboard({
                       }`}
                     >
                       <Users className="w-4 h-4" />
-                      <span>سحوبات البائعين ({withdrawals.filter((w) => w.status === 'PENDING').length})</span>
+                      <span>سحوبات المسوقين ({withdrawals.filter((w) => w.status === 'PENDING').length})</span>
                     </button>
 
                     <button
@@ -3601,7 +3357,7 @@ export function AdminDashboard({
                       }`}
                     >
                       <Building className="w-4 h-4" />
-                      <span>طلبات سحب الموردين ({settlements.filter((st) => st.status === 'PENDING').length})</span>
+                      <span>سحوبات البائعين ({settlements.filter((st) => st.status === 'PENDING').length})</span>
                     </button>
                   </div>
                 </div>
@@ -3615,11 +3371,11 @@ export function AdminDashboard({
                 </div>
                 <div className="flex items-center justify-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0"></span>
-                  <span>2. تسوية وتحويل مستحقات مبيعات الجملة للموردين عند طلب السحب</span>
+                  <span>2. تسوية وتحويل مستحقات مبيعات الجملة للبائعين عند طلب السحب</span>
                 </div>
                 <div className="flex items-center justify-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0"></span>
-                  <span>3. تحويل أرباح وعمولات البائعين والمسوقين لحساباتهم</span>
+                  <span>3. تحويل أرباح وعمولات المسوقين لحساباتهم</span>
                 </div>
               </div>
             </div>
@@ -3629,7 +3385,7 @@ export function AdminDashboard({
               {/* Card 1: Supplier Collections */}
               <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-1">
                 <div className="flex justify-between items-center text-xs text-slate-500 font-extrabold">
-                  <span>محصلات الموردين المقبوضة</span>
+                  <span>محصلات البائعين المقبوضة</span>
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => {
@@ -3637,7 +3393,7 @@ export function AdminDashboard({
                         setIsZeroBalancesModalOpen(true);
                       }}
                       className="p-1 rounded-md hover:bg-rose-100 dark:hover:bg-rose-950/60 text-slate-400 hover:text-rose-600 transition cursor-pointer"
-                      title="تصفير محصلات الموردين"
+                      title="تصفير محصلات البائعين"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                     </button>
@@ -3647,13 +3403,13 @@ export function AdminDashboard({
                 <div className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono">
                   <MoneyText amount={totalCollectedFromSuppliers} />
                 </div>
-                <p className="text-[10px] text-slate-400">إجمالي المبالغ المسددة من الموردين للآدمن</p>
+                <p className="text-[10px] text-slate-400">إجمالي المبالغ المسددة من البائعين للآدمن</p>
               </div>
 
               {/* Card 2: Paid Seller Withdrawals */}
               <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-1">
                 <div className="flex justify-between items-center text-xs text-slate-500 font-extrabold">
-                  <span>سحوبات البائعين المصروفة</span>
+                  <span>سحوبات المسوقين المصروفة</span>
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => {
@@ -3730,9 +3486,9 @@ export function AdminDashboard({
                   <div>
                     <h4 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
                       <Users className="w-4 h-4 text-purple-600" />
-                      <span>قائمة طلبات سحب الأرباح والمستحقات (البائعين، مؤكدي الطلبيات، وعمال المستودع)</span>
+                      <span>طلبات السحب</span>
                     </h4>
-                    <p className="text-xs text-slate-500 font-medium">مراجعة وتحويل المستحقات والأتعاب لحسابات المستفيدين (BaridiMob / CCP / نقداً) وتوثيق أرقام وصولات التحويل</p>
+                    <p className="text-xs text-slate-500 font-medium">مراجعة وتحويل المستحقات وتوثيق الحوالات (BaridiMob / CCP).</p>
                   </div>
 
                   {/* Filter Pills & Reset Action */}
@@ -3776,10 +3532,10 @@ export function AdminDashboard({
                   <span className="text-[11px] text-slate-400 font-black px-2">تصنيف المستفيد:</span>
                   {[
                     { id: 'ALL' as const, label: `الكل (${withdrawals.length})` },
-                    { id: 'SELLER' as const, label: `🛒 البائعين (${withdrawals.filter((w) => !w.userType || w.userType === 'SELLER').length})` },
+                    { id: 'SELLER' as const, label: `🛒 المسوقين (${withdrawals.filter((w) => !w.userType || w.userType === 'SELLER').length})` },
                     { id: 'CONFIRMER' as const, label: `🎧 مؤكدو الطلبيات (${withdrawals.filter((w) => w.userType === 'CONFIRMER').length})` },
                     { id: 'PACKER' as const, label: `📦 عمال المستودع (${withdrawals.filter((w) => w.userType === 'PACKER').length})` },
-                    { id: 'SUPPLIER' as const, label: `🏭 الموردين (${withdrawals.filter((w) => w.userType === 'SUPPLIER').length})` },
+                    { id: 'SUPPLIER' as const, label: `🏭 البائعين (${withdrawals.filter((w) => w.userType === 'SUPPLIER').length})` },
                   ].map((r) => (
                     <button
                       key={r.id}
@@ -3997,9 +3753,9 @@ export function AdminDashboard({
                   <div>
                     <h4 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
                       <Building className="w-4 h-4 text-purple-600" />
-                      <span>تحصيلات وتسويات مستحقات الموردين (Supplier Dues Ledger)</span>
+                      <span>تسويات مستحقات البائعين</span>
                     </h4>
-                    <p className="text-xs text-slate-500 font-medium">مراجعة وتأكيد المبالغ والعمولات المسددة من قبل الموردين للآدمن</p>
+                    <p className="text-xs text-slate-500 font-medium">متابعة وتصفية مستحقات مبيعات البائعين.</p>
                   </div>
 
                   <button
@@ -4008,7 +3764,7 @@ export function AdminDashboard({
                       setIsZeroBalancesModalOpen(true);
                     }}
                     className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-100 transition cursor-pointer flex items-center gap-1.5"
-                    title="تصفير مبالغ تحصيلات الموردين"
+                    title="تصفير مبالغ تحصيلات البائعين"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>تصفير مبالغ التحصيلات</span>
@@ -4017,7 +3773,7 @@ export function AdminDashboard({
 
                 {settlements.length === 0 ? (
                   <div className="p-8 text-center rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 text-xs font-bold">
-                    لا توجد طلبات سحب أو تسويات مسجلة للموردين حالياً.
+                    لا توجد طلبات سحب أو تسويات مسجلة للبائعين حالياً.
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -4170,7 +3926,7 @@ export function AdminDashboard({
                     تصفير المبالغ في خانة السحوبات والخزينة
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    اختر نوع التصفير المطلوب. يتم تصفير المبالغ المالية مع الحفاظ الصارم على بيانات وحسابات البائعين والموردين.
+                    اختر نوع التصفير المطلوب. يتم تصفير المبالغ المالية مع الحفاظ الصارم على بيانات وحسابات البائعين والمسوقين.
                   </p>
                 </div>
               </div>
@@ -4300,14 +4056,14 @@ export function AdminDashboard({
                 <div className="flex-1">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-black text-slate-900 dark:text-white">
-                      تصفير مبالغ تحصيلات وتسويات الموردين (0 دج)
+                      تصفير مبالغ تحصيلات وتسويات البائعين (0 دج)
                     </span>
                     <span className="text-[11px] font-mono font-bold text-purple-600 dark:text-purple-400">
                       {settlements.reduce((sum, st) => sum + (st.amountDzd || 0), 0).toLocaleString()} دج
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    تصفير مبالغ المدفوعات والتحصيلات المسددة من الموردين ليعود المؤشر إلى 0 دج.
+                    تصفير مبالغ المدفوعات والتحصيلات المسددة من البائعين ليعود المؤشر إلى 0 دج.
                   </p>
                 </div>
               </div>
@@ -4369,7 +4125,7 @@ export function AdminDashboard({
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    إفراغ جدول طلبات السحب بالكامل للبدء بسجل جديد، مع الحفاظ التام والصارم على حسابات البائعين والموردين.
+                    إفراغ جدول طلبات السحب بالكامل للبدء بسجل جديد، مع الحفاظ التام والصارم على حسابات المسوقين والبائعين.
                   </p>
                 </div>
               </div>
@@ -4379,7 +4135,7 @@ export function AdminDashboard({
             <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl text-[11px] text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
               <span>
-                <strong>ضمان الأمان:</strong> عملية التصفير تطبق فقط على المبالغ المختارة وتضمن الحفاظ الصارم على حسابات البائعين، الموردين، والمتاجر دون مساس.
+                <strong>ضمان الأمان:</strong> عملية التصفير تطبق فقط على المبالغ المختارة وتضمن الحفاظ الصارم على حسابات المسوقين، البائعين، والمتاجر دون مساس.
               </span>
             </div>
 
@@ -4417,7 +4173,7 @@ export function AdminDashboard({
               <div>
                 <h3 className="font-black text-base text-white">مستودع المنصة</h3>
                 <p className="text-slate-300 text-xs mt-0.5">
-                  إدارة المخزون واستقبال شحنات التوريد من الموردين وتغذية شبكة المسوقين.
+                  إدارة المخزون واستقبال شحنات السلع من البائعين وتغذية شبكة المسوقين.
                 </p>
               </div>
             </div>
@@ -4428,7 +4184,7 @@ export function AdminDashboard({
                 className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-rose-600/20"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>فحص جودة المرتجعات (QC)</span>
+                <span>فحص المرتجعات</span>
               </button>
 
               <button
@@ -4436,7 +4192,7 @@ export function AdminDashboard({
                 className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-md shadow-blue-600/20"
               >
                 <BarChart3 className="w-3.5 h-3.5" />
-                <span>معدلات التوصيل بالولايات</span>
+                <span>إحصائيات التوصيل</span>
               </button>
 
               <button
@@ -4456,39 +4212,42 @@ export function AdminDashboard({
           {/* Quick Metrics Bar */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-1">
-              <span className="text-[11px] text-slate-500 font-bold block">إجمالي المنتجات بالمستودع</span>
+              <span className="text-[11px] text-slate-500 font-bold block">المنتجات</span>
               <span className="text-xl font-black text-slate-900 dark:text-white font-mono">{products.length} صنف</span>
             </div>
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-1">
-              <span className="text-[11px] text-slate-500 font-bold block">إجمالي القطع المتاحة حالياً</span>
+              <span className="text-[11px] text-slate-500 font-bold block">المخزون المتوفر</span>
               <span className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono">
                 {products.reduce((acc, p) => acc + p.variants.reduce((sum, v) => sum + (Number(v.stockCount) || 0), 0), 0)} قطعة
               </span>
             </div>
             <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 shadow-xs space-y-1">
-              <span className="text-[11px] text-amber-800 dark:text-amber-300 font-bold block">شحنات توريد في الطريق للمستودع</span>
+              <span className="text-[11px] text-amber-800 dark:text-amber-300 font-bold block">شحنات في الطريق</span>
               <span className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">
                 {adminInboundRequests.filter((r) => r.status === 'IN_TRANSIT').length} شحنة
               </span>
             </div>
             <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 shadow-xs space-y-1">
-              <span className="text-[11px] text-emerald-800 dark:text-emerald-300 font-bold block">شحنات مستلمة ومفحوصة</span>
+              <span className="text-[11px] text-emerald-800 dark:text-emerald-300 font-bold block">شحنات مستلمة</span>
               <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
                 {adminInboundRequests.filter((r) => r.status === 'RECEIVED').length} شحنة
               </span>
             </div>
           </div>
 
-          {/* SECTION 1: INBOUND STOCK DELIVERIES AUDIT (استقبال شحنات الموردين وتأكيد فحصها) */}
+          {/* SOURCING REQUESTS & WAREHOUSE ADDRESS MANAGEMENT */}
+          <AdminWarehouseAddressAndSourcingTab onShowToast={onShowToast} />
+
+          {/* SECTION 1: INBOUND STOCK DELIVERIES AUDIT (استقبال شحنات البائعين وتأكيد فحصها) */}
           <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <h4 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
                   <Boxes className="w-4 h-4 text-emerald-600" />
-                  <span>سجل وتأكيد شحنات التوريد من الموردين (Inbound Shipments Receiving)</span>
+                  <span>سجل شحنات التوريد</span>
                 </h4>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  تأكيد وصول كراتين السلع لمستودع المنصة وفحصها لتغذية المخزون الحي تلقائياً دون كتابة يدوية.
+                  فحص وتأكيد استلام كراتين البضائع وتغذية المخزون تلقائياً.
                 </p>
               </div>
 
@@ -4555,7 +4314,7 @@ export function AdminDashboard({
                             {isRec ? '✔ تم الاستلام وتغذية المخزون الحي' : '🚚 قيد الوصول للمستودع'}
                           </span>
                           <span className="text-[11px] text-slate-600 dark:text-slate-300 font-bold">
-                            المورد: {req.supplierName} ({req.supplierPhone || ''})
+                            البائع: {req.supplierName} ({req.supplierPhone || ''})
                           </span>
                         </div>
 
@@ -4602,7 +4361,7 @@ export function AdminDashboard({
                                   setAdminInboundRequests((prev) => prev.filter((item) => item.id !== req.id));
                                   setProducts(getStoredProducts());
                                   onShowToast(
-                                    `✔ تم تأكيد استلام وفحص شحنة المورد (${req.supplierName}) وإضافة ${req.totalUnits} قطعة للمخزون الحي!`,
+                                    `✔ تم تأكيد استلام وفحص شحنة البائع (${req.supplierName}) وإضافة ${req.totalUnits} قطعة للمخزون الحي!`,
                                     'success'
                                   );
                                 }
@@ -4610,12 +4369,12 @@ export function AdminDashboard({
                               className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center gap-1.5 shadow-sm cursor-pointer transition"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>تم إيداع الشحنة في رفوف المستودع والمخزون متاح للمسوقين فوراً</span>
+                              <span>تم إيداع الشحنة في المستودع والمخزون متاح للمسوقين فوراً</span>
                             </button>
                           ) : (
                             <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 text-xs">
                               <CheckCircle2 className="w-4 h-4" />
-                              <span>تم إيداع الشحنة في رفوف المستودع والمخزون متاح للمسوقين فوراً</span>
+                              <span>تم إيداع الشحنة في المستودع والمخزون متاح للمسوقين فوراً</span>
                             </span>
                           )}
                         </div>
@@ -4623,64 +4382,6 @@ export function AdminDashboard({
                     </div>
                   );
                 })}
-            </div>
-          </div>
-
-          {/* SECTION 2: BIN LOCATIONS & SHELVES IN CENTRAL WAREHOUSE */}
-          <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
-            <div>
-              <h4 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <WarehouseIcon className="w-4 h-4 text-purple-600" />
-                <span>إدارة أرفف ومواقع تخزين المنتجات بالمستودع المركزي</span>
-              </h4>
-              <p className="text-xs text-slate-500 mt-0.5">
-                تحديد كود الرف والممر (Bin / Shelf Location) لتسهيل التقاط وتغليف الطرود بسرعة عند تجهيز الطلبيات.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {products.map((p, pIdx) => (
-                <div
-                  key={`${p.id}-${pIdx}`}
-                  className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3 text-xs"
-                >
-                  <div className="flex justify-between items-center font-bold">
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-900 dark:text-white">{p.nameAr}</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-                        {p.supplierName || 'مستودع المنصة'}
-                      </span>
-                    </div>
-                    <span className="text-purple-600 dark:text-purple-400 font-mono font-black">
-                      مخزون حي: {p.variants.reduce((acc, v) => acc + (Number(v.stockCount) || 0), 0)} قطعة
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] text-slate-400">موقع المنتج بالرف:</span>
-                    <input
-                      type="text"
-                      value={inventoryLocation[p.id] || 'مستودع العاصمة - رف A1'}
-                      onChange={(e) =>
-                        setInventoryLocation({ ...inventoryLocation, [p.id]: e.target.value })
-                      }
-                      className="flex-1 min-w-[200px] px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-mono text-[11px] border border-slate-200 dark:border-slate-700"
-                    />
-                    <button
-                      onClick={() => onShowToast('✔ تم حفظ وتحديث كود الرف بنجاح!')}
-                      className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-[10px] cursor-pointer transition shadow-2xs"
-                    >
-                      حفظ موقع الرف
-                    </button>
-                    <button
-                      onClick={() => handleClearBinLocation(p.id)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-700 dark:text-slate-300 font-bold text-[10px] cursor-pointer transition"
-                    >
-                      مسح الرف
-                    </button>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         </div>
@@ -4692,11 +4393,11 @@ export function AdminDashboard({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-xs font-extrabold text-slate-800 dark:text-white uppercase">
-                إدارة فئات وتصنيفات المنتجات ({categories.length})
+              <h3 className="text-sm font-black text-slate-800 dark:text-white">
+                فئات المنتجات ({categories.length})
               </h3>
-              <p className="text-[11px] text-slate-500 font-bold">
-                الفئات المعروضة هنا تظهر تلقائياً في الشريط الأفقي لكتالوج المنتجات
+              <p className="text-xs text-slate-500">
+                إدارة تصنيفات الكتالوج وعرضها
               </p>
             </div>
             <button
@@ -4713,7 +4414,7 @@ export function AdminDashboard({
               className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition"
             >
               <FolderPlus className="w-3.5 h-3.5" />
-              <span>+ إضافة فئة وتصنيف جديد</span>
+              <span>إضافة فئة</span>
             </button>
           </div>
 
@@ -5002,10 +4703,10 @@ export function AdminDashboard({
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    أداة استيراد المنتجات من قناة التلغرام (Telegram Importer)
-                    <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 text-[10px] font-bold">ذكية ⚡</span>
+                    <span>استيراد من تلغرام</span>
+                    <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 text-[10px] font-bold">تلقائي</span>
                   </h3>
-                  <p className="text-xs text-slate-500">انسخ المنشور من قناة التلغرام والصقه هنا، وسيتم استخراج العنونة والأسعار والوصف والصور تلقائياً!</p>
+                  <p className="text-xs text-slate-500">استخراج بيانات المنتج والصور تلقائياً من منشور التلغرام.</p>
                 </div>
               </div>
               <button
@@ -5022,7 +4723,7 @@ export function AdminDashboard({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  نص منشور التلغرام (Telegram Post Text):
+                  نص المنشور:
                 </label>
                 <button
                   onClick={() => {
@@ -5150,7 +4851,7 @@ export function AdminDashboard({
                     className="px-6 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs transition cursor-pointer shadow-md flex items-center gap-1.5"
                   >
                     <Check className="w-4 h-4" />
-                    <span>تأكيد إضافة المنتج لـ NouvaMarket</span>
+                    <span>إضافة المنتج</span>
                   </button>
                 </div>
               </div>
@@ -5164,7 +4865,7 @@ export function AdminDashboard({
                 }}
                 className="px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-200 transition cursor-pointer"
               >
-                إغلاق الأداة
+                إغلاق
               </button>
             </div>
           </div>
@@ -5183,24 +4884,24 @@ export function AdminDashboard({
                 </div>
                 <div>
                   <h4 className="font-black text-sm text-white flex items-center gap-2">
-                    <span>إدارة شركات التوصيل والدورة المالية المركزية (Central Financial Brokerage)</span>
+                    <span>شركات التوصيل والدورة المالية</span>
                     <span className="px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-400/30">
-                      أموال الـ COD عند الأدمن
+                      تحصيل COD مركزي
                     </span>
                   </h4>
                   <p className="text-xs text-slate-300">
-                    المنصة والأدمن هما الوسيط المالي المباشر بين المسوّق والمورّد لضمان حقوق كافة الأطراف.
+                    المنصة والأدمن هما الوسيط المالي المباشر بين المسوّق والبائع لضمان حقوق كافة الأطراف.
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 self-end md:self-auto">
                 <button
-                  onClick={() => setActiveAdminTab('withdrawals')}
+                  onClick={() => setActiveAdminTab('wallet')}
                   className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition"
                 >
                   <DollarSign className="w-3.5 h-3.5" />
-                  <span>جدول التحويلات والتسويات</span>
+                  <span>التسويات المالية</span>
                 </button>
               </div>
             </div>
@@ -5218,10 +4919,10 @@ export function AdminDashboard({
 
               <div className="p-3 rounded-2xl bg-slate-900/80 border border-indigo-800/40 space-y-1">
                 <div className="flex items-center gap-1.5 font-bold text-emerald-300 text-[11px]">
-                  <span>2. تسديد حقوق الموردين</span>
+                  <span>2. تسديد حقوق البائعين</span>
                 </div>
                 <p className="text-[11px] text-slate-300 leading-relaxed">
-                  يقوم الأدمن بدفع سعر الجملة المحدد للسلع المسلّمة لحساب المورد في CCP أو BaridiMob.
+                  يقوم الأدمن بدفع سعر الجملة المحدد للسلع المسلّمة لحساب البائع في CCP أو BaridiMob.
                 </p>
               </div>
 
@@ -5230,22 +4931,22 @@ export function AdminDashboard({
                   <span>3. تسديد عمولات المسوّقين</span>
                 </div>
                 <p className="text-[11px] text-slate-300 leading-relaxed">
-                  يقوم الأدمن بدفع صافي عمولات التسويق للبائعين عند طلب السحب من محفظتهم.
+                  يقوم الأدمن بدفع صافي عمولات التسويق للمسوقين عند طلب السحب من محفظتهم.
                 </p>
               </div>
             </div>
           </div>
 
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-extrabold text-slate-800 dark:text-white uppercase">
-              مفاتيح الـ API وربط شركات التوصيل المعتمدة (Yalidine / Maystro / ZR / Ecom / Nord&Sud)
+            <h3 className="text-sm font-black text-slate-800 dark:text-white">
+              شركات التوصيل المربوطة
             </h3>
             <button
               onClick={() => setIsAddingCourierModalOpen(true)}
               className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>+ إضافة شركة توصيل جديدة</span>
+              <span>إضافة شركة توصيل</span>
             </button>
           </div>
 
@@ -5437,9 +5138,7 @@ export function AdminDashboard({
           <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl text-xs text-purple-900 dark:text-purple-300 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Building className="w-5 h-5 text-purple-600 shrink-0" />
-              <span>
-                <strong>نظام إدارة الموردين (Supplier System):</strong> التحكم في طلبات انضمام الموردين، اعتماد المنتجات الجديدة، ضبط عمولات Nouva Market، وتحويل المستحقات والتحويلات المالية.
-              </span>
+              <span>إدارة حسابات البائعين، عمولات المنصة، واعتماد السلع.</span>
             </div>
           </div>
 
@@ -5449,9 +5148,9 @@ export function AdminDashboard({
               <div>
                 <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
                   <Percent className="w-4 h-4 text-purple-600" />
-                  <span>إعدادات عمولات المنصة (نسبة المورد، نسبة المسوق، ورسوم التغليف والتجهيز)</span>
+                  <span>عمولات ورسوم المنصة</span>
                 </h3>
-                <p className="text-xs text-slate-500">التحكم في نسبة عمولة المنصة من المورد، والنسبة المقتطعة من أرباح المسوق، ورسوم تغليف وتجهيز الطرد (أجر عامل المستودع)</p>
+                <p className="text-xs text-slate-500">تحديد نسب عمولة المنصة ورسوم التجهيز والتأكيد.</p>
               </div>
 
               <button
@@ -5459,7 +5158,7 @@ export function AdminDashboard({
                 className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer self-start sm:self-auto"
               >
                 <Check className="w-4 h-4" />
-                <span>حفظ إعدادات الرسوم والعمولات</span>
+                <span>حفظ الإعدادات</span>
               </button>
             </div>
 
@@ -5468,7 +5167,7 @@ export function AdminDashboard({
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-slate-800 dark:text-slate-200 font-black block">
-                    1. عمولة المنصة من المورد (Supplier Fee %):
+                    1. عمولة المنصة من البائع (Seller Fee %):
                   </label>
                   <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-black">
                     افتراضياً 5%
@@ -5519,11 +5218,14 @@ export function AdminDashboard({
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 text-[10px] text-purple-800 dark:text-purple-300 space-y-1">
-                  <p className="font-extrabold">💡 كيف تُحسب عمولة المورد؟</p>
+                  <p className="font-extrabold">💡 كيف تُحسب عمولة البائع وماذا تغطي؟</p>
                   <p className="text-slate-600 dark:text-slate-400">
-                    إذا أدخل المورد سعر النيت = 3,000 دج ونسبة العمولة {feeSettings.supplierFeePercent ?? 5}%،
+                    إذا أدخل البائع سعر النيت = 3,000 دج ونسبة العمولة {feeSettings.supplierFeePercent ?? 5}%،
                     تأخذ المنصة {Math.round((3000 * (feeSettings.supplierFeePercent ?? 5)) / 100)} دج،
                     ويظهر للمسوق سعر الجملة = {3000 + Math.round((3000 * (feeSettings.supplierFeePercent ?? 5)) / 100)} دج.
+                  </p>
+                  <p className="text-[10px] text-purple-700 dark:text-purple-300 font-bold pt-1 border-t border-purple-200/50 dark:border-purple-800/40">
+                    تظهر للبائع مع شارة: «شاملة: التسويق + تأكيد الطلبية + تغليفها + توصيلها وتتكفل بالإرجاع (ليست ربحاً صافياً)».
                   </p>
                 </div>
               </div>
@@ -5592,71 +5294,11 @@ export function AdminDashboard({
                 </div>
               </div>
 
-              {/* Warehouse Packaging & Picking Fee Control */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-slate-800 dark:text-slate-200 font-black block">
-                    3. أتعاب التغليف والتجهيز (عامل المستودع):
-                  </label>
-                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-black">
-                    على عاتق الإدارة
-                  </span>
-                </div>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    max="2000"
-                    step="10"
-                    value={feeSettings.pickAndPackFeeDzd ?? 100}
-                    onChange={(e) =>
-                      setFeeSettings({
-                        ...feeSettings,
-                        pickAndPackFeeDzd: Number(e.target.value),
-                      })
-                    }
-                    className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono text-sm text-amber-600 dark:text-amber-400 font-black focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-black text-[11px]">دج / طرد</span>
-                </div>
-
-                {/* Quick Presets */}
-                <div className="flex items-center gap-1.5 pt-1">
-                  <span className="text-[10px] text-slate-400 font-bold">مبالغ:</span>
-                  {[0, 50, 100, 150, 200].map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() =>
-                        setFeeSettings({
-                          ...feeSettings,
-                          pickAndPackFeeDzd: amt,
-                        })
-                      }
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition cursor-pointer ${
-                        (feeSettings.pickAndPackFeeDzd ?? 100) === amt
-                          ? 'bg-amber-600 text-white'
-                          : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100'
-                      }`}
-                    >
-                      {amt === 0 ? '0' : `${amt} دج`}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 text-[10px] text-amber-800 dark:text-amber-300 space-y-1">
-                  <p className="font-extrabold">💡 تغطية الإدارة للتغليف:</p>
-                  <p className="text-slate-600 dark:text-slate-400">
-                    تُحسب على كل طرد مُسلّم ({feeSettings.pickAndPackFeeDzd ?? 100} دج). تُصرف كأجر لعامل المستودع أو كلفة مواد التغليف، وتتحملها المنصة بالكامل دون خصم من المورد أو المسوق.
-                  </p>
-                </div>
-              </div>
-
               {/* Confirmation Agent Fee Control */}
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-slate-800 dark:text-slate-200 font-black block">
-                    4. أتعاب مؤكد الطلبيات (فريق التأكيد):
+                    3. أتعاب مؤكد الطلبيات (فريق التأكيد):
                   </label>
                   <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-black">
                     على عاتق الإدارة
@@ -5707,7 +5349,7 @@ export function AdminDashboard({
                 <div className="p-2.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 text-[10px] text-blue-800 dark:text-blue-300 space-y-1">
                   <p className="font-extrabold">💡 تغطية الإدارة لأتعاب التأكيد:</p>
                   <p className="text-slate-600 dark:text-slate-400">
-                    تُحسب على كل طرد أكده المؤكد وتم تسليمه ({feeSettings.confirmerFeeDzd ?? 100} دج). تُصرف كحافز إنتاجي للمؤكد من إيرادات المنصة دون اقتطاع من المسوق أو المورد.
+                    تُحسب على كل طرد أكده المؤكد وتم تسليمه ({feeSettings.confirmerFeeDzd ?? 100} دج). تُصرف كحافز إنتاجي للمؤكد من إيرادات المنصة دون اقتطاع من المسوق أو البائع.
                   </p>
                 </div>
               </div>
@@ -5721,7 +5363,7 @@ export function AdminDashboard({
                   <span>محاكاة الدورة المالية المتكاملة للطلبية المسلّمة (النيت 3,000 دج والبيع 4,500 دج):</span>
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold">
-                  التغليف والتأكيد على عاتق الإدارة 100%
+                  التأكيد على عاتق الإدارة 100%
                 </span>
               </div>
 
@@ -5729,7 +5371,6 @@ export function AdminDashboard({
                 const netSupplier = 3000;
                 const supFee = feeSettings.supplierFeePercent ?? 5;
                 const resFee = feeSettings.resellerFeePercent ?? 0;
-                const packingFee = feeSettings.pickAndPackFeeDzd ?? 100;
                 const confirmerFee = feeSettings.confirmerFeeDzd ?? 100;
                 
                 const platformFromSupplier = Math.round((netSupplier * supFee) / 100);
@@ -5740,33 +5381,27 @@ export function AdminDashboard({
                 const netResellerProfit = Math.max(0, grossResellerProfit - platformFromReseller);
                 
                 const grossPlatformRevenue = platformFromSupplier + platformFromReseller;
-                const totalOperatingCosts = packingFee + confirmerFee;
+                const totalOperatingCosts = confirmerFee;
                 const netPlatformProfit = grossPlatformRevenue - totalOperatingCosts;
 
                 return (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 pt-1.5">
                     <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
                       <span className="text-[10px] text-slate-400 block font-bold">سعر الجملة للمسوق</span>
                       <span className="text-xs font-black text-purple-600 dark:text-purple-400 font-mono">{wholesale} دج</span>
-                      <span className="text-[9px] text-slate-400 block mt-0.5">(صافي المورد {netSupplier} دج)</span>
+                      <span className="text-[9px] text-slate-400 block mt-0.5">(صافي البائع {netSupplier} دج)</span>
                     </div>
 
                     <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-center">
                       <span className="text-[10px] text-emerald-700 dark:text-emerald-300 block font-bold">صافي ربح المسوق</span>
                       <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 font-mono">{netResellerProfit} دج</span>
-                      <span className="text-[9px] text-emerald-600/80 block mt-0.5">كاملاً دون خصم تغليف/تأكيد</span>
+                      <span className="text-[9px] text-emerald-600/80 block mt-0.5">كاملاً دون خصم تأكيد</span>
                     </div>
 
                     <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
                       <span className="text-[10px] text-purple-600 dark:text-purple-300 block font-bold">إجمالي عمولة المنصة</span>
                       <span className="text-xs font-black text-purple-600 dark:text-purple-400 font-mono">+{grossPlatformRevenue} دج</span>
                       <span className="text-[9px] text-slate-400 block mt-0.5">({supFee}% من النيت + {resFee}% مسوق)</span>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 text-center">
-                      <span className="text-[10px] text-amber-700 dark:text-amber-300 block font-bold">أتعاب عامل التغليف</span>
-                      <span className="text-xs font-black text-amber-700 dark:text-amber-400 font-mono">-{packingFee} دج</span>
-                      <span className="text-[9px] text-amber-600/70 block mt-0.5">تتحملها الإدارة لعامل المستودع</span>
                     </div>
 
                     <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-300 dark:border-blue-800 text-center">
@@ -5785,7 +5420,7 @@ export function AdminDashboard({
                         {netPlatformProfit >= 0 ? `+${netPlatformProfit}` : netPlatformProfit} دج
                       </span>
                       <span className="text-[9px] opacity-75 block mt-0.5">
-                        بعد صرف التغليف والتأكيد
+                        بعد صرف أتعاب التأكيد
                       </span>
                     </div>
                   </div>
@@ -5800,9 +5435,9 @@ export function AdminDashboard({
               <div>
                 <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
                   <Users className="w-4 h-4 text-purple-600" />
-                  <span>طلبات الانضمام والموردين المسجلين ({supplierList.length})</span>
+                  <span>قائمة البائعين ({supplierList.length})</span>
                 </h3>
-                <p className="text-xs text-slate-500">قبول، رفض أو تعليق حسابات الموردين والمستودعات</p>
+                <p className="text-xs text-slate-500">إدارة وتفعيل حسابات البائعين.</p>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
@@ -5811,7 +5446,7 @@ export function AdminDashboard({
                   className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>+ إضافة مورد جديد</span>
+                  <span>إضافة بائع</span>
                 </button>
 
                 {/* Status Filter Tabs */}
@@ -5852,14 +5487,14 @@ export function AdminDashboard({
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-amber-500 animate-spin" />
                   <span className="text-amber-800 dark:text-amber-300 font-bold">
-                    يوجد <strong className="text-amber-600 dark:text-amber-400">{pendingSuppliers.length}</strong> طلبات انضمام موردين بانتظار موافقتك وتفعيل حساباتهم.
+                    يوجد <strong className="text-amber-600 dark:text-amber-400">{pendingSuppliers.length}</strong> طلبات انضمام بائعين بانتظار موافقتك وتفعيل حساباتهم.
                   </span>
                 </div>
                 <button
                   onClick={() => setSupplierFilter('PENDING')}
                   className="px-3 py-1 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] transition cursor-pointer shrink-0"
                 >
-                  عرض الموردين المعلقين الآن ⏳
+                  عرض البائعين المعلقين الآن ⏳
                 </button>
               </div>
             )}
@@ -5915,22 +5550,22 @@ export function AdminDashboard({
                         <button
                           onClick={() => handleEnterSupplierDashboard(s)}
                           className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-[11px] flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-                          title="الدخول المباشر لداشبورد هذا المورد"
+                          title="الدخول المباشر لداشبورد هذا البائع"
                         >
                           <WarehouseIcon className="w-3.5 h-3.5" />
-                          <span>دخول حساب المورد 🏭</span>
+                          <span>دخول حساب البائع 🏭</span>
                         </button>
 
                         {/* WhatsApp Direct Link */}
                         <a
                           href={getWhatsAppUrl(
                             s.phone,
-                            `مرحباً ${s.companyName || s.fullName}، نحييك من إدارة منصة Nouva بشأن حساب المورد الخاص بك.`
+                            `مرحباً ${s.companyName || s.fullName}، نحييك من إدارة منصة Nouva بشأن حساب البائع الخاص بك.`
                           )}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-[11px] flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-                          title="مراسلة المورد مباشرة عبر الواتساب"
+                          title="مراسلة البائع مباشرة عبر الواتساب"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
                           <span>واتساب</span>
@@ -5942,7 +5577,7 @@ export function AdminDashboard({
                               onClick={() => handleUpdateSupplierStatus(s.id, 'APPROVED')}
                               className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-[11px] shadow-xs cursor-pointer"
                             >
-                              قبول المورد ✔
+                              قبول البائع ✔
                             </button>
                             <button
                               onClick={() => handleUpdateSupplierStatus(s.id, 'REJECTED')}
@@ -5992,7 +5627,7 @@ export function AdminDashboard({
                             })
                           }
                           className="px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 font-bold text-[11px] flex items-center gap-1 transition cursor-pointer border border-amber-500/30"
-                          title="تعديل كلمة السر أو البريد الإلكتروني للمورد"
+                          title="تعديل كلمة السر أو البريد الإلكتروني للبائع"
                         >
                           <Key className="w-3.5 h-3.5" />
                           <span>تعديل كلمة السر</span>
@@ -6001,7 +5636,7 @@ export function AdminDashboard({
                         <button
                           onClick={() => handleDeleteSupplier(s.id)}
                           className="px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-extrabold text-xs flex items-center gap-1 transition cursor-pointer"
-                          title="حذف حساب المورد نهائياً"
+                          title="حذف حساب البائع نهائياً"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>حذف</span>
@@ -6042,15 +5677,15 @@ export function AdminDashboard({
             <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
               <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
                 <Package className="w-4 h-4 text-amber-500" />
-                <span>طابور موافقة المنتجات المضافة من الموردين (Product Approvals)</span>
+                <span>مراجعة منتجات البائعين</span>
               </h3>
-              <p className="text-xs text-slate-500">لا تظهر منتجات الموردين في الكتالوج العام للمسوقين إلا بعد مراجعتها وقبولها من الأدمن</p>
+              <p className="text-xs text-slate-500">مراجعة واعتماد المنتجات الجديدة قبل النشر بالكتالوج.</p>
             </div>
 
             <div className="space-y-3">
               {products.filter((p) => p.approvalStatus === 'PENDING').length === 0 ? (
                 <div className="py-8 text-center text-slate-400 text-xs font-bold">
-                  ✔ لا توجد منتجات قيد المراجعة حالياً. جميع منتجات الموردين معتمدة أو تمت مراجعتها!
+                  لا توجد منتجات قيد المراجعة حالياً.
                 </div>
               ) : (
                 products
@@ -6069,7 +5704,7 @@ export function AdminDashboard({
                         <div>
                           <h4 className="font-black text-sm text-slate-900 dark:text-white">{p.nameAr}</h4>
                           <span className="text-[10px] text-slate-400 block font-bold">
-                            المورد: {p.supplierName || 'مورد الجزائر'} | الفئة: {p.categoryNameAr}
+                            البائع: {p.supplierName || 'بائع الجزائر'} | الفئة: {p.categoryNameAr}
                           </span>
                           <div className="flex items-center gap-3 mt-1 font-mono">
                             <span className="text-slate-600 dark:text-slate-300">
@@ -6088,14 +5723,14 @@ export function AdminDashboard({
                           className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs shadow-xs cursor-pointer flex items-center gap-1"
                         >
                           <Check className="w-4 h-4" />
-                          <span>قبول ونشر بالكتالوج</span>
+                          <span>اعتماد ونشر</span>
                         </button>
                         <button
                           onClick={() => handleRejectProduct(p.id)}
                           className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-xs cursor-pointer flex items-center gap-1"
                         >
                           <X className="w-4 h-4" />
-                          <span>رفض المنتج</span>
+                          <span>رفض</span>
                         </button>
                       </div>
                     </div>
@@ -6204,9 +5839,9 @@ export function AdminDashboard({
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-900 dark:text-white">
-                    إضافة وتسجيل مورد جديد (Supplier Registration)
+                    إضافة وتسجيل بائع جديد (Seller Registration)
                   </h3>
-                  <p className="text-[11px] text-slate-500">أدخل بيانات المورد كاملة لإضافته مباشرة إلى حسابات المنصة</p>
+                  <p className="text-[11px] text-slate-500">أدخل بيانات البائع كاملة لإضافته مباشرة إلى حسابات المنصة</p>
                 </div>
               </div>
               <button
@@ -6359,7 +5994,7 @@ export function AdminDashboard({
               {/* Initial Status Selection */}
               <div className="p-3 bg-purple-50/60 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-900/60 rounded-2xl space-y-1.5">
                 <label className="text-xs font-extrabold text-purple-900 dark:text-purple-200 block">
-                  حالة المورد المبدئية عند التسجيل:
+                  حالة البائع المبدئية عند التسجيل:
                 </label>
                 <div className="flex items-center gap-4 text-xs font-bold">
                   <label className="flex items-center gap-1.5 cursor-pointer">
@@ -6401,7 +6036,7 @@ export function AdminDashboard({
                   className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs cursor-pointer shadow-md transition flex items-center gap-1.5"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>إضافة وتسجيل المورد 🚀</span>
+                  <span>إضافة وتسجيل البائع 🚀</span>
                 </button>
               </div>
             </form>
@@ -6412,8 +6047,8 @@ export function AdminDashboard({
       {/* ---------------- 9. COUPONS ---------------- */}
       {activeAdminTab === 'coupons' && (
         <div className="space-y-3">
-          <h3 className="text-xs font-extrabold text-slate-800 dark:text-white uppercase">
-            إدارة كوبونات الخصم والعروض
+          <h3 className="text-sm font-black text-slate-800 dark:text-white">
+            كوبونات الخصم
           </h3>
 
           <div className="space-y-2">
@@ -6446,10 +6081,10 @@ export function AdminDashboard({
             <div>
               <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-purple-600" />
-                <span>إدارة مستخدمي النظام، الأدوار والصلاحيات وكلمات السر</span>
+                <span>فريق العمل والصلاحيات</span>
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                يمكن لكل مستخدم إداري تسجيل الدخول مباشرة من صفحة الدخول بالبريد الإلكتروني وكلمة المرور المحددة له هنا.
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                إدارة حسابات الفريق وصلاحيات الوصول.
               </p>
             </div>
             <button
@@ -6467,7 +6102,7 @@ export function AdminDashboard({
               className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
             >
               <UserPlus className="w-4 h-4" />
-              <span>+ إضافة مستخدم وكلمة مرور جديدة</span>
+              <span>إضافة عضو</span>
             </button>
           </div>
 
@@ -6478,14 +6113,14 @@ export function AdminDashboard({
 
               const roleLabel =
                 u.role === 'ADMIN'
-                  ? 'مدير النظام (Admin)'
+                  ? 'مدير النظام'
                   : u.role === 'ORDER_CONFIRMER'
-                  ? 'مؤكد الطلبيات لجميع الموردين (Confirmer)'
+                  ? 'مؤكد الطلبات'
                   : u.role === 'WAREHOUSE'
-                  ? 'أمين المستودع (Warehouse)'
+                  ? 'مسؤول مستودع'
                   : u.role === 'FINANCE_MANAGER'
-                  ? 'مدير المالية والمحفظة'
-                  : 'الدعم الفني للبائعين';
+                  ? 'المالية والمحفظة'
+                  : 'الدعم الفني';
 
               const roleBadgeColor =
                 u.role === 'ADMIN'
@@ -6729,10 +6364,10 @@ export function AdminDashboard({
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold outline-none"
                 >
                   <option value="ADMIN">أدمن كامل الصلاحيات (ADMIN)</option>
-                  <option value="ORDER_CONFIRMER">مؤكد الطلبيات لجميع الموردين (CONFIRMER)</option>
+                  <option value="ORDER_CONFIRMER">مؤكد الطلبيات لجميع البائعين (CONFIRMER)</option>
                   <option value="WAREHOUSE">مسؤول مستودع ومخزون (WAREHOUSE)</option>
                   <option value="FINANCE_MANAGER">مدير المحفظة والمالية (FINANCE)</option>
-                  <option value="RESELLER_SUPPORT">الدعم الفني للبائعين (SUPPORT)</option>
+                  <option value="RESELLER_SUPPORT">الدعم الفني للمسوقين (SUPPORT)</option>
                 </select>
               </div>
             </div>
@@ -6849,10 +6484,10 @@ export function AdminDashboard({
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold outline-none"
                   >
                     <option value="ADMIN">أدمن كامل الصلاحيات</option>
-                    <option value="ORDER_CONFIRMER">مؤكد الطلبيات لجميع الموردين</option>
+                    <option value="ORDER_CONFIRMER">مؤكد الطلبيات لجميع البائعين</option>
                     <option value="WAREHOUSE">مسؤول مستودع</option>
                     <option value="FINANCE_MANAGER">مدير المحفظة والمالية</option>
-                    <option value="RESELLER_SUPPORT">الدعم الفني للبائعين</option>
+                    <option value="RESELLER_SUPPORT">الدعم الفني للمسوقين</option>
                   </select>
                 </div>
 
@@ -6915,6 +6550,28 @@ export function AdminDashboard({
         />
       )}
 
+      {/* ---------------- 11.5 SUPPORT & MARKETER ASSIGNMENTS (AFFECTATION VENDEURS) ---------------- */}
+      {activeAdminTab === 'support' && (
+        <AdminSupportManagementTab
+          systemUsers={systemUsers}
+          onOpenAddUserModal={() => {
+            setNewUserForm({
+              email: '',
+              fullName: '',
+              role: 'RESELLER_SUPPORT',
+              permissions: ['RESELLER_SUPPORT', 'ORDERS_MANAGE', 'STORE_SYNC_ASSIST'],
+              password: generateRandomPassword(),
+              status: 'ACTIVE',
+            });
+            setShowNewUserPassword(true);
+            setIsAddingUserModalOpen(true);
+          }}
+          onEditUser={(u) => handleStartEditUser(u)}
+          onShowToast={onShowToast}
+          onSwitchToSupportDashboard={onSwitchToSupportDashboard}
+        />
+      )}
+
       {/* ---------------- 11. AI PROVIDER SETTINGS (GEMINI API) ---------------- */}
       {activeAdminTab === 'ai_provider' && (
         <AdminAiProviderSettings onShowToast={onShowToast} />
@@ -6931,13 +6588,13 @@ export function AdminDashboard({
               </div>
               <div>
                 <h4 className="text-sm font-black text-white flex items-center gap-2">
-                  <span>مزود الذكاء الاصطناعي (Google Gemini API)</span>
+                  <span>الذكاء الاصطناعي (Gemini)</span>
                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
                     نشط وموصى به
                   </span>
                 </h4>
                 <p className="text-[11px] text-indigo-200/80 mt-0.5">
-                  تعديل واختيار نماذج Gemini، ربط مفتاح API، واختبار الاتصال الفوري بخوادم Google AI
+                  إدارة نماذج الذكاء الاصطناعي ومفاتيح الربط.
                 </p>
               </div>
             </div>
@@ -6945,13 +6602,13 @@ export function AdminDashboard({
               onClick={() => setActiveAdminTab('ai_provider')}
               className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-black text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-md shrink-0"
             >
-              <span>فتح إعدادات الذكاء الاصطناعي</span>
+              <span>الإعدادات</span>
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
             </button>
           </div>
 
           <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 text-xs">
-            <h3 className="text-sm font-black text-slate-900 dark:text-white">إعدادات المنصة الأساسية</h3>
+            <h3 className="text-sm font-black text-slate-900 dark:text-white">إعدادات المنصة</h3>
 
             <div className="space-y-3">
               <div>
@@ -6996,13 +6653,13 @@ export function AdminDashboard({
               </div>
               <div>
                 <h3 className="text-sm font-black text-white flex items-center gap-2">
-                  <span>خدمة الإشعارات والتنبيهات والبث المباشر (Notification Service)</span>
+                  <span>مركز الإشعارات</span>
                   <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold">
-                    Tone & Broadcast
+                    بث مباشر
                   </span>
                 </h3>
                 <p className="text-[11px] text-violet-200/80">
-                  إرسال إشعارات فورية مع نغمة تنبيه صوتية لجميع البائعين أو فريق الأدمن والإدارة.
+                  إرسال تنبيهات فورية للمستخدمين وفريق الإدارة.
                 </p>
               </div>
             </div>
@@ -7013,7 +6670,7 @@ export function AdminDashboard({
                 className="px-3 py-2 rounded-xl bg-violet-600/40 hover:bg-violet-600/60 border border-violet-500/50 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
               >
                 <Music className="w-3.5 h-3.5 text-violet-300" />
-                <span>اختبار نغمة التنبيه</span>
+                <span>اختبار النغمة</span>
               </button>
               <button
                 onClick={() => setIsAdminNotifModalOpen(true)}
@@ -7029,49 +6686,49 @@ export function AdminDashboard({
           <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3.5 shadow-xs">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
               <h4 className="text-xs font-extrabold text-slate-800 dark:text-white flex items-center gap-2">
-                <span>📢 إنشاء وبث إشعار فوري جديد (Broadcast)</span>
+                <span>إرسال إشعار جديد</span>
               </h4>
-              <span className="text-[10px] text-slate-400">يُصدر نغمة تنبيه فورية للمستلم</span>
+              <span className="text-[10px] text-slate-400">يُصدر نغمة تنبيه فورية</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                  الجمهور المستهدف (Recipient Role):
+                  الجمهور المستهدف:
                 </label>
                 <select
                   value={broadcastRole}
                   onChange={(e) => setBroadcastRole(e.target.value as any)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
                 >
-                  <option value="seller">🛍️ جميع البائعين والمسوقين (Sellers)</option>
-                  <option value="admin">🛡️ طاقم الأدمن والإدارة (Admins)</option>
-                  <option value="all">🌐 الجميع - كافة مستخدمي المنصة (Broadcast All)</option>
+                  <option value="seller">جميع البائعين والمسوقين</option>
+                  <option value="admin">فريق الإدارة والأدمن</option>
+                  <option value="all">كافة مستخدمي المنصة</option>
                 </select>
               </div>
 
               <div>
                 <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                  نوع الإشعار (Notification Type):
+                  نوع الإشعار:
                 </label>
                 <select
                   value={broadcastType}
                   onChange={(e) => setBroadcastType(e.target.value as any)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
                 >
-                  <option value="system">⚙️ تنبيه نظام عام (System Alert)</option>
-                  <option value="product_add">🔥 وصل منتج جديد (Product Add)</option>
-                  <option value="stock_update">📦 تجديد المخزون (Stock Update)</option>
-                  <option value="wallet">💰 المحفظة والأرباح (Wallet)</option>
-                  <option value="reward">🌟 جوائز وبونص (Reward / Bonus)</option>
-                  <option value="order">🛒 الطلبيات والتوصيل (Order Alert)</option>
+                  <option value="system">⚙️ تنبيه نظام عام</option>
+                  <option value="product_add">🔥 منتج جديد</option>
+                  <option value="stock_update">📦 تجديد المخزون</option>
+                  <option value="wallet">💰 المحفظة والأرباح</option>
+                  <option value="reward">🌟 مكافآت وبونص</option>
+                  <option value="order">🛒 الطلبيات والتوصيل</option>
                 </select>
               </div>
             </div>
 
             <div>
               <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                عنوان التنبيه والإشعار (العربية):
+                عنوان التنبيه:
               </label>
               <input
                 type="text"
@@ -7084,11 +6741,11 @@ export function AdminDashboard({
 
             <div>
               <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                نص ومحتوى الرسالة والتفاصيل:
+                نص الرسالة:
               </label>
               <textarea
                 rows={3}
-                placeholder="تفاصيل الإشعار الذي سيظهر للبائعين في مركز التنبيهات..."
+                placeholder="تفاصيل الإشعار الذي سيظهر للمستخدمين..."
                 value={broadcastBody}
                 onChange={(e) => setBroadcastBody(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-medium"
@@ -7097,21 +6754,21 @@ export function AdminDashboard({
 
             <div className="flex items-center justify-between pt-1">
               <span className="text-[10px] text-slate-500">
-                سيصل هذا الإشعار فوراً مع نغمة صوتية مرئية في جرس التنبيهات.
+                سيصل هذا الإشعار فوراً مع نغمة صوتية.
               </span>
               <button
                 onClick={handleSendBroadcast}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-black text-xs shadow-md flex items-center gap-1.5 cursor-pointer transition"
               >
                 <Send className="w-4 h-4" />
-                <span>إرسال وبث التنبيه الفوري 📢</span>
+                <span>إرسال الإشعار</span>
               </button>
             </div>
           </div>
 
           {/* SMS & Delivery Templates */}
           <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
-            <h4 className="text-xs font-black text-slate-900 dark:text-white">قوالب إشعارات الرسائل والـ SMS والواتساب التلقائية</h4>
+            <h4 className="text-xs font-black text-slate-900 dark:text-white">قوالب الرسائل التلقائية</h4>
 
             <div className="space-y-3">
               <div>
@@ -7142,10 +6799,10 @@ export function AdminDashboard({
             <div>
               <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
                 <Award className="w-5 h-5 text-amber-500" />
-                <span>إدارة وتعديل مستويات الجوائز والبونص للبائعين والمسوّقين</span>
+                <span>مستويات المكافآت والرتب</span>
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                يمكنك التعديل على جميع تفاصيل مستويات الجوائز (اسم المستوى، عدد الطلبات المسلمة المطلوبة، البونص المالي، الشارة والمزايا).
+                تحديد شروط الرتب والمكافآت المالية للمسوقين.
               </p>
             </div>
             <button
@@ -7153,7 +6810,7 @@ export function AdminDashboard({
               className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer whitespace-nowrap shrink-0"
             >
               <Plus className="w-4 h-4" />
-              <span>+ إضافة مستوى جوائز جديد 🌟</span>
+              <span>إضافة رتبة</span>
             </button>
           </div>
 

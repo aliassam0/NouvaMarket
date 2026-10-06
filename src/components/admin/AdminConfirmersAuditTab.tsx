@@ -182,10 +182,10 @@ export function AdminConfirmersAuditTab({
             </span>
             <div>
               <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
-                لوحة تدقيق ومراقبة أداء مؤكدي الطلبيات (Order Confirmers Audit)
+                أداء فريق التأكيد
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                متابعة دقيقة لعدد الطلبيات المؤكدة لكل مؤكد، وعدد الطلبيات المتابعة حتى التسليم النهائي، ونسبة النجاح.
+                متابعة إحصائيات التأكيد والتسليم ونسبة النجاح.
               </p>
             </div>
           </div>
@@ -196,7 +196,7 @@ export function AdminConfirmersAuditTab({
           className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer self-start sm:self-auto"
         >
           <UserPlus className="w-4 h-4" />
-          <span>+ إضافة مؤكد طلبات جديد</span>
+          <span>إضافة مؤكد</span>
         </button>
       </div>
 

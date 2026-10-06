@@ -55,7 +55,7 @@ export const EnterprisePendingApprovalModal: React.FC<EnterprisePendingApprovalM
   const [isApprovedNow, setIsApprovedNow] = useState(false);
 
   const isSupplier = info.role === 'supplier';
-  const roleLabel = isSupplier ? 'المورّد والمستودع' : 'البائع والمسوق';
+  const roleLabel = isSupplier ? 'البائع (صاحب السلع)' : 'المسوّق (مسوّق بالعمولة)';
 
   const referenceCode =
     info.referenceCode ||
@@ -91,7 +91,7 @@ export const EnterprisePendingApprovalModal: React.FC<EnterprisePendingApprovalM
         );
         if (found && found.status === 'APPROVED') {
           setIsApprovedNow(true);
-          onShowToast('🎉 تهانينا! تمت مصادقة وتفعيل حساب المورد بنجاح من قِبل الإدارة.', 'success');
+          onShowToast('🎉 تهانينا! تمت مصادقة وتفعيل حساب البائع بنجاح من قِبل الإدارة.', 'success');
           return;
         }
       } else {
@@ -103,7 +103,7 @@ export const EnterprisePendingApprovalModal: React.FC<EnterprisePendingApprovalM
         );
         if (found && found.approvalStatus === 'APPROVED') {
           setIsApprovedNow(true);
-          onShowToast('🎉 تهانينا! تمت مصادقة وتفعيل حساب البائع بنجاح من قِبل الإدارة.', 'success');
+          onShowToast('🎉 تهانينا! تمت مصادقة وتفعيل حساب المسوق بنجاح من قِبل الإدارة.', 'success');
           return;
         }
       }

@@ -31,8 +31,8 @@ interface AuthContextType {
 
 const DEFAULT_USER: UserProfile = {
   id: 'u-reseller-12',
-  fullName: 'بائع جديد',
-  storeName: 'متجر البائع',
+  fullName: 'مسوق جديد',
+  storeName: 'متجر المسوق',
   phone: '0550123456',
   email: 'seller@nouvachat.com',
   password: 'Aliass@m1989',
@@ -231,7 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       if (data.user) {
-        let role: 'reseller' | 'admin' | 'warehouse' | 'confirmer' = data.user.role || 'reseller';
+        let role: 'reseller' | 'admin' | 'warehouse' | 'confirmer' | 'support' = data.user.role || 'reseller';
         if (
           data.user.systemRole === 'ORDER_CONFIRMER' ||
           data.user.role === 'confirmer' ||
@@ -239,6 +239,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           cleanEmail.startsWith('confirm@')
         ) {
           role = 'confirmer';
+        } else if (
+          data.user.systemRole === 'RESELLER_SUPPORT' ||
+          data.user.role === 'support' ||
+          cleanEmail.includes('support') ||
+          cleanEmail.startsWith('support@')
+        ) {
+          role = 'support';
         } else if (cleanEmail.includes('admin') || cleanEmail.startsWith('admin@')) {
           role = 'admin';
         } else if (
@@ -250,7 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role = 'warehouse';
         }
 
-        if (role !== 'admin' && role !== 'confirmer' && data.user.approvalStatus && data.user.approvalStatus !== 'APPROVED') {
+        if (role !== 'admin' && role !== 'confirmer' && role !== 'support' && data.user.approvalStatus && data.user.approvalStatus !== 'APPROVED') {
           setAuthError(
             '⏳ حسابك قيد المراجعة والتدقيق. تطبيقاً لقوانين المنصة، لا يمكنك الدخول إلى الحساب إلا بموافقة الأدمن من خلال الضغط على زر الموافقة في الداشبورد.'
           );
@@ -272,18 +279,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const appRole = mapSystemUserToAppRole(matchedSystemUser.role);
       const isWarehouse = appRole === 'warehouse';
       const isConfirmer = appRole === 'confirmer';
+      const isSupport = appRole === 'support';
       const loggedUser: UserProfile = {
         id: matchedSystemUser.id,
         fullName: matchedSystemUser.fullName,
-        storeName: isWarehouse ? 'مستودع Nouva' : isConfirmer ? 'فريق تأكيد الطلبيات Nouva' : 'الإدارة العامة Nouva',
+        storeName: isWarehouse
+          ? 'مستودع Nouva'
+          : isConfirmer
+          ? 'فريق تأكيد الطلبيات Nouva'
+          : isSupport
+          ? 'الدعم الفني للمسوقين والبائعين Nouva'
+          : 'الإدارة العامة Nouva',
         phone: '0550123456',
         email: matchedSystemUser.email,
         password: matchedSystemUser.password || cleanPass,
         role: appRole,
         wilaya: '16 - الجزائر',
         rank: 'GOLD',
-        rankAr: matchedSystemUser.role === 'ADMIN' ? 'مدير النظام' : matchedSystemUser.role === 'ORDER_CONFIRMER' ? 'مؤكد الطلبيات (Confirmer)' : matchedSystemUser.role,
-        rankFr: matchedSystemUser.role === 'ORDER_CONFIRMER' ? 'Agent de confirmation' : 'Administrateur',
+        rankAr:
+          matchedSystemUser.role === 'ADMIN'
+            ? 'مدير النظام'
+            : matchedSystemUser.role === 'ORDER_CONFIRMER'
+            ? 'مؤكد الطلبيات (Confirmer)'
+            : matchedSystemUser.role === 'RESELLER_SUPPORT'
+            ? 'الدعم الفني للمسوقين (Support)'
+            : matchedSystemUser.role,
+        rankFr:
+          matchedSystemUser.role === 'ORDER_CONFIRMER'
+            ? 'Agent de confirmation'
+            : matchedSystemUser.role === 'RESELLER_SUPPORT'
+            ? 'Support Technique'
+            : 'Administrateur',
         kycStatus: 'APPROVED',
         approvalStatus: 'APPROVED',
         totalOrdersCount: 0,
@@ -316,10 +342,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // STRICT ADMIN APPROVAL MANDATE:
       if (matchedSupplier.status !== 'APPROVED') {
         if (matchedSupplier.status === 'REJECTED') {
-          setAuthError('❌ تم رفض طلب انضمام حساب المورد هذا من قِبل إدارة المنصة.');
+          setAuthError('❌ تم رفض طلب انضمام حساب البائع هذا من قِبل إدارة المنصة.');
           return false;
         } else if (matchedSupplier.status === 'SUSPENDED') {
-          setAuthError('⛔ تم تعليق حساب المورد هذا مؤقتاً من قِبل إدارة المنصة.');
+          setAuthError('⛔ تم تعليق حساب البائع هذا مؤقتاً من قِبل إدارة المنصة.');
           return false;
         } else {
           // Keep registrant connected in PENDING status so they stay in app and auto-enter when approved!
@@ -394,10 +420,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // STRICT ADMIN APPROVAL MANDATE:
       if (matchedSeller.approvalStatus !== 'APPROVED') {
         if (matchedSeller.approvalStatus === 'REJECTED') {
-          setAuthError('❌ تم رفض طلب انضمام حساب البائع هذا من قِبل إدارة المنصة.');
+          setAuthError('❌ تم رفض طلب انضمام حساب المسوق هذا من قِبل إدارة المنصة.');
           return false;
         } else if (matchedSeller.approvalStatus === 'SUSPENDED') {
-          setAuthError('⛔ تم تعليق حساب البائع هذا مؤقتاً من قِبل إدارة المنصة.');
+          setAuthError('⛔ تم تعليق حساب المسوق هذا مؤقتاً من قِبل إدارة المنصة.');
           return false;
         } else {
           // Keep registrant connected in PENDING status so they stay in app and auto-enter when approved!
@@ -501,7 +527,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (cleanPass !== 'Aliass@m1989') return false;
       const loggedUser: UserProfile = {
         id: 'u-wh-1',
-        fullName: 'أمين المستودع والمورد الرئيسي',
+        fullName: 'صاحب السلع والبائع الرئيسي',
         storeName: 'المستودع الرئيسي',
         phone: '0550123456',
         email: cleanEmail,

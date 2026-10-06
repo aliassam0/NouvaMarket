@@ -34,7 +34,6 @@ interface PickItem {
   productImage?: string;
   variantSize?: string;
   variantColor?: string;
-  shelfLocation: string;
   barcode: string;
   totalQuantity: number;
   orderIds: string[];
@@ -55,12 +54,11 @@ export const PickingPackingModal: React.FC<PickingPackingModalProps> = ({
   const [packedItemsMap, setPackedItemsMap] = useState<Record<string, Record<string, boolean>>>({});
   const [barcodeInput, setBarcodeInput] = useState('');
 
-  // Map product shelf locations
+  // Map product metadata
   const productMetaMap = useMemo(() => {
-    const map = new Map<string, { shelfLocation: string; barcode: string; image?: string }>();
+    const map = new Map<string, { barcode: string; image?: string }>();
     products.forEach((p) => {
       map.set(p.id, {
-        shelfLocation: p.shelfLocation || 'مستودع العاصمة - رف A1',
         barcode: p.barcode || `EAN-${p.id.slice(-6)}`,
         image: p.images?.[0],
       });
@@ -85,7 +83,6 @@ export const PickingPackingModal: React.FC<PickingPackingModalProps> = ({
             productImage: it.productImage || meta?.image,
             variantSize: it.variantSize,
             variantColor: it.variantColor,
-            shelfLocation: meta?.shelfLocation || 'مستودع المنصة - رف عام',
             barcode: meta?.barcode || `EAN-${it.productId.slice(-5)}`,
             totalQuantity: 0,
             orderIds: [],
@@ -99,7 +96,7 @@ export const PickingPackingModal: React.FC<PickingPackingModalProps> = ({
       });
     });
 
-    return Object.values(agg).sort((a, b) => a.shelfLocation.localeCompare(b.shelfLocation));
+    return Object.values(agg).sort((a, b) => a.productName.localeCompare(b.productName, 'ar'));
   }, [orders, productMetaMap]);
 
   const totalItemsCount = useMemo(
@@ -184,7 +181,7 @@ export const PickingPackingModal: React.FC<PickingPackingModalProps> = ({
                 </span>
               </div>
               <p className="text-slate-500 text-xs">
-                تجميع السلع من أرفف المستودع المركزي مرة واحدة، فحص الطرود، وتفادي أخطاء التغليف.
+                تجميع السلع للطلبيات المحددة، فحص الطرود، وتفادي أخطاء التجهيز.
               </p>
             </div>
           </div>
@@ -247,7 +244,7 @@ export const PickingPackingModal: React.FC<PickingPackingModalProps> = ({
             <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <span className="text-xs font-black text-indigo-950 dark:text-indigo-200 block">
-                  تقدم عملية جني السلع من أرفف المستودع
+                  تقدم عملية جني وتحضير السلع
                 </span>
                 <span className="text-[11px] text-indigo-700 dark:text-indigo-400">
                   تم التقاط <strong>{pickedCount}</strong> من إجمالي <strong>{totalItemsCount}</strong> قطعة عبر {pickingList.length} صنف مختلف.
@@ -267,7 +264,6 @@ export const PickingPackingModal: React.FC<PickingPackingModalProps> = ({
                 <thead>
                   <tr className="bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700">
                     <th className="p-3 text-center w-12">تم</th>
-                    <th className="p-3 text-start">موقع الرف (Bin)</th>
                     <th className="p-3 text-start">المنتج والمواصفات</th>
                     <th className="p-3 text-center">الكمية الإجمالية</th>
                     <th className="p-3 text-start">كود الباركود</th>
@@ -295,11 +291,6 @@ export const PickingPackingModal: React.FC<PickingPackingModalProps> = ({
                             onClick={(e) => e.stopPropagation()}
                             className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                           />
-                        </td>
-                        <td className="p-3 font-mono font-black text-indigo-600 dark:text-indigo-400">
-                          <span className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800">
-                            {item.shelfLocation}
-                          </span>
                         </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2.5">
@@ -480,7 +471,7 @@ export const PickingPackingModal: React.FC<PickingPackingModalProps> = ({
                               {it.productName}
                             </span>
                             <span className="text-[11px] text-slate-500">
-                              المقاس: {it.variantSize} | اللون: {it.variantColor} | الرف: {meta?.shelfLocation || 'A1'}
+                              المقاس: {it.variantSize} | اللون: {it.variantColor}
                             </span>
                           </div>
                         </div>

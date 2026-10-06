@@ -19,11 +19,10 @@ export interface ClientAiConfig {
   geminiKeyMasked?: string;
 }
 
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-3.8-flash';
 const CANDIDATE_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
-  'gemini-2.0-flash',
+  'gemini-3.8-flash',
+  'gemini-3.5-flash-lite',
 ];
 
 /**
@@ -33,14 +32,29 @@ export function getStoredAiConfig(): ClientAiConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_CONFIG);
     const customKey = localStorage.getItem(STORAGE_KEY_CUSTOM_KEY) || '';
-    const customModel = localStorage.getItem(STORAGE_KEY_CUSTOM_MODEL) || DEFAULT_MODEL;
+    let customModel = localStorage.getItem(STORAGE_KEY_CUSTOM_MODEL) || DEFAULT_MODEL;
+    if (
+      customModel.startsWith('gemini-2.5') ||
+      customModel.startsWith('gemini-2.0') ||
+      customModel.startsWith('gemini-1.5')
+    ) {
+      customModel = DEFAULT_MODEL;
+    }
 
     if (raw) {
       const parsed = JSON.parse(raw);
+      let parsedModel = customModel || parsed.geminiModel || DEFAULT_MODEL;
+      if (
+        parsedModel.startsWith('gemini-2.5') ||
+        parsedModel.startsWith('gemini-2.0') ||
+        parsedModel.startsWith('gemini-1.5')
+      ) {
+        parsedModel = DEFAULT_MODEL;
+      }
       return {
         provider: parsed.provider || 'gemini',
         geminiApiKey: customKey || parsed.geminiApiKey || '',
-        geminiModel: customModel || parsed.geminiModel || DEFAULT_MODEL,
+        geminiModel: parsedModel,
         temperature: typeof parsed.temperature === 'number' ? parsed.temperature : 0.3,
         isEnabled: parsed.isEnabled !== false,
         hasGeminiKey: Boolean(customKey || parsed.geminiApiKey),
@@ -239,7 +253,7 @@ export async function callGeminiDirectRest(
   } else if (lastError.includes('quota') || lastError.includes('429') || lastError.includes('RESOURCE_EXHAUSTED')) {
     userFriendly = 'تم تجاوز حد الاستهلاك المسموح به للمفتاح أو الحصة المجانية مؤقتاً (Quota Limit Exceeded). يرجى التحقق من إعدادات حسابك في Google AI Studio.';
   } else if (lastError.includes('NOT_FOUND') || lastError.includes('404')) {
-    userFriendly = 'النموذج المحدد غير متاح لحسابك حالياً. يرجى اختيار نموذج آخر مثل gemini-3.6-flash.';
+    userFriendly = 'النموذج المحدد غير متاح لحسابك حالياً. يرجى اختيار نموذج آخر مثل gemini-3.8-flash.';
   } else if (lastError) {
     userFriendly = `خطأ في اتصال Gemini API: ${lastError}`;
   }

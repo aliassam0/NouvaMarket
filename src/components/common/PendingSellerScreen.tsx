@@ -13,7 +13,7 @@ export function PendingSellerScreen({ onLogout, onGoToLanding }: PendingSellerSc
   const { user } = useAuth();
 
   const isSupplier = user?.role === 'warehouse';
-  const roleLabel = isSupplier ? 'المورّد والمستودع' : 'البائع والمسوق';
+  const roleLabel = isSupplier ? 'البائع (صاحب السلع)' : 'المسوّق (مسوّق بالعمولة)';
   const isSuspended = user?.approvalStatus === 'SUSPENDED';
   const isRejected = user?.approvalStatus === 'REJECTED';
 

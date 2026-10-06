@@ -813,7 +813,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     ) {
       return {
         success: false,
-        message: `⛔ غير مسموح: هذه الطلبية تم تأكيدها مسبقاً من قِبل المورد/المستودع (${currentOrder.confirmerName || 'المستودع'}). لا يمكن للمؤكد والمورد تأكيد نفس الطلبية لمنع الازدواجية وتكرار الشحن.`,
+        message: `⛔ غير مسموح: هذه الطلبية تم تأكيدها مسبقاً من قِبل البائع/المستودع (${currentOrder.confirmerName || 'المستودع'}). لا يمكن للمؤكد والبائع تأكيد نفس الطلبية لمنع الازدواجية وتكرار الشحن.`,
       };
     }
 
@@ -905,7 +905,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         window.dispatchEvent(new CustomEvent('orders_updated'));
       } catch (e) {}
 
-      return { success: true, order: updatedOrder, message: 'تم تأكيد الطلبية بنجاح ومزامنتها مع المورد والمسوق' };
+      return { success: true, order: updatedOrder, message: 'تم تأكيد الطلبية بنجاح ومزامنتها مع البائع والمسوق' };
     }
 
     return { success: false, message: 'الطلبية غير موجودة' };
@@ -1011,8 +1011,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             situation = 'Livré';
             deliveredAt = deliveredAt || new Date().toISOString();
             if (!o.commissionCredited) {
-              const creditedProfit = o.totalProfit || 2500;
-              creditResellerCommission(o.id, creditedProfit, o.resellerId);
+              const creditedProfit = o.totalProfit !== undefined ? o.totalProfit : (o.isDirectSupplierSale ? (o.supplierProfit || 1950) : 2500);
+              const targetUserId = o.isDirectSupplierSale ? (o.resellerId || o.supplierId) : o.resellerId;
+              creditResellerCommission(o.id, creditedProfit, targetUserId);
               triggerSaleNotification({
                 profit: creditedProfit,
                 orderId: o.trackingCode || o.id,
@@ -1120,8 +1121,9 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             situation = 'Livré';
             deliveredAt = deliveredAt || new Date().toISOString();
             if (!o.commissionCredited) {
-              const creditedProfit = o.totalProfit || 2500;
-              creditResellerCommission(o.id, creditedProfit, o.resellerId);
+              const creditedProfit = o.totalProfit !== undefined ? o.totalProfit : (o.isDirectSupplierSale ? (o.supplierProfit || 1950) : 2500);
+              const targetUserId = o.isDirectSupplierSale ? (o.resellerId || o.supplierId) : o.resellerId;
+              creditResellerCommission(o.id, creditedProfit, targetUserId);
               triggerSaleNotification({
                 profit: creditedProfit,
                 orderId: o.trackingCode || o.id,
@@ -1706,7 +1708,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             adminConfirmed: true,
             isLockedForEdit: true,
             confirmedBy: supplierInfo?.id || 'supplier',
-            confirmerName: supplierInfo?.name || 'المورد / المستودع',
+            confirmerName: supplierInfo?.name || 'البائع / المستودع',
             confirmedByRole: 'SUPPLIER',
             confirmedAt: new Date().toISOString(),
             trackingCode: tracking,

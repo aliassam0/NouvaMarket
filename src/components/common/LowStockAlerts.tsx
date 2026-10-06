@@ -201,7 +201,7 @@ export function LowStockModal({
 
     // Reset input
     setAddQuantityInputs((prev) => ({ ...prev, [productId]: 20 }));
-    onShowToast(`✔ تم تزويد المنتج بـ +${qtyToAdd} قطعة بنجاح وإرسال إشعار للبائعين!`, 'success');
+    onShowToast(`✔ تم تزويد المنتج بـ +${qtyToAdd} قطعة بنجاح وإرسال إشعار للمسوقين!`, 'success');
   };
 
   // Helper to update minStockAlert threshold
@@ -233,7 +233,7 @@ export function LowStockModal({
 
     navigator.clipboard.writeText(text);
     setCopiedChecklist(true);
-    onShowToast('📋 تم نسخ قائمة التوريد للموردين بنجاح!');
+    onShowToast('📋 تم نسخ قائمة التوريد للبائعين بنجاح!');
     setTimeout(() => setCopiedChecklist(false), 3000);
   };
 
@@ -301,7 +301,7 @@ export function LowStockModal({
               className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              <span>إرسال للمورد (واتساب)</span>
+              <span>إرسال للبائع (واتساب)</span>
             </button>
           </div>
         </div>

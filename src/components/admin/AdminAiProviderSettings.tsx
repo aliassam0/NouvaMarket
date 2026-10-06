@@ -43,7 +43,7 @@ export const AdminAiProviderSettings: React.FC<AdminAiProviderSettingsProps> = (
   const [provider, setProvider] = useState<'gemini' | 'openrouter'>('gemini');
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
   const [temperature, setTemperature] = useState(0.3);
   const [isEnabled, setIsEnabled] = useState(true);
 
@@ -54,22 +54,22 @@ export const AdminAiProviderSettings: React.FC<AdminAiProviderSettingsProps> = (
   const [maskedKey, setMaskedKey] = useState('');
   const [supportedModels, setSupportedModels] = useState<AIModelOption[]>([
     {
-      id: 'gemini-2.5-flash',
-      name: 'Gemini 2.5 Flash (الرسمي المعتمد - موصى به)',
+      id: 'gemini-3.8-flash',
+      name: 'Gemini 3.8 Flash (الرسمي المعتمد - موصى به)',
       speed: 'فائق السرعة',
       quality: 'عالية جداً',
-      description: 'النموذج الرسمي الموصى به لإنشاء نصوص الإعلانات، أوصاف المنتجات AIDA، والتعرف البصري على الصور.',
+      description: 'النموذج الرسمي الأحدث لإنشاء نصوص الإعلانات، أوصاف المنتجات AIDA، والتعرف البصري على الصور.',
     },
     {
-      id: 'gemini-2.5-flash-lite',
-      name: 'Gemini 2.5 Flash Lite (فائق السرعة واقتصادي)',
+      id: 'gemini-3.5-flash-lite',
+      name: 'Gemini 3.5 Flash Lite (فائق السرعة واقتصادي)',
       speed: 'فائق السرعة (أقل من ثانية)',
       quality: 'جيدة جداً',
       description: 'نموذج خفيف وسريع جداً مخصص للاستجابات اللحظية وتوليد الأسماء.',
     },
     {
-      id: 'gemini-2.5-pro',
-      name: 'Gemini 2.5 Pro (الأقوى تحليلياً والتفكير المتعمق)',
+      id: 'gemini-3.1-pro-preview',
+      name: 'Gemini 3.1 Pro (الأقوى تحليلياً والتفكير المتعمق)',
       speed: 'متوسط',
       quality: 'الأعلى ذكاءً',
       description: 'نموذج التفكير المتقدم لأدق المهام التحليلية وصياغة المحتوى المتعمق واستخراج المنتجات.',
@@ -274,15 +274,15 @@ export const AdminAiProviderSettings: React.FC<AdminAiProviderSettingsProps> = (
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
-                  <span>مزود الذكاء الاصطناعي (AI Provider)</span>
+                  <span>إعدادات الذكاء الاصطناعي</span>
                 </h2>
                 <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-200 border border-indigo-400/40 text-[11px] font-extrabold flex items-center gap-1">
                   <Cpu className="w-3 h-3" />
-                  Google Gemini Official
+                  Gemini AI
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-indigo-200/80 font-medium mt-1">
-                إدارة وربط محرك الذكاء الاصطناعي Google Gemini API لصياغة الإعلانات، وأوصاف المنتجات، والتعرف البصري
+                إدارة نماذج ومفاتيح Google Gemini API لخدمات الذكاء الاصطناعي.
               </p>
             </div>
           </div>
@@ -740,7 +740,7 @@ export const AdminAiProviderSettings: React.FC<AdminAiProviderSettingsProps> = (
             </h4>
             <ul className="text-[11px] text-slate-300 space-y-2 leading-relaxed list-disc list-inside">
               <li>
-                نموذج <span className="font-mono text-amber-200">gemini-2.5-flash</span> يقدم أفضل توازن بين السرعة الفائقة وجودة المخرجات.
+                نموذج <span className="font-mono text-amber-200">gemini-3.8-flash</span> يقدم أفضل توازن بين السرعة الفائقة وجودة المخرجات.
               </li>
               <li>
                 إذا كان لديك مفتاح بيئة مسجل على السيرفر، يمكنك تركه فارغاً وسيستخدمه النظام تلقائياً.

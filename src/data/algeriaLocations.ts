@@ -130,7 +130,7 @@ export const ALGERIA_WILAYAS: WilayaInfo[] = [
       'الزرق',
       'عين البابوش',
       'بريش',
-      'سقنية'
+      'سيقوس'
     ],
     estimatedDays: '2-3 أيام'
   },

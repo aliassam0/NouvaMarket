@@ -43,7 +43,7 @@ import { MarketerCustomization } from '../../types';
 import { ProductImageSlider } from '../common/ProductImageSlider';
 import { ProductDescriptionView } from '../common/ProductDescriptionView';
 import { isStandardSize, isStandardColor } from '../../utils/variantUtils';
-import { getStoredMarketplaceFees } from '../../lib/supplierHelper';
+import { getStoredMarketplaceFees, getStoredSuppliers } from '../../lib/supplierHelper';
 import { getStoredSellers } from '../../lib/sellerHelper';
 import {
   initAllPixels,
@@ -344,19 +344,34 @@ export function CustomerShareOrderView({ product: initialProduct, onBackToApp, o
   const activeWilaya = getWilayaByCode(selectedWilayaCode);
   const shippingFee = deliveryType === 'home' ? activeWilaya.homeFee : activeWilaya.officeFee;
   
-  const totalAmount = effectiveProductPrice + shippingFee;
   const feeSettings = getStoredMarketplaceFees();
-  const resellerFeeRate = feeSettings.resellerFeePercent || 0;
-  const grossProfit = Math.max(0, effectiveProfit);
-  const platformResellerCut = Math.round((grossProfit * resellerFeeRate) / 100);
-  const totalProfit = Math.max(0, grossProfit - platformResellerCut);
+  const isSupplierDirectSale = Boolean(
+    searchParams.get('sellerRole') === 'supplier' ||
+    searchParams.get('isSupplier') === 'true' ||
+    (product.supplierId && (
+      product.supplierId === effectiveSellerId ||
+      (effectiveSellerEmail && product.supplierEmail && product.supplierEmail.toLowerCase() === effectiveSellerEmail.toLowerCase())
+    ))
+  );
+
+  const supplierFeeRate = feeSettings.supplierFeePercent || 5;
+  const baseWholesale = product.supplierNetPrice || product.wholesalePrice || 1000;
+  const platformFeePerUnit = product.nouvaFeeAmount ?? Math.round((baseWholesale * supplierFeeRate) / 100);
+  const totalSupplierPlatformFee = platformFeePerUnit * effectiveQuantity;
+  const directSellerProfit = Math.max(0, effectiveProductPrice - totalSupplierPlatformFee);
+
+  const totalAmount = effectiveProductPrice + shippingFee;
+  const resellerFeeRate = isSupplierDirectSale ? 0 : (feeSettings.resellerFeePercent || 0);
+  const grossProfit = isSupplierDirectSale ? directSellerProfit : Math.max(0, effectiveProfit);
+  const platformResellerCut = isSupplierDirectSale ? totalSupplierPlatformFee : Math.round((grossProfit * resellerFeeRate) / 100);
+  const totalProfit = isSupplierDirectSale ? directSellerProfit : Math.max(0, grossProfit - platformResellerCut);
 
   // Social Media Pixel Configuration & Auto-Tracking
   const fbPixelParam = searchParams.get('fbPixel') || searchParams.get('metaPixel') || '';
   const ttPixelParam = searchParams.get('ttPixel') || searchParams.get('tiktokPixel') || '';
   const snapPixelParam = searchParams.get('snapPixel') || searchParams.get('snapchatPixel') || '';
 
-  // Match marketer profile from storage if pixel IDs are not in URL parameters
+  // Match marketer or vendor profile from storage if pixel IDs are not in URL parameters
   const matchedSeller = useMemo(() => {
     if (user && user.role === 'reseller' && (user.id === effectiveSellerId || !effectiveSellerId)) {
       return user;
@@ -370,9 +385,24 @@ export function CustomerShareOrderView({ product: initialProduct, onBackToApp, o
     );
   }, [user, effectiveSellerId, effectiveSellerPhone, effectiveSellerEmail]);
 
-  const resolvedMetaPixel = fbPixelParam || matchedSeller?.metaPixelId || '';
-  const resolvedTikTokPixel = ttPixelParam || matchedSeller?.tiktokPixelId || '';
-  const resolvedSnapchatPixel = snapPixelParam || matchedSeller?.snapchatPixelId || '';
+  const matchedSupplier = useMemo(() => {
+    if (user && (user.role === 'warehouse' || (user as any).role === 'supplier') && (user.id === effectiveSellerId || !effectiveSellerId)) {
+      return user as any;
+    }
+    const suppliers = getStoredSuppliers();
+    return suppliers.find(
+      (s) =>
+        (effectiveSellerId && s.id === effectiveSellerId) ||
+        (product.supplierId && s.id === product.supplierId) ||
+        (effectiveSellerPhone && s.phone === effectiveSellerPhone) ||
+        (effectiveSellerEmail && s.email?.toLowerCase() === effectiveSellerEmail.toLowerCase()) ||
+        (product.supplierEmail && s.email && s.email.toLowerCase() === product.supplierEmail.toLowerCase())
+    );
+  }, [user, effectiveSellerId, product.supplierId, product.supplierEmail, effectiveSellerPhone, effectiveSellerEmail]);
+
+  const resolvedMetaPixel = fbPixelParam || matchedSeller?.metaPixelId || matchedSupplier?.metaPixelId || '';
+  const resolvedTikTokPixel = ttPixelParam || matchedSeller?.tiktokPixelId || matchedSupplier?.tiktokPixelId || '';
+  const resolvedSnapchatPixel = snapPixelParam || matchedSeller?.snapchatPixelId || matchedSupplier?.snapchatPixelId || '';
 
   // 1. Initialize Pixels & Fire PageView + ViewContent
   useEffect(() => {
@@ -513,13 +543,15 @@ export function CustomerShareOrderView({ product: initialProduct, onBackToApp, o
       ],
       totalAmount,
       shippingFee,
-      totalProfit, // Reseller net profit credited
+      totalProfit, // Reseller net profit credited OR Seller direct sale net dues
+      isDirectSupplierSale: isSupplierDirectSale,
+      supplierProfit: isSupplierDirectSale ? directSellerProfit : undefined,
       grossProfit,
       platformResellerFee: platformResellerCut,
       resellerFeePercent: resellerFeeRate,
-      supplierId: product.supplierId || undefined,
-      supplierName: product.supplierName || undefined,
-      supplierEmail: product.supplierEmail || undefined,
+      supplierId: product.supplierId || (isSupplierDirectSale ? effectiveSellerId : undefined),
+      supplierName: product.supplierName || (isSupplierDirectSale ? effectiveSellerName : undefined),
+      supplierEmail: product.supplierEmail || (isSupplierDirectSale ? effectiveSellerEmail : undefined),
       resellerId: effectiveSellerId || undefined,
       resellerName: effectiveSellerName || undefined,
       resellerPhone: effectiveSellerPhone || undefined,
@@ -528,7 +560,7 @@ export function CustomerShareOrderView({ product: initialProduct, onBackToApp, o
       statusAr: 'طلب من الرابط',
       statusFr: 'Commande par lien',
       situation: 'طلب من الرابط',
-      source: 'LINK',
+      source: isSupplierDirectSale ? 'SUPPLIER_LINK' : 'LINK',
       adminConfirmed: false,
       isLockedForEdit: false,
     };
@@ -561,9 +593,13 @@ export function CustomerShareOrderView({ product: initialProduct, onBackToApp, o
     setOrderingCrossSellId(item.product.id);
     const crossSellingPrice = item.activeLink.sellingPrice;
     const crossWholesalePrice = item.product.wholesalePrice;
-    const grossCrossProfit = Math.max(0, crossSellingPrice - crossWholesalePrice);
-    const crossPlatformCut = Math.round((grossCrossProfit * resellerFeeRate) / 100);
-    const crossNetProfit = Math.max(0, grossCrossProfit - crossPlatformCut);
+    const isCrossSupplierDirectSale = Boolean(isSupplierDirectSale && (!item.product.supplierId || item.product.supplierId === effectiveSellerId));
+    const crossSupplierPlatformFee = item.product.nouvaFeeAmount ?? Math.round(((item.product.supplierNetPrice || crossWholesalePrice) * supplierFeeRate) / 100);
+    const crossDirectSellerProfit = Math.max(0, crossSellingPrice - crossSupplierPlatformFee);
+
+    const grossCrossProfit = isCrossSupplierDirectSale ? crossDirectSellerProfit : Math.max(0, crossSellingPrice - crossWholesalePrice);
+    const crossPlatformCut = isCrossSupplierDirectSale ? crossSupplierPlatformFee : Math.round((grossCrossProfit * resellerFeeRate) / 100);
+    const crossNetProfit = isCrossSupplierDirectSale ? crossDirectSellerProfit : Math.max(0, grossCrossProfit - crossPlatformCut);
 
     const crossOrderPayload: Partial<Order> = {
       customerName: customerName.trim(),
@@ -600,13 +636,15 @@ export function CustomerShareOrderView({ product: initialProduct, onBackToApp, o
       ],
       totalAmount: crossSellingPrice,
       shippingFee: 0, // Free combined shipping with existing order
-      totalProfit: crossNetProfit, // Credited net to the SAME reseller
+      totalProfit: crossNetProfit, // Credited net to the SAME reseller or supplier
+      isDirectSupplierSale: isCrossSupplierDirectSale,
+      supplierProfit: isCrossSupplierDirectSale ? crossDirectSellerProfit : undefined,
       grossProfit: grossCrossProfit,
       platformResellerFee: crossPlatformCut,
       resellerFeePercent: resellerFeeRate,
-      supplierId: item.product.supplierId || undefined,
-      supplierName: item.product.supplierName || undefined,
-      supplierEmail: item.product.supplierEmail || undefined,
+      supplierId: item.product.supplierId || (isCrossSupplierDirectSale ? effectiveSellerId : undefined),
+      supplierName: item.product.supplierName || (isCrossSupplierDirectSale ? effectiveSellerName : undefined),
+      supplierEmail: item.product.supplierEmail || (isCrossSupplierDirectSale ? effectiveSellerEmail : undefined),
       resellerId: effectiveSellerId || undefined,
       resellerName: effectiveSellerName || undefined,
       resellerPhone: effectiveSellerPhone || undefined,
@@ -615,7 +653,7 @@ export function CustomerShareOrderView({ product: initialProduct, onBackToApp, o
       statusAr: 'طلب من الرابط (منتج إضافي)',
       statusFr: 'Commande Produit Complémentaire',
       situation: 'طلب من الرابط (منتج إضافي)',
-      source: 'LINK',
+      source: isCrossSupplierDirectSale ? 'SUPPLIER_LINK' : 'LINK',
       adminConfirmed: false,
       isLockedForEdit: false,
     };
@@ -1257,8 +1295,8 @@ export function CustomerShareOrderView({ product: initialProduct, onBackToApp, o
                       onChange={(e) => setCommune(e.target.value)}
                       className="w-full p-3 rounded-2xl border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-slate-900 dark:text-white font-bold text-xs focus:ring-2 focus:ring-purple-500 transition outline-hidden"
                     >
-                      {activeWilaya.communes.map((c) => (
-                        <option key={c} value={c}>
+                      {activeWilaya.communes.map((c, cIdx) => (
+                        <option key={`${c}-${cIdx}`} value={c}>
                           {c}
                         </option>
                       ))}

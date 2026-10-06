@@ -246,7 +246,7 @@ export function ProductUrlImportModal({
                 {defaultSupplierName && (
                   <span className="text-[10px] text-purple-400 font-extrabold flex items-center gap-1 bg-purple-950/60 px-2.5 py-1 rounded-lg border border-purple-800/40">
                     <Building className="w-3 h-3 text-purple-400" />
-                    <span>سيتم النسبة للمورد: {defaultSupplierName}</span>
+                    <span>سيتم النسبة للبائع: {defaultSupplierName}</span>
                   </span>
                 )}
               </div>
@@ -325,7 +325,7 @@ export function ProductUrlImportModal({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-800/80 bg-slate-900/50 p-2.5 rounded-xl">
                       <div>
                         <label className="text-[9px] text-purple-400 font-extrabold block mb-0.5">
-                          سعر التكلفة/المورد (DZD):
+                          سعر التكلفة/البائع (DZD):
                         </label>
                         <input
                           type="number"

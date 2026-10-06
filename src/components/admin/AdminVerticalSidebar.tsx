@@ -39,7 +39,8 @@ import {
   Store,
   HelpCircle,
   Menu,
-  ChevronDown
+  ChevronDown,
+  LifeBuoy
 } from 'lucide-react';
 
 export type AdminTabKey =
@@ -51,6 +52,7 @@ export type AdminTabKey =
   | 'inventory'
   | 'couriers'
   | 'suppliers'
+  | 'support'
   | 'categories'
   | 'coupons'
   | 'rewards'
@@ -103,19 +105,19 @@ export function AdminVerticalSidebar({
   // Navigation sections grouped professionally in crisp Light theme
   const navGroups = [
     {
-      groupTitle: 'الرئيسية والاعتماد',
+      groupTitle: 'الرئيسية',
       items: [
         {
           id: 'orders' as AdminTabKey,
-          label: 'إدارة ومزامنة الطلبيات الموحدة',
-          shortLabel: 'الطلبيات المركزية',
+          label: 'الطلبات',
+          shortLabel: 'الطلبات',
           icon: Package,
-          badge: counts.ordersCount ? `${counts.ordersCount} طلب` : undefined,
+          badge: counts.ordersCount ? `${counts.ordersCount}` : undefined,
           badgeColor: 'bg-violet-100 text-violet-800 border border-violet-200 font-bold',
         },
         {
           id: 'approvals' as AdminTabKey,
-          label: 'طلبات الانضمام والاعتماد',
+          label: 'طلبات الانضمام',
           shortLabel: 'الاعتماد',
           icon: UserCheck,
           badge: counts.totalPendingApprovals > 0 ? `${counts.totalPendingApprovals} معلق` : undefined,
@@ -123,7 +125,7 @@ export function AdminVerticalSidebar({
         },
         {
           id: 'products' as AdminTabKey,
-          label: 'كتالوج وإدارة المنتجات',
+          label: 'المنتجات',
           shortLabel: 'المنتجات',
           icon: Layers,
           badge: `${counts.productsCount}`,
@@ -132,27 +134,35 @@ export function AdminVerticalSidebar({
       ],
     },
     {
-      groupTitle: 'الشركاء والعمليات',
+      groupTitle: 'الشركاء',
       items: [
         {
           id: 'sellers' as AdminTabKey,
-          label: 'شبكة البائعين والمسوقين',
-          shortLabel: 'البائعين',
+          label: 'المسوقين',
+          shortLabel: 'المسوقين',
           icon: Users,
           badge: counts.pendingSellersCount > 0 ? `${counts.pendingSellersCount} معلق` : `${counts.sellersCount}`,
           badgeColor: counts.pendingSellersCount > 0 ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-slate-100 text-slate-700 border border-slate-200',
         },
         {
           id: 'suppliers' as AdminTabKey,
-          label: 'الموردين والمستودعات',
-          shortLabel: 'الموردين',
+          label: 'البائعين',
+          shortLabel: 'البائعين',
           icon: Building,
           badge: `${counts.suppliersCount}`,
           badgeColor: 'bg-slate-100 text-slate-700 border border-slate-200',
         },
         {
+          id: 'support' as AdminTabKey,
+          label: 'دعم المسوقين',
+          shortLabel: 'الدعم',
+          icon: LifeBuoy,
+          badge: 'إسناد وتوزيع',
+          badgeColor: 'bg-teal-100 text-teal-800 border border-teal-200',
+        },
+        {
           id: 'confirmers' as AdminTabKey,
-          label: 'مؤكدو الطلبيات (المراقبة)',
+          label: 'فريق التأكيد',
           shortLabel: 'المؤكدين',
           icon: PhoneCall,
           badge: `${counts.confirmersCount}`,
@@ -160,37 +170,36 @@ export function AdminVerticalSidebar({
         },
         {
           id: 'couriers' as AdminTabKey,
-          label: 'شركات التوصيل وربط API',
+          label: 'شركات التوصيل',
           shortLabel: 'التوصيل',
           icon: Truck,
-          badge: 'API نشط',
+          badge: 'نشط',
           badgeColor: 'bg-blue-100 text-blue-800 border border-blue-200',
         },
       ],
     },
     {
-      groupTitle: 'المالية والمخازن',
+      groupTitle: 'المالية والمخزون',
       items: [
         {
           id: 'wallet' as AdminTabKey,
-          label: 'الخزينة وسحوبات الأموال',
-          shortLabel: 'السحوبات',
+          label: 'الخزينة',
+          shortLabel: 'الخزينة',
           icon: Wallet,
           badge: counts.pendingWithdrawalsCount > 0 ? `${counts.pendingWithdrawalsCount} معلق` : undefined,
           badgeColor: 'bg-amber-100 text-amber-900 border border-amber-300 font-black',
         },
         {
           id: 'inventory' as AdminTabKey,
-          label: 'المستودع المركزي وشحنات التوريد',
+          label: 'المستودع',
           shortLabel: 'المستودع',
           icon: WarehouseIcon,
-          badge: counts.lowStockCount > 0 ? `${counts.lowStockCount} تنبيه` : 'Fulfillment',
+          badge: counts.lowStockCount > 0 ? `${counts.lowStockCount} تنبيه` : undefined,
           badgeColor: counts.lowStockCount > 0 ? 'bg-rose-100 text-rose-800 border border-rose-300 font-black animate-pulse' : 'bg-indigo-100 text-indigo-800 border border-indigo-200 font-bold',
         },
-
         {
           id: 'categories' as AdminTabKey,
-          label: 'فئات وتصنيفات المنتجات',
+          label: 'الفئات',
           shortLabel: 'الفئات',
           icon: Tag,
           badge: `${counts.categoriesCount}`,
@@ -198,7 +207,7 @@ export function AdminVerticalSidebar({
         },
         {
           id: 'coupons' as AdminTabKey,
-          label: 'الكوبونات والخصومات',
+          label: 'الكوبونات',
           shortLabel: 'الكوبونات',
           icon: Percent,
           badge: `${counts.couponsCount}`,
@@ -206,7 +215,7 @@ export function AdminVerticalSidebar({
         },
         {
           id: 'rewards' as AdminTabKey,
-          label: 'رتب ومكافآت المسوقين',
+          label: 'الرتب والمكافآت',
           shortLabel: 'الرتب',
           icon: Award,
           badge: `${counts.rewardsCount}`,
@@ -215,27 +224,27 @@ export function AdminVerticalSidebar({
       ],
     },
     {
-      groupTitle: 'النظام والذكاء الاصطناعي',
+      groupTitle: 'النظام',
       items: [
         {
           id: 'users' as AdminTabKey,
-          label: 'المستخدمين والصلاحيات',
-          shortLabel: 'المستخدمين',
+          label: 'فريق العمل',
+          shortLabel: 'الفريق',
           icon: UserCheck,
           badge: `${counts.usersCount}`,
           badgeColor: 'bg-slate-100 text-slate-700 border border-slate-200',
         },
         {
           id: 'ai_provider' as AdminTabKey,
-          label: 'مزود الذكاء الاصطناعي (Gemini)',
+          label: 'الذكاء الاصطناعي',
           shortLabel: 'الذكاء الاصطناعي',
           icon: Sparkles,
-          badge: 'Gemini 3.8',
+          badge: 'Gemini',
           badgeColor: 'bg-indigo-100 text-indigo-800 font-bold border border-indigo-200',
         },
         {
           id: 'notifications' as AdminTabKey,
-          label: 'سجل إشعارات الإدارة',
+          label: 'الإشعارات',
           shortLabel: 'الإشعارات',
           icon: Bell,
           badge: counts.unreadNotifsCount > 0 ? `${counts.unreadNotifsCount}` : undefined,
@@ -243,7 +252,7 @@ export function AdminVerticalSidebar({
         },
         {
           id: 'settings' as AdminTabKey,
-          label: 'إعدادات المنصة العامة',
+          label: 'الإعدادات',
           shortLabel: 'الإعدادات',
           icon: Settings,
         },

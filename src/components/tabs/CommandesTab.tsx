@@ -451,7 +451,7 @@ export function CommandesTab() {
             className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md transition"
           >
             <Truck className="w-3.5 h-3.5" />
-            <span>🚚 أسعار التوصيل (68 ولاية)</span>
+            <span>أسعار التوصيل</span>
           </button>
 
           {/* Shipment Tracking Toggle Button */}
@@ -464,7 +464,7 @@ export function CommandesTab() {
             }`}
           >
             <Search className="w-3.5 h-3.5" />
-            <span>{showTrackingTool ? 'إخفاء أداة التتبع' : '📦 تتبع الشحنة'}</span>
+            <span>{showTrackingTool ? 'إخفاء التتبع' : 'تتبع الشحنة'}</span>
           </button>
 
           {/* Pull External Store Orders Button */}
@@ -472,10 +472,10 @@ export function CommandesTab() {
             onClick={handlePullExternalOrders}
             disabled={isPullingExternalOrders}
             className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition disabled:opacity-50"
-            title="سحب الطلبيات الواردة من Shopify / YouCan / WooCommerce أوتوماتيكياً"
+            title="مزامنة طلبات المتاجر الخارجية"
           >
             <Store className={`w-3.5 h-3.5 ${isPullingExternalOrders ? 'animate-spin' : ''}`} />
-            <span>{isPullingExternalOrders ? 'جاري السحب...' : '🔄 سحب طلبات المتاجر'}</span>
+            <span>{isPullingExternalOrders ? 'جاري المزامنة...' : 'مزامنة المتاجر'}</span>
           </button>
 
           {viewRole === 'admin_warehouse' && (
@@ -570,13 +570,13 @@ export function CommandesTab() {
             ? [
                 {
                   id: 'LINK_ORDER',
-                  labelAr: '🔗 طلب من الرابط',
+                  labelAr: 'طلبات الروابط',
                   labelFr: 'Commandes via lien',
                   badge: pendingLinkOrdersCount,
                 },
               ]
             : []),
-          { id: 'REVIEW', labelAr: '🔍 قيد المراجعة', labelFr: 'En révision' },
+          { id: 'REVIEW', labelAr: 'قيد المراجعة', labelFr: 'En révision' },
           { id: 'CONFIRMED', labelAr: 'تم التأكيد', labelFr: 'Confirmée' },
           { id: 'PROCESSING', labelAr: 'قيد التحضير', labelFr: 'En préparation' },
           { id: 'SHIPPED', labelAr: 'قيد التوصيل', labelFr: 'En transit' },

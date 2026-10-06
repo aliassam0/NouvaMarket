@@ -1,4 +1,5 @@
 import { SupplierProfile, SupplierSettlement, MarketplaceFeeSettings } from '../types';
+export type { SupplierProfile };
 
 const STORAGE_KEY_SUPPLIERS = 'nouva_suppliers_v2';
 const STORAGE_KEY_SETTLEMENTS = 'nouva_settlements_v1';
@@ -74,7 +75,7 @@ export const DEFAULT_FEES: MarketplaceFeeSettings = {
   defaultSupplierFeePercent: 5,
   defaultResellerCommissionPercent: 0,
   resellerMinProfitMargin: 0,
-  pickAndPackFeeDzd: 100, // 100 DZD per fulfilled parcel
+  pickAndPackFeeDzd: 0, // Pick & Pack removed
   confirmerFeeDzd: 100, // 100 DZD per delivered parcel to confirmation agent
   lastUpdated: new Date().toISOString().split('T')[0],
 };
@@ -393,6 +394,47 @@ export function updateSupplierStatus(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedSupplierObj),
     }).catch(() => {});
+  }
+}
+
+/**
+ * Record a successfully delivered order for a supplier
+ * Updates totalDeliveredOrders, totalSalesDzd, and platform commission
+ */
+export function recordSupplierOrderDelivered(
+  supplierIdOrName: string,
+  wholesaleAmount: number,
+  orderTotalAmount: number
+): void {
+  try {
+    const suppliers = getStoredSuppliers();
+    const cleanTarget = (supplierIdOrName || '').trim().toLowerCase();
+    if (!cleanTarget) return;
+
+    let matched = false;
+    const updated = suppliers.map((sup) => {
+      const match =
+        sup.id.toLowerCase() === cleanTarget ||
+        (sup.companyName && sup.companyName.trim().toLowerCase() === cleanTarget) ||
+        (sup.fullName && sup.fullName.trim().toLowerCase() === cleanTarget);
+
+      if (match) {
+        matched = true;
+        return {
+          ...sup,
+          totalDeliveredOrders: (sup.totalDeliveredOrders || 0) + 1,
+          totalSalesDzd: (sup.totalSalesDzd || 0) + orderTotalAmount,
+          nouvaCommissionDzd: (sup.nouvaCommissionDzd || 0) + Math.max(0, orderTotalAmount - wholesaleAmount),
+        };
+      }
+      return sup;
+    });
+
+    if (matched) {
+      saveStoredSuppliers(updated);
+    }
+  } catch (err) {
+    console.error('Error recording delivered order on supplier:', err);
   }
 }
 
@@ -808,7 +850,7 @@ export function getStoredMarketplaceFees(): MarketplaceFeeSettings {
       defaultSupplierFeePercent: Number(supplierFee) || 5,
       defaultResellerCommissionPercent: Number(resellerFee) || 0,
       resellerMinProfitMargin: parsed.resellerMinProfitMargin || 0,
-      pickAndPackFeeDzd: Number(parsed.pickAndPackFeeDzd ?? 100),
+      pickAndPackFeeDzd: Number(parsed.pickAndPackFeeDzd ?? 0),
       confirmerFeeDzd: Number(parsed.confirmerFeeDzd ?? 100),
       lastUpdated: parsed.lastUpdated || new Date().toISOString().split('T')[0],
     };
@@ -828,7 +870,7 @@ export function saveStoredMarketplaceFees(fees: MarketplaceFeeSettings): void {
       resellerFeePercent: resellerFee,
       defaultSupplierFeePercent: supplierFee,
       defaultResellerCommissionPercent: resellerFee,
-      pickAndPackFeeDzd: Number(fees.pickAndPackFeeDzd ?? 100),
+      pickAndPackFeeDzd: Number(fees.pickAndPackFeeDzd ?? 0),
       confirmerFeeDzd: Number(fees.confirmerFeeDzd ?? 100),
       lastUpdated: new Date().toISOString().split('T')[0],
     };
@@ -855,6 +897,35 @@ export function calculateResellerProfitBreakdown(
   const platformCut = Math.max(0, Math.round((grossProfit * feePercent) / 100));
   const netProfit = Math.max(0, grossProfit - platformCut);
   return { grossProfit, netProfit, platformCut, feePercent };
+}
+
+/**
+ * Calculate earnings breakdown for Seller Direct Sale:
+ * When the seller sells their own product directly (via link or direct order):
+ * Example: Base wholesale = 1,000 DZD, Platform fee 5% = 50 DZD.
+ * Customer price = 2,000 DZD.
+ * Seller receives: 2,000 - 50 = 1,950 DZD!
+ * (Unlike a marketer who only receives 2,000 - 1,050 = 950 DZD).
+ */
+export function calculateSupplierDirectEarnings(
+  sellingPrice: number,
+  wholesaleBasePrice: number,
+  feePercent?: number
+): {
+  sellingPrice: number;
+  platformFee: number;
+  sellerDue: number;
+  feePercent: number;
+} {
+  const feeRate = feePercent ?? getStoredMarketplaceFees().supplierFeePercent ?? 5;
+  const platformFee = Math.round((wholesaleBasePrice * feeRate) / 100);
+  const sellerDue = Math.max(0, sellingPrice - platformFee);
+  return {
+    sellingPrice,
+    platformFee,
+    sellerDue,
+    feePercent: feeRate,
+  };
 }
 
 /**

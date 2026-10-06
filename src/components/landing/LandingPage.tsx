@@ -39,9 +39,10 @@ import { TermsModal } from './TermsModal';
 import { PrivacyModal } from './PrivacyModal';
 import { EnterprisePendingApprovalModal, PendingApprovalData } from './EnterprisePendingApprovalModal';
 import { WhatsAppIcon } from '../tabs/CustomerShareOrderEnhancements';
+import { GlobalExpansionHeroVisual } from './GlobalExpansionHeroVisual';
 
 interface LandingPageProps {
-  onEnterApp: (role?: 'reseller' | 'admin' | 'warehouse' | 'confirmer') => void;
+  onEnterApp: (role?: 'reseller' | 'admin' | 'warehouse' | 'confirmer' | 'support' | 'platform_warehouse') => void;
   onShowToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
@@ -169,7 +170,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
 
       const success = await loginWithEmailPassword(loginEmail, loginPassword);
       if (success) {
-        let targetRole: 'reseller' | 'admin' | 'warehouse' | 'confirmer' = loginRole;
+        let targetRole: 'reseller' | 'admin' | 'warehouse' | 'confirmer' | 'support' | 'platform_warehouse' = 'reseller';
 
         // 1. Check system users
         const sysUsers = getStoredSystemUsers();
@@ -179,6 +180,8 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
 
         if (matchedSysUser) {
           targetRole = mapSystemUserToAppRole(matchedSysUser.role);
+        } else if (lowerEmail.includes('support') || lowerEmail.startsWith('support@')) {
+          targetRole = 'support';
         } else if (loginRole === 'confirmer' || lowerEmail.includes('confirm') || lowerEmail.startsWith('confirm@')) {
           targetRole = 'confirmer';
         } else if (lowerEmail.includes('admin') || lowerEmail.startsWith('admin@')) {
@@ -204,11 +207,13 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
           ? `🛠️ ${matchedSysUser.fullName} (${matchedSysUser.role})`
           : targetRole === 'admin'
           ? '🛠️ مدير النظام (Admin)'
+          : targetRole === 'support'
+          ? '🎧 الدعم الفني للمسوقين (Support Desk)'
           : targetRole === 'confirmer'
-          ? '🎧 مؤكد الطلبيات لجميع الموردين'
+          ? '🎧 مؤكد الطلبيات لجميع البائعين'
           : targetRole === 'warehouse'
-          ? '📦 أمين المستودع والمورد'
-          : '🛍️ بائع';
+          ? '📦 البائع (صاحب السلع والمستودع)'
+          : '🛍️ مسوّق (بالعمولة)';
 
         onShowToast(`تم تسجيل الدخول بنجاح كـ ${roleLabel}`, 'success');
         setIsLoginModalOpen(false);
@@ -277,7 +282,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
           referenceCode: refId,
         });
         onShowToast(
-          '⏳ تم استلام وتوثيق ملف المورد! الملف قيد التدقيق الإداري والاعتماد من قِبل إدارة Nouva Market.',
+          '⏳ تم استلام وتوثيق ملف البائع! الملف قيد التدقيق الإداري والاعتماد من قِبل إدارة Nouva Market.',
           'info'
         );
       } else {
@@ -311,7 +316,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
           referenceCode: refId,
         });
         onShowToast(
-          '🎉 تم استلام وتوثيق ملف البائع! الملف قيد التدقيق الإداري والاعتماد من قِبل إدارة Nouva Market.',
+          '🎉 تم استلام وتوثيق ملف المسوق! الملف قيد التدقيق الإداري والاعتماد من قِبل إدارة Nouva Market.',
           'success'
         );
       }
@@ -337,7 +342,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
           <div className="flex items-center gap-2 font-bold">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping inline-block shrink-0" />
             <span>
-              مرحباً <strong>{user.storeName || user.fullName}</strong> • أنت متصل داخل المنصة وحسابك {user.role === 'warehouse' ? 'كمورّد' : 'كبائع'} قيد مراجعة الإدارة. ستبقى متصلاً بالمنصة وسيتم نقلك مباشرة إلى لوحة التحكم فور موافقة الأدمن دون الحاجة لتسجيل الدخول مجدداً!
+              مرحباً <strong>{user.storeName || user.fullName}</strong> • أنت متصل داخل المنصة وحسابك {user.role === 'warehouse' ? 'كبائع' : 'كمسوق'} قيد مراجعة الإدارة. ستبقى متصلاً بالمنصة وسيتم نقلك مباشرة إلى لوحة التحكم فور موافقة الأدمن دون الحاجة لتسجيل الدخول مجدداً!
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -360,7 +365,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
             </button>
             <a
               href={`https://wa.me/213550228983?text=${encodeURIComponent(
-                `مرحباً إدارة Nouva Market، قمت بتسجيل حساب (${user.role === 'warehouse' ? 'مورد' : 'بائع'}) جديد باسم (${user.storeName || user.fullName})، وأرغب في مراجعة وتفعيل الحساب.`
+                `مرحباً إدارة Nouva Market، قمت بتسجيل حساب (${user.role === 'warehouse' ? 'بائع' : 'مسوق'}) جديد باسم (${user.storeName || user.fullName})، وأرغب في مراجعة وتفعيل الحساب.`
               )}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -411,7 +416,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
                 >
                   <UserCheck className="w-4 h-4 text-purple-300" />
                   <span>
-                    {user.fullName || user.storeName || user.email} ({user.role === 'admin' ? 'مدير' : user.role === 'confirmer' ? 'مؤكد طلبات' : user.role === 'warehouse' ? 'مورد' : 'بائع'}) - دخول الحساب
+                    {user.fullName || user.storeName || user.email} ({user.role === 'admin' ? 'مدير' : user.role === 'confirmer' ? 'مؤكد طلبات' : user.role === 'warehouse' ? 'بائع' : 'مسوق'}) - دخول الحساب
                   </span>
                   <ArrowLeft className="w-4 h-4" />
                 </button>
@@ -458,13 +463,13 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
                   <span>تسجيل الدخول</span>
                 </button>
 
-                {/* Register Seller CTA */}
+                {/* Register Marketer CTA */}
                 <button
                   onClick={() => setIsRegisterModalOpen(true)}
                   className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-purple-600 hover:from-purple-500 hover:to-purple-500 text-white font-black text-xs sm:text-sm shadow-md shadow-purple-600/20 active:scale-95 transition duration-200 flex items-center gap-2 cursor-pointer"
                 >
                   <UserCheck className="w-4 h-4" />
-                  <span>تسجيل بائع</span>
+                  <span>تسجيل مسوق</span>
                 </button>
               </>
             )}
@@ -473,39 +478,38 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
       </header>
 
       {/* Hero Section */}
-      <section className="relative pt-10 sm:pt-20 pb-16 sm:pb-28 overflow-hidden z-10">
+      <section className="relative pt-8 sm:pt-16 pb-16 sm:pb-24 overflow-hidden z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto space-y-6">
-            {/* Top Trust Pills */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-50 border border-purple-200 text-purple-800 text-xs font-bold shadow-xs animate-pulse">
-              <Sparkles className="w-4 h-4 text-purple-600" />
-              <span>منصة التجارة الإلكترونية الأولى في الجزائر بدون رأس مال!</span>
+          <div className="text-center max-w-4xl mx-auto space-y-6 sm:space-y-7">
+            {/* Top Trust Pill Badge with pulsating live indicator */}
+            <div className="inline-flex items-center gap-2.5 px-4 sm:px-5 py-2 rounded-full bg-white/90 border border-slate-200/90 text-slate-800 text-xs sm:text-sm font-extrabold shadow-xs backdrop-blur-md transition hover:border-purple-300">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse" />
+              <span>منصة التجارة الإلكترونية المتكاملة لرواد الأعمال والتجار</span>
             </div>
 
             {/* Main Headline */}
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 leading-tight tracking-tight">
-              حقّق أرباحاً يومية من <br className="hidden sm:inline" />
-              <span className="bg-gradient-to-r from-purple-600 via-purple-600 to-purple-600 bg-clip-text text-transparent">
-                التجارة الإلكترونية
-              </span>
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 leading-[1.25] tracking-tight">
+              بوابتك لتطوير تجارتك <br className="hidden sm:inline" />
+              <span className="text-purple-600">الإلكترونية والتوسع</span> <br className="hidden sm:inline" />
+              نحو الأسواق الدولية
             </h1>
 
             {/* Subtitle */}
-            <p className="text-sm sm:text-lg text-slate-600 font-medium leading-relaxed">
-              لا تحتاج شراء مخزون أو امتلاك رأس مال! نحن نوفر لك أحدث تشكيلات الإلكترونيات والمنتجات الذكية والأجهزة الأكثر مبيعاً، التغليف، والتوصيل لـ <span className="text-purple-700 font-bold">69 ولاية</span> مع الدفع عند الاستلام (COD)، وأنت تستلم أرباحك الصافية فوراً.
+            <p className="text-sm sm:text-base lg:text-lg text-slate-600 font-medium leading-relaxed max-w-2xl mx-auto">
+              انطلق من السوق الجزائري نحو آفاق عالمية رابحة. نوفر لك السلع الرابحة الأكثر طلباً، التخزين المجاني، التأكيد الفوري، وشبكة شحن متكاملة لـ <strong className="text-purple-700 font-black">58 ولاية</strong> مع الدفع عند الاستلام — ونستعد لافتتاح أسواق دولية واعدة لتوسيع تجارتك ومضاعفة أرباحك حول العالم.
             </p>
 
-            {/* Main CTA Buttons */}
-            <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+            {/* Main CTA Buttons - Styled as prominent pill button like reference */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
               {user ? (
                 user.approvalStatus === 'APPROVED' ? (
                   <button
                     onClick={() => onEnterApp(user.role as any)}
-                    className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-500 text-white font-black text-base shadow-xl shadow-purple-600/20 active:scale-95 transition flex items-center justify-center gap-2.5 group cursor-pointer"
+                    className="w-full sm:w-auto min-w-[260px] px-8 py-4 sm:py-4.5 rounded-full bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 text-white font-black text-base sm:text-lg shadow-xl shadow-purple-600/30 active:scale-95 transition-all duration-200 flex items-center justify-center gap-3 group cursor-pointer"
                   >
-                    <UserCheck className="w-5 h-5 text-purple-300" />
-                    <span>مرحباً {user.fullName || user.storeName} - الانتقال المباشر لمساحة العمل</span>
-                    <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition" />
+                    <UserCheck className="w-5 h-5 text-purple-200" />
+                    <span>مرحباً {user.fullName || user.storeName} - ابدأ الآن</span>
+                    <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1.5 transition-transform" />
                   </button>
                 ) : (
                   <button
@@ -521,51 +525,90 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
                         referenceCode: user.id ? `NV-${user.role === 'warehouse' ? 'SUP' : 'SEL'}-${user.id.slice(-6).toUpperCase()}` : undefined,
                       });
                     }}
-                    className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-base shadow-xl shadow-amber-500/20 active:scale-95 transition flex items-center justify-center gap-2.5 group cursor-pointer"
+                    className="w-full sm:w-auto min-w-[260px] px-8 py-4 sm:py-4.5 rounded-full bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-base shadow-xl shadow-amber-500/20 active:scale-95 transition-all duration-200 flex items-center justify-center gap-3 group cursor-pointer"
                   >
                     <Clock className="w-5 h-5 text-slate-950 animate-pulse" />
-                    <span>حسابك ({user.storeName || user.fullName}) قيد مراجعة الإدارة • عرض الحالة</span>
+                    <span>حسابك قيد مراجعة الإدارة • عرض الحالة</span>
                   </button>
                 )
               ) : (
                 <>
                   <button
                     onClick={() => setIsRegisterModalOpen(true)}
-                    className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-500 text-white font-black text-base shadow-xl shadow-purple-600/20 active:scale-95 transition flex items-center justify-center gap-2.5 group cursor-pointer"
+                    className="w-full sm:w-auto min-w-[260px] px-8 py-4 sm:py-4.5 rounded-full bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 text-white font-black text-base sm:text-lg shadow-xl shadow-purple-600/30 active:scale-95 transition-all duration-200 flex items-center justify-center gap-3 group cursor-pointer"
                   >
-                    <Zap className="w-5 h-5 fill-current text-white group-hover:scale-110 transition" />
-                    <span>ابدأ الربح الآن - تسجيل بائع مجاناً</span>
-                    <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition" />
+                    <span>ابدأ الآن</span>
+                    <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1.5 transition-transform" />
                   </button>
 
                   <button
                     onClick={() => setIsLoginModalOpen(true)}
-                    className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-white hover:bg-slate-100/80 border border-slate-200 text-slate-800 font-bold text-sm transition shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full sm:w-auto px-7 py-4 rounded-full bg-white hover:bg-slate-100/90 border border-slate-200 text-slate-800 font-bold text-sm sm:text-base transition-all duration-200 shadow-xs flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Lock className="w-5 h-5 text-purple-600" />
-                    <span>تسجيل الدخول إلى حسابك</span>
+                    <Lock className="w-4 h-4 text-purple-600" />
+                    <span>تسجيل الدخول</span>
                   </button>
                 </>
               )}
             </div>
 
-            {/* Key Trust Badges Below Hero */}
-            <div className="pt-8 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-xs font-bold text-slate-700">
-              <div className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center gap-2">
-                <Truck className="w-4 h-4 text-purple-600 shrink-0" />
-                <span>شحن 69 ولاية COD</span>
+            {/* Social Proof Row below CTA matching reference screenshot */}
+            <div className="pt-1 flex flex-wrap items-center justify-center gap-3 sm:gap-5 text-xs font-bold text-slate-600">
+              <div className="flex items-center -space-x-2 space-x-reverse">
+                <div className="w-8 h-8 rounded-full bg-purple-600 text-white font-black flex items-center justify-center border-2 border-white text-xs shadow-xs">
+                  A
+                </div>
+                <div className="w-8 h-8 rounded-full bg-indigo-600 text-white font-black flex items-center justify-center border-2 border-white text-xs shadow-xs">
+                  B
+                </div>
+                <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center border-2 border-white text-xs shadow-xs">
+                  C
+                </div>
+                <div className="w-8 h-8 rounded-full bg-amber-500 text-slate-950 font-black flex items-center justify-center border-2 border-white text-xs shadow-xs">
+                  ★
+                </div>
               </div>
-              <div className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center gap-2">
+
+              <span className="font-extrabold text-slate-800">
+                شبكة متنامية من التجار والمسوقين النشطين
+              </span>
+
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+
+              <div className="flex items-center gap-1 text-amber-500">
+                <span className="flex text-sm">★★★★★</span>
+                <span className="font-extrabold text-slate-800 mr-1">تقييم 4.9</span>
+              </div>
+            </div>
+
+            {/* ================= ALGERIA & MYSTERY EXPANSION CENTERPIECE ================= */}
+            <GlobalExpansionHeroVisual
+              onNotifyMe={(marketTitle) =>
+                onShowToast(`🎉 تم تسجيل اهتمامك بالسوق (${marketTitle})! سنرسل لك إشعاراً حصرياً فور الإطلاق.`, 'success')
+              }
+              onExploreMore={() => {
+                const el = document.getElementById('features');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+            />
+
+            {/* Key Trust Badges Below Visual */}
+            <div className="pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-xs font-bold text-slate-700">
+              <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center gap-2">
+                <Truck className="w-4 h-4 text-purple-600 shrink-0" />
+                <span>شحن 58 ولاية COD</span>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center gap-2">
                 <Wallet className="w-4 h-4 text-purple-600 shrink-0" />
                 <span>سحب الأرباح عبر CCP</span>
               </div>
-              <div className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center gap-2">
+              <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center gap-2">
                 <Package className="w-4 h-4 text-purple-600 shrink-0" />
                 <span>بدون مخزون أو رأس مال</span>
               </div>
-              <div className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-violet-600 shrink-0" />
-                <span>ضمان الجودة والمرجوعات</span>
+              <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                <span>توسع دولي قادم 🌍</span>
               </div>
             </div>
           </div>
@@ -577,15 +620,15 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             <div className="space-y-1">
-              <p className="text-2xl sm:text-4xl font-black text-purple-600 tracking-tight">+15,400</p>
-              <p className="text-xs sm:text-sm text-slate-500 font-bold">طرد مسلّم للزبائن 📦</p>
+              <p className="text-2xl sm:text-4xl font-black text-purple-600 tracking-tight">آلاف</p>
+              <p className="text-xs sm:text-sm text-slate-500 font-bold">الطرود المسلّمة بنجاح 📦</p>
             </div>
             <div className="space-y-1">
               <p className="text-2xl sm:text-4xl font-black text-purple-600 tracking-tight">+1,250</p>
-              <p className="text-xs sm:text-sm text-slate-500 font-bold">بائع وموزع نشط 🛍️</p>
+              <p className="text-xs sm:text-sm text-slate-500 font-bold">مسوق وموزع نشط 🛍️</p>
             </div>
             <div className="space-y-1">
-              <p className="text-2xl sm:text-4xl font-black text-purple-600 tracking-tight">69</p>
+              <p className="text-2xl sm:text-4xl font-black text-purple-600 tracking-tight">58</p>
               <p className="text-xs sm:text-sm text-slate-500 font-bold">ولاية مغطاة بالكامل 🇩🇿</p>
             </div>
             <div className="space-y-1">
@@ -607,7 +650,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
               كل ما تحتاجه للنجاح في تجارتك الإلكترونية
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 font-medium">
-              صمّمنا المنصة خصيصاً للموزعين والبائعين في الجزائر لنوفر عليهم عناء الاستيراد والتخزين والتوصيل.
+              صمّمنا المنصة خصيصاً للموزعين والمسوقين في الجزائر لنوفر عليهم عناء الاستيراد والتخزين والتوصيل.
             </p>
           </div>
 
@@ -730,7 +773,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
                 onClick={() => setIsRegisterModalOpen(true)}
                 className="w-full py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-black text-sm transition shadow-md shadow-purple-600/20 cursor-pointer"
               >
-                تسجيل بائع لكسب هذا المدخول الآن
+                تسجيل مسوق لكسب هذا المدخول الآن
               </button>
             </div>
           </div>
@@ -753,7 +796,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
             {[
               {
                 step: '01',
-                title: 'سجل حساب بائع',
+                title: 'سجل حساب مسوق',
                 desc: 'أنشئ حسابك مجاناً بدون رسوم اشتراك في دقيقة واحدة.',
                 icon: Store,
                 color: 'text-purple-700 bg-purple-50 border-purple-200',
@@ -865,7 +908,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
             جاهز لبدء تحقيق أرباح حقيقية اليوم؟
           </h2>
           <p className="text-xs sm:text-base text-purple-50 font-medium max-w-xl mx-auto">
-            انضم إلى أكثر من 1,200 بائع وموزع ناجح بالجزائر. سجل الآن مجاناً وابدأ نشر أول منتج في أقل من 3 دقائق!
+            انضم إلى أكثر من 1,200 مسوق وموزع ناجح بالجزائر. سجل الآن مجاناً وابدأ نشر أول منتج في أقل من 3 دقائق!
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             {user ? (
@@ -882,7 +925,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
                   onClick={() => setIsRegisterModalOpen(true)}
                   className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white hover:bg-slate-50 text-slate-950 font-black text-base shadow-xl active:scale-95 transition cursor-pointer"
                 >
-                  تسجيل بائع جديد الآن
+                  تسجيل مسوق جديد الآن
                 </button>
                 <button
                   onClick={() => setIsLoginModalOpen(true)}
@@ -1022,7 +1065,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
                   }}
                   className="text-purple-600 font-black hover:underline cursor-pointer"
                 >
-                  سجل كبائع جديد الآن
+                  سجل كمسوق جديد الآن
                 </button>
               </p>
             </div>
@@ -1030,7 +1073,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
         </div>
       )}
 
-      {/* ===================== REGISTER MODAL (تسجيل بائع) ===================== */}
+      {/* ===================== REGISTER MODAL (تسجيل مسوق / بائع) ===================== */}
       {isRegisterModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative text-right max-h-[90vh] overflow-y-auto">
@@ -1044,12 +1087,12 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
             <div className="space-y-2">
               <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
                 <UserCheck className="w-6 h-6 text-purple-600" />
-                <span>{regAccountType === 'supplier' ? 'انضم كمورد للكتالوج' : 'تسجيل بائع / مسوق جديد'}</span>
+                <span>{regAccountType === 'supplier' ? 'انضم كبائع للمنصة (صاحب منتجات)' : 'تسجيل مسوّق جديد (بالعمولة)'}</span>
               </h3>
               <p className="text-xs text-slate-500 font-medium">
                 {regAccountType === 'supplier'
-                  ? 'سجل معلومات مستودعك أو براندك لبدء توريد المنتجات وسحب المستحقات'
-                  : 'ابدأ عملك مجاناً وبدون أي تكاليف أولية أو شراء مخزون'}
+                  ? 'سجل معلومات مستودعك أو نشاطك لبدء بيع المنتجات وسحب مستحقاتك'
+                  : 'ابدأ عملك في التسويق بالعمولة مجاناً وبدون أي تكاليف أولية أو شراء مخزون'}
               </p>
 
               {/* Account Type Toggle Tabs */}
@@ -1064,7 +1107,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
                   }`}
                 >
                   <Store className="w-4 h-4" />
-                  <span>تسجيل كبائع / مسوق</span>
+                  <span>تسجيل كمسوّق (Affiliate)</span>
                 </button>
 
                 <button
@@ -1077,7 +1120,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
                   }`}
                 >
                   <Package className="w-4 h-4" />
-                  <span>انضم كمورد (Supplier)</span>
+                  <span>انضم كبائع (Seller / أصحاب سلع)</span>
                 </button>
               </div>
             </div>
@@ -1275,7 +1318,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
                   />
                   <span>
                     {regAccountType === 'supplier'
-                      ? 'أقرّ بأنني أنا مالك المنتجات المعروضة على المنصة بصفتي مورّدًا لها، وألتزم بتوفير منتجات أصلية ومطابقة للمواصفات المعلنة.'
+                      ? 'أقرّ بأنني أنا مالك المنتجات المعروضة على المنصة بصفتي بائعًا لها، وألتزم بتوفير منتجات أصلية ومطابقة للمواصفات المعلنة.'
                       : 'أقرّ بأنني أسوّق وأبيع منتجات المنصة بصفتي وكيلاً عنها مقابل ربح معلوم، وألتزم بالصدق والأمانة في البيع.'}
                   </span>
                 </label>
@@ -1293,8 +1336,8 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
                 {isRegistering
                   ? 'جاري إنشاء الحساب...'
                   : regAccountType === 'supplier'
-                  ? 'إنشاء حساب مورد معتمد'
-                  : 'إنشاء حساب بائع معتمد'}
+                  ? 'إنشاء حساب بائع معتمد'
+                  : 'إنشاء حساب مسوق معتمد'}
               </button>
             </form>
 

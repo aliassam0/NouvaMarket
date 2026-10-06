@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Boxes,
   Headphones,
+  LifeBuoy,
 } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -45,12 +46,15 @@ import { DevToolsDrawer } from './components/tabs/DevToolsDrawer';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { WarehouseDashboard } from './components/warehouse/WarehouseDashboard';
 import { ConfirmerDashboard } from './components/confirmer/ConfirmerDashboard';
+import { SupportDashboard } from './components/support/SupportDashboard';
 import { LandingPage } from './components/landing/LandingPage';
 import { MarketedProductsTab } from './components/tabs/MarketedProductsTab';
 import { ShareProductModal } from './components/tabs/ShareProductModal';
 import { CustomerShareOrderView } from './components/tabs/CustomerShareOrderView';
 import { ExternalStoreSyncModal } from './components/common/ExternalStoreSyncModal';
 import { StoresManagementModal } from './components/common/StoresManagementModal';
+import { SellerDirectSupportChatWidget } from './components/chat/SellerDirectSupportChatWidget';
+import { SupportAgentInboxWidget } from './components/chat/SupportAgentInboxWidget';
 import { PWAInstallButton } from './components/common/PWAInstallButton';
 import { DashboardSwitcher, DashboardRole } from './components/common/DashboardSwitcher';
 import { InstantSaleBanner } from './components/common/InstantSaleBanner';
@@ -58,8 +62,8 @@ import { MOCK_PRODUCTS, getStoredProducts, syncProductsWithServer } from './data
 
 import { Product, ProductVariant } from './types';
 
-type TabType = 'accueil' | 'produits' | 'commandes' | 'wallet' | 'analytics' | 'marketing' | 'profil';
-type RoleType = 'reseller' | 'admin' | 'warehouse' | 'confirmer';
+type TabType = 'accueil' | 'produits' | 'marketed' | 'commandes' | 'wallet' | 'analytics' | 'marketing' | 'profil';
+export type RoleType = 'reseller' | 'admin' | 'warehouse' | 'platform_warehouse' | 'confirmer' | 'support';
 type ViewMode = 'landing' | 'app';
 
 function AppContent() {
@@ -73,6 +77,8 @@ function AppContent() {
   const [impersonatedSellerName, setImpersonatedSellerName] = useState<string | null>(null);
   const [impersonatedSupplierName, setImpersonatedSupplierName] = useState<string | null>(null);
   const [impersonatedConfirmerName, setImpersonatedConfirmerName] = useState<string | null>(null);
+  const [impersonatedSupportName, setImpersonatedSupportName] = useState<string | null>(null);
+  const [impersonatedSupportAgentId, setImpersonatedSupportAgentId] = useState<string | null>(null);
 
   const handleImpersonateSupplier = (supplier: any) => {
     const name = supplier.companyName || supplier.fullName;
@@ -90,7 +96,7 @@ function AppContent() {
     };
     localStorage.setItem('nouva_supplier_profile', JSON.stringify(supplierData));
     setCurrentRole('warehouse');
-    showToast(`تم الدخول لحساب المورد: ${name}`, 'info');
+    showToast(`تم الدخول لحساب البائع: ${name}`, 'info');
   };
 
   useEffect(() => {
@@ -112,19 +118,27 @@ function AppContent() {
     setImpersonatedSellerName(null);
     setImpersonatedSupplierName(null);
     setImpersonatedConfirmerName(null);
+    setImpersonatedSupportName(null);
+    setImpersonatedSupportAgentId(null);
     setCurrentRole('reseller');
     setActiveTab('accueil');
     showToast('تم تسجيل الخروج بنجاح 👋', 'info');
   };
 
-  // Check if current session can switch between all 4 dashboards
+  // Check if current session can switch between dashboards
+  // When a support user or confirmer logs in directly, they remain locked in their dashboard
+  const isDirectSupportUser = user?.role === 'support' && !impersonatedSupportName;
+  const isDirectConfirmerUser = user?.role === 'confirmer' && !impersonatedConfirmerName;
   const canSwitchAll = Boolean(
-    user?.role === 'admin' ||
+    !isDirectSupportUser &&
+    !isDirectConfirmerUser &&
+    (user?.role === 'admin' ||
     user?.email?.includes('admin') ||
     impersonatedSellerName ||
     impersonatedSupplierName ||
     impersonatedConfirmerName ||
-    !user
+    impersonatedSupportName ||
+    !user)
   );
 
   const handleSwitchDashboard = (newRole: DashboardRole) => {
@@ -132,8 +146,17 @@ function AppContent() {
       setImpersonatedSellerName(null);
       setImpersonatedSupplierName(null);
       setImpersonatedConfirmerName(null);
+      setImpersonatedSupportName(null);
+      setImpersonatedSupportAgentId(null);
       setCurrentRole('admin');
       showToast('تم الانتقال إلى: لوحة الأدمن (Admin HQ)', 'info');
+    } else if (newRole === 'support') {
+      if (user?.role === 'admin' && !impersonatedSupportName) {
+        setImpersonatedSupportName('معاينة وكيل الدعم الفني');
+        setImpersonatedSupportAgentId(null);
+      }
+      setCurrentRole('support');
+      showToast('تم الانتقال إلى: لوحة الدعم الفني للمسوقين', 'info');
     } else if (newRole === 'confirmer') {
       if (user?.role === 'admin' && !impersonatedConfirmerName) {
         setImpersonatedConfirmerName('معاينة مؤكد الطلبيات');
@@ -142,17 +165,17 @@ function AppContent() {
       showToast('تم الانتقال إلى: واجهة المؤكد (Confirmer Desk)', 'info');
     } else if (newRole === 'warehouse') {
       if (user?.role === 'admin' && !impersonatedSupplierName) {
-        setImpersonatedSupplierName('مورد الأجهزة والإلكترونيات');
+        setImpersonatedSupplierName('بائع الأجهزة والإلكترونيات');
       }
       setCurrentRole('warehouse');
-      showToast('تم الانتقال إلى: بوابة المورّد', 'info');
+      showToast('تم الانتقال إلى: بوابة البائع', 'info');
     } else if (newRole === 'platform_warehouse') {
       setCurrentRole('platform_warehouse');
       showToast('تم الانتقال إلى: مستودع المنصة', 'info');
     } else if (newRole === 'reseller') {
       setCurrentRole('reseller');
       setActiveTab('accueil');
-      showToast('تم الانتقال إلى: لوحة المسوّق (Seller Hub)', 'info');
+      showToast('تم الانتقال إلى: لوحة المسوّق (Marketer Hub)', 'info');
     }
   };
 
@@ -273,7 +296,7 @@ function AppContent() {
       <div className="w-full h-full min-h-screen relative">
         <LandingPage
           onEnterApp={(role) => {
-            if (role === 'admin' || role === 'warehouse' || role === 'reseller' || role === 'confirmer') {
+            if (role === 'admin' || role === 'warehouse' || role === 'reseller' || role === 'confirmer' || role === 'support' || role === 'platform_warehouse') {
               setCurrentRole(role);
             } else {
               setCurrentRole('reseller');
@@ -343,11 +366,11 @@ function AppContent() {
         <div className="flex items-center gap-1.5 shrink-0">
           <PWAInstallButton />
 
-          {currentRole === 'reseller' && (
+          {(currentRole === 'reseller' || currentRole === 'warehouse') && (
             <button
               onClick={() => setIsStoresManagerOpen(true)}
               className="px-2.5 py-1.5 rounded-xl bg-violet-50 hover:bg-violet-100 dark:bg-violet-950/80 text-violet-700 dark:text-violet-300 font-extrabold text-[11px] border border-violet-200 dark:border-violet-800 hidden md:flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
-              title="إدارة ربط المتاجر (Shopify / YouCan / WooCommerce)"
+              title="إدارة ربط المتاجر (Shopify / YouCan / WooCommerce / WordPress)"
             >
               <Store className="w-3.5 h-3.5" />
               <span>ربط المتاجر</span>
@@ -357,7 +380,7 @@ function AppContent() {
           <button
             onClick={() => setIsNotificationsOpen(true)}
             className="flex p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition relative cursor-pointer"
-            title="إشعارات وتنبيهات البائعين"
+            title="إشعارات وتنبيهات المسوقين"
           >
             <Bell className="w-4 h-4" />
             {unreadNotifCount > 0 && (
@@ -408,10 +431,10 @@ function AppContent() {
           <div className="flex items-center gap-2">
             <span className="bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide flex items-center gap-1">
               <Boxes className="w-3 h-3 text-amber-200" />
-              <span>معاينة المورد</span>
+              <span>معاينة البائع</span>
             </span>
             <span>
-              أنت تتصفح الآن حساب المورد:{' '}
+              أنت تتصفح الآن حساب البائع:{' '}
               <strong className="text-amber-300 font-extrabold">{impersonatedSupplierName}</strong>
             </span>
           </div>
@@ -451,6 +474,30 @@ function AppContent() {
         </div>
       )}
 
+      {currentRole !== 'admin' && impersonatedSupportName && (
+        <div className="bg-gradient-to-r from-teal-800 via-cyan-950 to-slate-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-teal-500/40">
+          <div className="flex items-center gap-2">
+            <span className="bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide flex items-center gap-1">
+              <LifeBuoy className="w-3 h-3 text-teal-200" />
+              <span>معاينة الدعم</span>
+            </span>
+            <span>
+              أنت تتصفح الآن لوحة الدعم الفني للمسوقين:{' '}
+              <strong className="text-teal-300 font-extrabold">{impersonatedSupportName}</strong>
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setImpersonatedSupportName(null);
+              setCurrentRole('admin');
+            }}
+            className="px-3 py-1 rounded-xl bg-white text-teal-950 hover:bg-teal-300 font-black text-[11px] flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
+          >
+            <span>العودة للوحة الأدمن</span>
+          </button>
+        </div>
+      )}
+
       {/* Main View rendering based on currentRole */}
       <main className="flex-1 overflow-hidden flex flex-col">
         {currentRole === 'admin' && (
@@ -465,6 +512,24 @@ function AppContent() {
             onSwitchToConfirmerDashboard={(confirmer) => {
               setImpersonatedConfirmerName(confirmer?.fullName || 'مؤكد الطلبيات');
               setCurrentRole('confirmer');
+            }}
+            onSwitchToSupportDashboard={(agent) => {
+              setImpersonatedSupportAgentId(agent?.id || null);
+              setImpersonatedSupportName(agent?.fullName || 'سارة مراد (الدعم الفني)');
+              setCurrentRole('support');
+            }}
+          />
+        )}
+
+        {currentRole === 'support' && (
+          <SupportDashboard
+            onShowToast={showToast}
+            onSwitchRole={handleSwitchDashboard}
+            impersonatedAgentId={impersonatedSupportAgentId}
+            impersonatedAgentName={impersonatedSupportName}
+            onClearImpersonation={() => {
+              setImpersonatedSupportAgentId(null);
+              setImpersonatedSupportName(null);
             }}
           />
         )}
@@ -553,18 +618,9 @@ function AppContent() {
         )}
       </main>
 
-      {/* Reseller Floating CTA & Mobile Navigation Bar */}
+      {/* Reseller Mobile Navigation Bar */}
       {currentRole === 'reseller' && (user?.approvalStatus === 'APPROVED' || impersonatedSellerName) && (
         <>
-          <button
-            onClick={() => handleOpenNewOrder()}
-            className="fixed bottom-20 end-5 z-30 p-3.5 rounded-full bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-extrabold shadow-2xl flex items-center gap-2 border-2 border-white/20 transition duration-200"
-            title="إنشاء طلبية جديدة"
-          >
-            <Zap className="w-5 h-5 fill-current" />
-            <span className="hidden sm:inline text-xs">طلب جديد</span>
-          </button>
-
           <nav className="px-2 py-2 bg-white/95 dark:bg-slate-900/95 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-around sticky bottom-0 z-30 backdrop-blur-md shadow-lg">
             {[
               { id: 'accueil', label: t('tab.home'), icon: Home },
@@ -657,6 +713,9 @@ function AppContent() {
       {isNewOrderModalOpen && (
         <NewOrderModal
           initialProduct={prefilledOrderProduct}
+          availableProducts={getStoredProducts().filter(
+            (p) => p.allowAffiliate !== false && !p.isSupplierExclusive && p.approvalStatus !== 'REJECTED'
+          )}
           onClose={() => setIsNewOrderModalOpen(false)}
           onShowToast={showToast}
         />
@@ -678,6 +737,21 @@ function AppContent() {
           onClose={() => setIsDevToolsOpen(false)}
           onShowToast={showToast}
         />
+      )}
+
+      {/* Real-time Direct Support Chat Widget for Reseller (Marketer) */}
+      {currentRole === 'reseller' && (user?.approvalStatus === 'APPROVED' || impersonatedSellerName) && (
+        <SellerDirectSupportChatWidget partyType="RESELLER" />
+      )}
+
+      {/* Real-time Direct Support Chat Widget for Supplier (Warehouse/Vendor) */}
+      {currentRole === 'warehouse' && (
+        <SellerDirectSupportChatWidget partyType="SUPPLIER" />
+      )}
+
+      {/* Real-time Direct Support Inbox Widget for Support Team */}
+      {currentRole === 'support' && (
+        <SupportAgentInboxWidget />
       )}
 
       {/* Floating Toast Alerts */}
