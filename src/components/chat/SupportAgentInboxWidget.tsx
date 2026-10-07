@@ -19,7 +19,7 @@ import {
   Download,
   Check,
   History,
-  LifeBuoy,
+  Headset,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -217,7 +217,7 @@ export function SupportAgentInboxWidget() {
               </span>
             )}
 
-            <LifeBuoy className="w-6 h-6 sm:w-7 sm:h-7 text-white transition-transform group-hover:rotate-45 duration-300" />
+            <Headset className="w-6 h-6 sm:w-7 sm:h-7 text-white transition-transform group-hover:scale-110 duration-300" />
           </button>
         </div>
       )}

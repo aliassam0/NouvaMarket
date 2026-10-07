@@ -17,7 +17,7 @@ import {
   Copy,
   Check,
   History,
-  LifeBuoy,
+  Headset,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -200,33 +200,33 @@ export function SellerDirectSupportChatWidget({ partyType }: SellerDirectSupport
 
   return (
     <>
-      {/* ================= FLOATING CHAT BUTTON (Support LifeBuoy Icon) ================= */}
+      {/* ================= FLOATING CHAT BUTTON (Call Center Headset Icon) ================= */}
       {!isOpen && (
         <div className="fixed bottom-20 sm:bottom-6 end-4 sm:end-6 z-40 flex items-center gap-2 group">
           {/* Tooltip Pill */}
           <div className="hidden sm:flex items-center gap-2 bg-slate-900/95 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-xl border border-slate-700/60 backdrop-blur-md opacity-0 group-hover:opacity-100 transition duration-200 pointer-events-none">
-            <span className="w-2 h-2 rounded-full bg-teal-400"></span>
-            <span>الدعم الفني المباشر: {conversation?.agentName || 'وكيلك المخصص'}</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>كول سنتر الدعم الفني: {conversation?.agentName || 'وكيلك المخصص'}</span>
           </div>
 
           <button
             onClick={() => setIsOpen(true)}
             className="relative p-3.5 sm:p-4 rounded-full bg-gradient-to-tr from-teal-600 via-teal-500 to-emerald-500 hover:from-teal-500 hover:to-emerald-400 text-white shadow-2xl shadow-teal-600/30 active:scale-95 transition-all duration-200 cursor-pointer border-2 border-white/40 flex items-center justify-center group"
-            title="محادثة مباشرة وفورية مع وكيل الدعم الفني الخاص بك"
-            aria-label="أيقونة الدعم الفني المباشر"
+            title="مركز الاتصال والدعم الفني المباشر (Call Center Support)"
+            aria-label="أيقونة كول سنتر الدعم الفني"
           >
-            {/* Online Static Indicator (No Heartbeat / No Pulse Animation) */}
-            <span className="absolute -top-0.5 -start-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-xs"></span>
+            {/* Online Static Indicator */}
+            <span className="absolute -top-0.5 -start-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white shadow-xs"></span>
 
-            {/* Unread Message Badge (Clean Static Badge) */}
+            {/* Unread Message Badge */}
             {unreadCount > 0 && (
               <span className="absolute -top-2 -end-2 bg-rose-600 text-white font-mono font-black text-[11px] px-2 py-0.5 rounded-full shadow-lg border-2 border-white">
                 {unreadCount}
               </span>
             )}
 
-            {/* Support LifeBuoy Icon */}
-            <LifeBuoy className="w-6 h-6 sm:w-7 sm:h-7 text-white transition-transform duration-300 group-hover:rotate-45" />
+            {/* Call Center Headset Icon */}
+            <Headset className="w-6 h-6 sm:w-7 sm:h-7 text-white transition-transform duration-300 group-hover:scale-110 drop-shadow-xs" />
           </button>
         </div>
       )}
@@ -234,12 +234,12 @@ export function SellerDirectSupportChatWidget({ partyType }: SellerDirectSupport
       {/* ================= LIVE CHAT POPUP WINDOW ================= */}
       {isOpen && (
         <div className="fixed bottom-4 sm:bottom-6 end-4 sm:end-6 z-50 w-[94vw] sm:w-[400px] h-[550px] max-h-[85vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 font-sans">
-          {/* Header (Support LifeBuoy Theme Banner) */}
+          {/* Header (Call Center Support Theme Banner) */}
           <div className="bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-600 text-white p-3.5 flex items-center justify-between shrink-0 shadow-md">
             <div className="flex items-center gap-2.5">
               <div className="relative">
                 <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white font-black text-sm border border-white/30">
-                  <LifeBuoy className="w-5 h-5" />
+                  <Headset className="w-5 h-5 text-white" />
                 </div>
                 <span className="absolute bottom-0 end-0 w-3 h-3 bg-emerald-400 border-2 border-teal-700 rounded-full"></span>
               </div>
@@ -247,13 +247,13 @@ export function SellerDirectSupportChatWidget({ partyType }: SellerDirectSupport
               <div>
                 <div className="flex items-center gap-1.5">
                   <h3 className="font-black text-xs sm:text-sm leading-tight">
-                    {conversation?.agentName || 'وكيل الدعم الفني'}
+                    {conversation?.agentName || 'وكيل الكول سنتر'}
                   </h3>
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-200" />
                 </div>
                 <div className="flex items-center gap-1.5 text-[11px] text-teal-100">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>
-                  <span>متصل الآن • مخصص لرعايتك 1-on-1</span>
+                  <span>كول سنتر متصل • مخصص لرعايتك 1-on-1</span>
                 </div>
               </div>
             </div>

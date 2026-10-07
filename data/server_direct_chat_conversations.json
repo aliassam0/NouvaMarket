@@ -1,0 +1,96 @@
+{
+  "conv_sel_101": {
+    "id": "conv_sel_101",
+    "partyId": "sel-101",
+    "partyType": "RESELLER",
+    "partyName": "أحمد بن علي",
+    "partyStoreName": "متجر الأناقة ديزاد",
+    "partyPhone": "0555123456",
+    "partyWilaya": "الجزائر العاصمة",
+    "agentId": "sys-usr-support-1",
+    "agentName": "سارة مراد",
+    "agentPhone": "0555000111",
+    "lastMessage": "تمام أختي سارة، شكراً جزيلاً تم تحويل أرباح الـ BaridiMob بنجاح!",
+    "lastMessageAt": "2026-10-07T22:00:38.984Z",
+    "unreadByAgentCount": 1,
+    "unreadByPartyCount": 0,
+    "messages": [
+      {
+        "id": "msg_init_1",
+        "conversationId": "conv_sel_101",
+        "senderId": "sys-usr-support-1",
+        "senderName": "سارة مراد",
+        "senderRole": "SUPPORT",
+        "text": "مرحباً بك أخي أحمد! معك سارة مراد من الدعم الفني. تمت مراجعة طلب السحب الخاص بك وجارٍ إرسال الحوالة.",
+        "timestamp": "2026-10-07T21:27:38.984Z",
+        "readByRecipient": true
+      },
+      {
+        "id": "msg_init_2",
+        "conversationId": "conv_sel_101",
+        "senderId": "sel-101",
+        "senderName": "أحمد بن علي",
+        "senderRole": "RESELLER",
+        "text": "تمام أختي سارة، شكراً جزيلاً تم تحويل أرباح الـ BaridiMob بنجاح!",
+        "timestamp": "2026-10-07T22:00:38.984Z",
+        "readByRecipient": false
+      }
+    ]
+  },
+  "conv_sup_1": {
+    "id": "conv_sup_1",
+    "partyId": "sup-1",
+    "partyType": "SUPPLIER",
+    "partyName": "كمال بلقاسم",
+    "partyStoreName": "مؤسسة النور للاستيراد والتصنيع",
+    "partyPhone": "0661223344",
+    "partyWilaya": "البليدة",
+    "agentId": "sys-usr-support-1",
+    "agentName": "سارة مراد",
+    "agentPhone": "0555000111",
+    "lastMessage": "السلام عليكم، أرسلنا اليوم شحنة 200 قطعة من الحقائب الجلدية إلى مستودع الوسط 1.",
+    "lastMessageAt": "2026-10-07T22:07:38.984Z",
+    "unreadByAgentCount": 1,
+    "unreadByPartyCount": 0,
+    "messages": [
+      {
+        "id": "msg_init_3",
+        "conversationId": "conv_sup_1",
+        "senderId": "sup-1",
+        "senderName": "كمال بلقاسم",
+        "senderRole": "SUPPLIER",
+        "text": "السلام عليكم، أرسلنا اليوم شحنة 200 قطعة من الحقائب الجلدية إلى مستودع الوسط 1.",
+        "timestamp": "2026-10-07T22:07:38.984Z",
+        "readByRecipient": false
+      }
+    ]
+  },
+  "conv_usr-1": {
+    "id": "conv_usr-1",
+    "partyId": "usr-1",
+    "partyType": "RESELLER",
+    "partyName": "مدير النظام (Admin)",
+    "partyStoreName": "الإدارة العامة Nouva",
+    "partyPhone": "0550123456",
+    "partyWilaya": "16 - الجزائر",
+    "agentId": "usr-4",
+    "agentName": "سارة مراد (الدعم الفني للمسوقين)",
+    "agentPhone": "0555000111",
+    "lastMessage": "مرحباً بك أخي مدير النظام (Admin)! معك سارة مراد (الدعم الفني للمسوقين)، وكيل الدعم الفني الخاص بك في منصة Nouva Market. أنا هنا لمساعدتك في أي استفسار حول طلبيات متجرك، الشحن، سحب الأرباح، أو ربط المنتجات. يمكنك مراسلتي في أي وقت وسأجيبك فوراً!",
+    "lastMessageAt": "2026-10-07T22:12:38.985Z",
+    "unreadByAgentCount": 0,
+    "unreadByPartyCount": 1,
+    "messages": [
+      {
+        "id": "msg_welcome_1791411158985",
+        "conversationId": "conv_usr-1",
+        "senderId": "usr-4",
+        "senderName": "سارة مراد (الدعم الفني للمسوقين)",
+        "senderRole": "SUPPORT",
+        "text": "مرحباً بك أخي مدير النظام (Admin)! معك سارة مراد (الدعم الفني للمسوقين)، وكيل الدعم الفني الخاص بك في منصة Nouva Market. أنا هنا لمساعدتك في أي استفسار حول طلبيات متجرك، الشحن، سحب الأرباح، أو ربط المنتجات. يمكنك مراسلتي في أي وقت وسأجيبك فوراً!",
+        "timestamp": "2026-10-07T22:12:38.985Z",
+        "readByRecipient": false
+      }
+    ]
+  }
+}

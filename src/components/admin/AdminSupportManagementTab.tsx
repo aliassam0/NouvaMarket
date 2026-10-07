@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  LifeBuoy,
+  Headset,
   Users,
   MessageSquare,
   Plus,
@@ -705,7 +705,7 @@ export function AdminSupportManagementTab({
       <div className="p-5 rounded-3xl bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 text-white border border-teal-500/30 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <div className="p-3.5 rounded-2xl bg-teal-600 text-white shadow-lg shadow-teal-600/30">
-            <LifeBuoy className="w-6 h-6" />
+            <Headset className="w-6 h-6" />
           </div>
           <div>
             <h3 className="font-black text-base flex items-center gap-2">
@@ -851,7 +851,7 @@ export function AdminSupportManagementTab({
         <div className="space-y-4">
           {supportAgents.length === 0 ? (
             <div className="p-8 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl space-y-3">
-              <LifeBuoy className="w-10 h-10 text-teal-400 mx-auto animate-bounce" />
+              <Headset className="w-10 h-10 text-teal-400 mx-auto" />
               <h4 className="font-black text-sm text-slate-800 dark:text-white">لا يوجد حسابات وكلاء دعم فني مضافة بعد</h4>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
                 قم بإنشاء حساب دعم فني للمسوقين والبائعين الآن. سيتمكن الوكيل من الدخول إلى لوحة الدعم المخصصة له فقط ومرافقة الحسابات المسندة إليه.

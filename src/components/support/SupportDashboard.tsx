@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  LifeBuoy,
+  Headset,
   MessageSquare,
   Users,
   Search,
@@ -548,7 +548,7 @@ export function SupportDashboard({
           {/* Logo & Portal Title */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center text-white shadow-md shadow-teal-500/20">
-              <LifeBuoy className="w-5 h-5" />
+              <Headset className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -891,7 +891,7 @@ export function SupportDashboard({
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
               {filteredTickets.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-xs space-y-2">
-                  <LifeBuoy className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
+                  <Headset className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
                   <p>لا توجد تذاكر تطابق معايير البحث الحالية.</p>
                 </div>
               ) : (
@@ -1131,7 +1131,7 @@ export function SupportDashboard({
               </>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400 text-xs space-y-2">
-                <LifeBuoy className="w-12 h-12 text-slate-300 dark:text-slate-700" />
+                <Headset className="w-12 h-12 text-slate-300 dark:text-slate-700" />
                 <p className="font-bold text-sm">حدد تذكرة من القائمة الجانبية لبدء المحادثة والمتابعة.</p>
               </div>
             )}

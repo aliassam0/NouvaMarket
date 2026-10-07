@@ -3,16 +3,19 @@
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
-  <!-- Main Landing & Portal -->
+  <!-- Main Home Landing -->
   <url>
     <loc>https://nouvamarket.com/</loc>
-    <lastmod>2026-09-06</lastmod>
+    <lastmod>2026-10-07</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="ar-DZ" href="https://nouvamarket.com/" />
+    <xhtml:link rel="alternate" hreflang="fr-DZ" href="https://nouvamarket.com/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://nouvamarket.com/" />
     <image:image>
       <image:loc>https://nouvamarket.com/og-image.png</image:loc>
-      <image:title>Nouva Market - منصة التسويق بالعمولة الأولى في الجزائر</image:title>
-      <image:caption>المنصة الرائدة للتسويق بالعمولة والتجارة الإلكترونية في الجزائر</image:caption>
+      <image:title>نوفا ماركت - أول منصة للتسويق بالعمولة والدروبشيبينغ في الجزائر</image:title>
+      <image:caption>المنصة الرائدة في التجارة الإلكترونية وربط المسوقين بالموردين في الجزائر</image:caption>
     </image:image>
     <image:image>
       <image:loc>https://nouvamarket.com/logo.png</image:loc>
@@ -20,36 +23,117 @@
     </image:image>
   </url>
 
-  <!-- Affiliate Products Catalog & Reseller Hub -->
+  <!-- Products Wholesale Catalog -->
   <url>
-    <loc>https://nouvamarket.com/?tab=products</loc>
-    <lastmod>2026-09-06</lastmod>
-    <changefreq>hourly</changefreq>
-    <priority>0.9</priority>
+    <loc>https://nouvamarket.com/products</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://nouvamarket.com/og-image.png</image:loc>
+      <image:title>كتالوج منتجات الجملة والدروبشيبينغ في الجزائر</image:title>
+    </image:image>
   </url>
 
-  <!-- Marketing & AI Promotion Kit -->
+  <!-- Suppliers & Manufacturers Portal -->
   <url>
-    <loc>https://nouvamarket.com/?tab=marketing</loc>
-    <lastmod>2026-09-06</lastmod>
+    <loc>https://nouvamarket.com/suppliers</loc>
+    <lastmod>2026-10-07</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.90</priority>
   </url>
 
-  <!-- Affiliates & Resellers Registration / Onboarding -->
+  <!-- Affiliate Resellers Guide -->
   <url>
-    <loc>https://nouvamarket.com/?tab=register</loc>
-    <lastmod>2026-09-06</lastmod>
+    <loc>https://nouvamarket.com/resellers</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.90</priority>
+  </url>
+
+  <!-- Educational Academy Hub -->
+  <url>
+    <loc>https://nouvamarket.com/academy</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- 58 Wilayas Shipping & Delivery Logistics -->
+  <url>
+    <loc>https://nouvamarket.com/shipping</loc>
+    <lastmod>2026-10-07</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.80</priority>
   </url>
 
-  <!-- Suppliers & Wholesalers Portal -->
+  <!-- Comprehensive FAQ Page -->
   <url>
-    <loc>https://nouvamarket.com/?tab=suppliers</loc>
-    <lastmod>2026-09-06</lastmod>
+    <loc>https://nouvamarket.com/faq</loc>
+    <lastmod>2026-10-07</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.80</priority>
+  </url>
+
+  <!-- About Nouva Market Company -->
+  <url>
+    <loc>https://nouvamarket.com/about</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+  </url>
+
+  <!-- Contact & Support Desk -->
+  <url>
+    <loc>https://nouvamarket.com/contact</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+  </url>
+
+  <!-- Terms of Service -->
+  <url>
+    <loc>https://nouvamarket.com/terms</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.50</priority>
+  </url>
+
+  <!-- Privacy Policy -->
+  <url>
+    <loc>https://nouvamarket.com/privacy</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.50</priority>
+  </url>
+
+  <!-- Featured Product Landing Pages -->
+  <url>
+    <loc>https://nouvamarket.com/p/prod-grooming-1</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <url>
+    <loc>https://nouvamarket.com/p/prod-grooming-2</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <url>
+    <loc>https://nouvamarket.com/p/prod-teeth-1</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <url>
+    <loc>https://nouvamarket.com/p/prod-hair-1</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
   </url>
 
 </urlset>

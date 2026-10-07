@@ -18,7 +18,7 @@ import {
   ShieldCheck,
   Boxes,
   Headphones,
-  LifeBuoy,
+  Headset,
   AlertCircle,
   ArrowRight,
 } from 'lucide-react';
@@ -52,6 +52,16 @@ import { WarehouseDashboard } from './components/warehouse/WarehouseDashboard';
 import { ConfirmerDashboard } from './components/confirmer/ConfirmerDashboard';
 import { SupportDashboard } from './components/support/SupportDashboard';
 import { LandingPage } from './components/landing/LandingPage';
+import { PublicProductsPage } from './components/public/PublicProductsPage';
+import { PublicSuppliersPage } from './components/public/PublicSuppliersPage';
+import { PublicResellersPage } from './components/public/PublicResellersPage';
+import { PublicAcademyPage } from './components/public/PublicAcademyPage';
+import { PublicShippingPage } from './components/public/PublicShippingPage';
+import { PublicFaqPage } from './components/public/PublicFaqPage';
+import { PublicAboutPage } from './components/public/PublicAboutPage';
+import { PublicContactPage } from './components/public/PublicContactPage';
+import { PublicTermsPage } from './components/public/PublicTermsPage';
+import { PublicPrivacyPage } from './components/public/PublicPrivacyPage';
 import { MarketedProductsTab } from './components/tabs/MarketedProductsTab';
 import { ShareProductModal } from './components/tabs/ShareProductModal';
 import { CustomerShareOrderView } from './components/tabs/CustomerShareOrderView';
@@ -407,9 +417,157 @@ function AppContent() {
   }
 
   // =========================================================================
-  // ROUTE 7: PUBLIC LANDING PAGE (/)
+  // PUBLIC SEO ROUTES (Dedicated, Crawlable Pages with Unique Meta & URLs)
   // =========================================================================
-  if (path === '/' || path === '') {
+  if (path === '/products' || path === '/catalog') {
+    return (
+      <div className="w-full h-full min-h-screen relative">
+        <PublicProductsPage
+          onOpenLogin={() => navigate('/login')}
+          onOpenRegister={() => navigate('/register')}
+        />
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </div>
+    );
+  }
+
+  if (path === '/suppliers') {
+    return (
+      <div className="w-full h-full min-h-screen relative">
+        <PublicSuppliersPage
+          onOpenLogin={() => navigate('/login')}
+          onOpenRegister={() => navigate('/register')}
+        />
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </div>
+    );
+  }
+
+  if (path === '/resellers') {
+    return (
+      <div className="w-full h-full min-h-screen relative">
+        <PublicResellersPage
+          onOpenLogin={() => navigate('/login')}
+          onOpenRegister={() => navigate('/register')}
+        />
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </div>
+    );
+  }
+
+  if (path === '/academy') {
+    return (
+      <div className="w-full h-full min-h-screen relative">
+        <PublicAcademyPage
+          onOpenLogin={() => navigate('/login')}
+          onOpenRegister={() => navigate('/register')}
+        />
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </div>
+    );
+  }
+
+  if (path === '/shipping') {
+    return (
+      <div className="w-full h-full min-h-screen relative">
+        <PublicShippingPage
+          onOpenLogin={() => navigate('/login')}
+          onOpenRegister={() => navigate('/register')}
+        />
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </div>
+    );
+  }
+
+  if (path === '/faq') {
+    return (
+      <div className="w-full h-full min-h-screen relative">
+        <PublicFaqPage
+          onOpenLogin={() => navigate('/login')}
+          onOpenRegister={() => navigate('/register')}
+        />
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </div>
+    );
+  }
+
+  if (path === '/about') {
+    return (
+      <div className="w-full h-full min-h-screen relative">
+        <PublicAboutPage
+          onOpenLogin={() => navigate('/login')}
+          onOpenRegister={() => navigate('/register')}
+        />
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </div>
+    );
+  }
+
+  if (path === '/contact') {
+    return (
+      <div className="w-full h-full min-h-screen relative">
+        <PublicContactPage
+          onOpenLogin={() => navigate('/login')}
+          onOpenRegister={() => navigate('/register')}
+        />
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </div>
+    );
+  }
+
+  if (path === '/terms') {
+    return (
+      <div className="w-full h-full min-h-screen relative">
+        <PublicTermsPage
+          onOpenLogin={() => navigate('/login')}
+          onOpenRegister={() => navigate('/register')}
+        />
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </div>
+    );
+  }
+
+  if (path === '/privacy') {
+    return (
+      <div className="w-full h-full min-h-screen relative">
+        <PublicPrivacyPage
+          onOpenLogin={() => navigate('/login')}
+          onOpenRegister={() => navigate('/register')}
+        />
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </div>
+    );
+  }
+
+  if (path === '/login' || path === '/register') {
+    return (
+      <div className="w-full h-full min-h-screen relative">
+        <LandingPage
+          initialModal={path === '/login' ? 'login' : 'register'}
+          onEnterApp={(role) => {
+            if (role === 'admin') {
+              navigate('/admin');
+            } else if (role === 'warehouse' || role === 'platform_warehouse') {
+              navigate('/warehouse');
+            } else if (role === 'confirmer') {
+              navigate('/confirmer');
+            } else if (role === 'support') {
+              navigate('/support');
+            } else {
+              navigate('/dashboard');
+            }
+          }}
+          onShowToast={showToast}
+        />
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // ROUTE 7: PUBLIC LANDING PAGE (/) OR UNRECOGNIZED PUBLIC PATH
+  // =========================================================================
+  if (path === '/' || path === '' || (!user && !path.startsWith('/dashboard') && path !== '/admin' && path !== '/warehouse' && path !== '/confirmer' && path !== '/support')) {
     return (
       <div className="w-full h-full min-h-screen relative">
         <LandingPage

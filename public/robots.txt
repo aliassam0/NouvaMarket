@@ -1,10 +1,54 @@
+# ==============================================================================
+# Robots.txt for Nouva Market - أول منصة للتسويق بالعمولة والدروبشيبينغ في الجزائر
+# Domain: https://nouvamarket.com/
+# ==============================================================================
+
 User-agent: *
 Allow: /
+Allow: /products
+Allow: /suppliers
+Allow: /resellers
+Allow: /academy
+Allow: /shipping
+Allow: /faq
+Allow: /about
+Allow: /contact
+Allow: /terms
+Allow: /privacy
+Allow: /p/
+Allow: /logo.svg
+Allow: /logo.png
+Allow: /favicon.svg
+Allow: /og-image.png
 
-# Disallow internal operational endpoints and raw API calls from search engine crawlers
+# Protect internal dashboards and administrative endpoints from indexing
+Disallow: /admin
+Disallow: /warehouse
+Disallow: /confirmer
+Disallow: /support
+Disallow: /dashboard
+Disallow: /dashboard/
 Disallow: /api/
-Disallow: /assets/
 Disallow: /scripts/
 
-# Sitemap location
+# Specific rules for Googlebot & Bingbot
+User-agent: Googlebot
+Allow: /
+Disallow: /admin
+Disallow: /warehouse
+Disallow: /confirmer
+Disallow: /support
+Disallow: /dashboard/
+Disallow: /api/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /admin
+Disallow: /warehouse
+Disallow: /confirmer
+Disallow: /support
+Disallow: /dashboard/
+Disallow: /api/
+
+# Official Sitemap location
 Sitemap: https://nouvamarket.com/sitemap.xml

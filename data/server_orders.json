@@ -48,7 +48,7 @@
     "confirmedAt": "2026-09-24T17:39:56.458Z",
     "createdAt": "2026-09-24T17:39:56.458Z",
     "trackingCode": "EC-31-82409",
-    "deliveryCompanyName": "Ecom Delivery (إيكوم ديليفري)",
+    "deliveryCompanyName": "Yalidine Express (ياليدين إكسبريس)",
     "trackingHistory": [
       {
         "timestamp": "2026-09-24 23:02",
@@ -61,6 +61,7 @@
       }
     ],
     "updatedAt": "2026-09-24T22:38:23.450Z",
-    "bordereauUrl": "/api/delivery/label/ORD-645866?tracking=EC-31-82409&v=1790290941977"
+    "bordereauUrl": "/api/delivery/label/ORD-645866?tracking=EC-31-82409&v=1790290941977",
+    "courierPartnerId": "cour-yalidine"
   }
 ]

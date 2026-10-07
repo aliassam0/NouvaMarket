@@ -40,7 +40,7 @@ import {
   HelpCircle,
   Menu,
   ChevronDown,
-  LifeBuoy
+  Headset
 } from 'lucide-react';
 
 export type AdminTabKey =
@@ -156,7 +156,7 @@ export function AdminVerticalSidebar({
           id: 'support' as AdminTabKey,
           label: 'دعم المسوقين',
           shortLabel: 'الدعم',
-          icon: LifeBuoy,
+          icon: Headset,
           badge: 'إسناد وتوزيع',
           badgeColor: 'bg-teal-100 text-teal-800 border border-teal-200',
         },
