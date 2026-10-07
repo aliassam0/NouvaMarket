@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Home,
   Layers,
@@ -19,14 +19,18 @@ import {
   Boxes,
   Headphones,
   LifeBuoy,
+  AlertCircle,
+  ArrowRight,
 } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { OrderProvider, useOrders } from './context/OrderContext';
 import { CategoryProvider } from './context/CategoryContext';
+import { RouterProvider, useRouter } from './router/RouterContext';
 import { MobileDeviceFrame } from './components/ui/MobileDeviceFrame';
 import { OfflineBanner } from './components/ui/OfflineBanner';
 import { Toast, ToastMessage } from './components/ui/Toast';
+import { AccessDeniedScreen } from './components/common/AccessDeniedScreen';
 
 import { AccueilTab } from './components/tabs/AccueilTab';
 import { ProduitsTab } from './components/tabs/ProduitsTab';
@@ -64,14 +68,13 @@ import { Product, ProductVariant } from './types';
 
 type TabType = 'accueil' | 'produits' | 'marketed' | 'commandes' | 'wallet' | 'analytics' | 'marketing' | 'profil';
 export type RoleType = 'reseller' | 'admin' | 'warehouse' | 'platform_warehouse' | 'confirmer' | 'support';
-type ViewMode = 'landing' | 'app';
 
 function AppContent() {
   const { t, language, isRtl } = useLanguage();
   const { user, logout } = useAuth();
   const { pendingLinkOrdersCount } = useOrders();
+  const { path, searchParams, navigate } = useRouter();
 
-  const [viewMode, setViewMode] = useState<ViewMode>(user ? 'app' : 'landing');
   const [currentRole, setCurrentRole] = useState<RoleType>((user?.role as RoleType) || 'reseller');
   const [activeTab, setActiveTab] = useState<TabType>('accueil');
   const [impersonatedSellerName, setImpersonatedSellerName] = useState<string | null>(null);
@@ -80,33 +83,36 @@ function AppContent() {
   const [impersonatedSupportName, setImpersonatedSupportName] = useState<string | null>(null);
   const [impersonatedSupportAgentId, setImpersonatedSupportAgentId] = useState<string | null>(null);
 
-  const handleImpersonateSupplier = (supplier: any) => {
-    const name = supplier.companyName || supplier.fullName;
-    setImpersonatedSupplierName(name);
-    const supplierData = {
-      id: supplier.id || 'SUP-DEMO',
-      fullName: supplier.fullName || name,
-      companyName: supplier.companyName || name,
-      phone: supplier.phone || '',
-      email: supplier.email || '',
-      wilaya: supplier.wilaya || '16 - الجزائر',
-      activityType: supplier.activityType || 'مصنع / مورد',
-      ccpOrRip: supplier.ccpOrRip || '',
-      status: supplier.status || 'APPROVED',
-    };
-    localStorage.setItem('nouva_supplier_profile', JSON.stringify(supplierData));
-    setCurrentRole('warehouse');
-    showToast(`تم الدخول لحساب البائع: ${name}`, 'info');
-  };
-
+  // Synchronize URL path with internal state
   useEffect(() => {
-    if (user) {
-      setViewMode('app');
-      if (user.role) {
-        setCurrentRole(user.role as RoleType);
+    // 1. Handle Legacy ?share=productId queries
+    const legacyShareId = searchParams.get('share');
+    if (legacyShareId) {
+      const linkId = searchParams.get('linkId');
+      navigate(`/p/${legacyShareId}${linkId ? `?linkId=${linkId}` : ''}`, { replace: true });
+      return;
+    }
+
+    // 2. Map route to role and tabs
+    if (path === '/admin') {
+      setCurrentRole('admin');
+    } else if (path === '/warehouse') {
+      setCurrentRole('warehouse');
+    } else if (path === '/confirmer') {
+      setCurrentRole('confirmer');
+    } else if (path === '/support') {
+      setCurrentRole('support');
+    } else if (path.startsWith('/dashboard')) {
+      setCurrentRole('reseller');
+      const sub = path.replace(/^\/dashboard\/?/, '').trim();
+      const validTabs: TabType[] = ['accueil', 'produits', 'marketed', 'commandes', 'wallet', 'analytics', 'marketing', 'profil'];
+      if (sub && validTabs.includes(sub as TabType)) {
+        setActiveTab(sub as TabType);
+      } else if (!sub) {
+        setActiveTab('accueil');
       }
     }
-  }, [user]);
+  }, [path, searchParams, navigate]);
 
   useEffect(() => {
     syncProductsWithServer();
@@ -114,7 +120,7 @@ function AppContent() {
 
   const handleLogout = () => {
     logout();
-    setViewMode('landing');
+    navigate('/');
     setImpersonatedSellerName(null);
     setImpersonatedSupplierName(null);
     setImpersonatedConfirmerName(null);
@@ -125,8 +131,54 @@ function AppContent() {
     showToast('تم تسجيل الخروج بنجاح 👋', 'info');
   };
 
-  // Check if current session can switch between dashboards
-  // When a support user or confirmer logs in directly, they remain locked in their dashboard
+  const handleSwitchDashboard = (newRole: DashboardRole) => {
+    if (newRole === 'admin') {
+      setImpersonatedSellerName(null);
+      setImpersonatedSupplierName(null);
+      setImpersonatedConfirmerName(null);
+      setImpersonatedSupportName(null);
+      setImpersonatedSupportAgentId(null);
+      setCurrentRole('admin');
+      navigate('/admin');
+      showToast('تم الانتقال إلى: لوحة الأدمن (Admin HQ)', 'info');
+    } else if (newRole === 'support') {
+      if (user?.role === 'admin' && !impersonatedSupportName) {
+        setImpersonatedSupportName('معاينة وكيل الدعم الفني');
+        setImpersonatedSupportAgentId(null);
+      }
+      setCurrentRole('support');
+      navigate('/support');
+      showToast('تم الانتقال إلى: لوحة الدعم الفني للمسوقين', 'info');
+    } else if (newRole === 'confirmer') {
+      if (user?.role === 'admin' && !impersonatedConfirmerName) {
+        setImpersonatedConfirmerName('معاينة مؤكد الطلبيات');
+      }
+      setCurrentRole('confirmer');
+      navigate('/confirmer');
+      showToast('تم الانتقال إلى: واجهة المؤكد (Confirmer Desk)', 'info');
+    } else if (newRole === 'warehouse') {
+      if (user?.role === 'admin' && !impersonatedSupplierName) {
+        setImpersonatedSupplierName('بائع الأجهزة والإلكترونيات');
+      }
+      setCurrentRole('warehouse');
+      navigate('/warehouse');
+      showToast('تم الانتقال إلى: لوحة المورد (Warehouse)', 'info');
+    } else if (newRole === 'platform_warehouse') {
+      setCurrentRole('platform_warehouse');
+      navigate('/warehouse');
+      showToast('تم الانتقال إلى: مستودع المنصة الرئيسي', 'info');
+    } else {
+      setImpersonatedSellerName(null);
+      setImpersonatedSupplierName(null);
+      setImpersonatedConfirmerName(null);
+      setImpersonatedSupportName(null);
+      setImpersonatedSupportAgentId(null);
+      setCurrentRole('reseller');
+      navigate('/dashboard');
+      showToast('تم الانتقال إلى: لوحة تحكم المسوق', 'info');
+    }
+  };
+
   const isDirectSupportUser = user?.role === 'support' && !impersonatedSupportName;
   const isDirectConfirmerUser = user?.role === 'confirmer' && !impersonatedConfirmerName;
   const canSwitchAll = Boolean(
@@ -141,83 +193,22 @@ function AppContent() {
     !user)
   );
 
-  const handleSwitchDashboard = (newRole: DashboardRole) => {
-    if (newRole === 'admin') {
-      setImpersonatedSellerName(null);
-      setImpersonatedSupplierName(null);
-      setImpersonatedConfirmerName(null);
-      setImpersonatedSupportName(null);
-      setImpersonatedSupportAgentId(null);
-      setCurrentRole('admin');
-      showToast('تم الانتقال إلى: لوحة الأدمن (Admin HQ)', 'info');
-    } else if (newRole === 'support') {
-      if (user?.role === 'admin' && !impersonatedSupportName) {
-        setImpersonatedSupportName('معاينة وكيل الدعم الفني');
-        setImpersonatedSupportAgentId(null);
-      }
-      setCurrentRole('support');
-      showToast('تم الانتقال إلى: لوحة الدعم الفني للمسوقين', 'info');
-    } else if (newRole === 'confirmer') {
-      if (user?.role === 'admin' && !impersonatedConfirmerName) {
-        setImpersonatedConfirmerName('معاينة مؤكد الطلبيات');
-      }
-      setCurrentRole('confirmer');
-      showToast('تم الانتقال إلى: واجهة المؤكد (Confirmer Desk)', 'info');
-    } else if (newRole === 'warehouse') {
-      if (user?.role === 'admin' && !impersonatedSupplierName) {
-        setImpersonatedSupplierName('بائع الأجهزة والإلكترونيات');
-      }
-      setCurrentRole('warehouse');
-      showToast('تم الانتقال إلى: بوابة البائع', 'info');
-    } else if (newRole === 'platform_warehouse') {
-      setCurrentRole('platform_warehouse');
-      showToast('تم الانتقال إلى: مستودع المنصة', 'info');
-    } else if (newRole === 'reseller') {
-      setCurrentRole('reseller');
-      setActiveTab('accueil');
-      showToast('تم الانتقال إلى: لوحة المسوّق (Marketer Hub)', 'info');
-    }
-  };
-
   // Modals state
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [shareModalProduct, setShareModalProduct] = useState<Product | null>(null);
   const [syncModalProduct, setSyncModalProduct] = useState<Product | null>(null);
+  const [shareModalProduct, setShareModalProduct] = useState<Product | null>(null);
   const [isStoresManagerOpen, setIsStoresManagerOpen] = useState(false);
-  const [customerSharedProduct, setCustomerSharedProduct] = useState<Product | null>(null);
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
   const [prefilledOrderProduct, setPrefilledOrderProduct] = useState<Product | null>(null);
-
-  // Check URL query param or hash for ?share=productId
-  React.useEffect(() => {
-    const checkShareUrl = () => {
-      const searchParams = new URLSearchParams(window.location.search);
-      let shareId = searchParams.get('share');
-      if (!shareId && window.location.hash.includes('share=')) {
-        const hashMatch = window.location.hash.match(/share=([^&]+)/);
-        if (hashMatch) shareId = hashMatch[1];
-      }
-
-      if (shareId) {
-        const allProducts = getStoredProducts();
-        const found = allProducts.find((p) => p.id === shareId);
-        if (found) {
-          setCustomerSharedProduct(found);
-        }
-      }
-    };
-
-    checkShareUrl();
-    window.addEventListener('popstate', checkShareUrl);
-    window.addEventListener('products_updated', checkShareUrl);
-    return () => {
-      window.removeEventListener('popstate', checkShareUrl);
-      window.removeEventListener('products_updated', checkShareUrl);
-    };
-  }, []);
-
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0);
+  const [isGamificationOpen, setIsGamificationOpen] = useState(false);
+  const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ id: 't-' + Date.now(), message, type });
+  };
 
   useEffect(() => {
     const handleNotifUpdate = () => {
@@ -233,36 +224,20 @@ function AppContent() {
     };
   }, [currentRole]);
 
-  const [isGamificationOpen, setIsGamificationOpen] = useState(false);
-  const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
-
-  // Toast
-  const [toast, setToast] = useState<ToastMessage | null>(null);
-
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToast({ id: 't-' + Date.now(), message, type });
-  };
-
   useEffect(() => {
     const handleAppToast = (e: Event) => {
       const customEvent = e as CustomEvent<{ message: string; type?: 'success' | 'error' | 'info' }>;
       if (customEvent.detail?.message) {
         setTimeout(() => {
           showToast(customEvent.detail.message, customEvent.detail.type || 'success');
-        }, 0);
+        }, 50);
       }
     };
-    window.addEventListener('app-toast', handleAppToast);
-    return () => window.removeEventListener('app-toast', handleAppToast);
+    window.addEventListener('app_toast', handleAppToast);
+    return () => window.removeEventListener('app_toast', handleAppToast);
   }, []);
 
-  const handleOpenNewOrder = (product?: Product) => {
-    if (product) setPrefilledOrderProduct(product);
-    else setPrefilledOrderProduct(null);
-    setIsNewOrderModalOpen(true);
-  };
-
-  const handleOrderFromDetail = (product: Product, variant: ProductVariant, customSellingPrice: number) => {
+  const handleOrderFromDetail = (product: Product) => {
     setPrefilledOrderProduct(product);
     setIsNewOrderModalOpen(true);
   };
@@ -271,37 +246,185 @@ function AppContent() {
     setSelectedProduct(null);
     setPrefilledOrderProduct(product);
     setActiveTab('marketing');
+    navigate('/dashboard/marketing');
   };
 
-  if (customerSharedProduct) {
+  // =========================================================================
+  // ROUTE 1: PUBLIC CUSTOMER SHARE & ORDER PAGE (/p/:productId or /order/:productId)
+  // =========================================================================
+  const isProductShareRoute = path.startsWith('/p/') || path.startsWith('/order/');
+  if (isProductShareRoute) {
+    const segments = path.split('/').filter(Boolean);
+    const targetProductId = segments[1] || '';
+    const allProducts = getStoredProducts();
+    const foundProduct = allProducts.find((p) => p.id === targetProductId);
+
+    if (foundProduct) {
+      return (
+        <div className="w-full h-full min-h-screen relative bg-slate-50 dark:bg-slate-950 overflow-y-auto">
+          <CustomerShareOrderView
+            product={foundProduct}
+            onBackToApp={() => {
+              if (user) {
+                navigate('/dashboard');
+              } else {
+                navigate('/');
+              }
+            }}
+            onShowToast={showToast}
+          />
+          <Toast toast={toast} onDismiss={() => setToast(null)} />
+        </div>
+      );
+    }
+
+    // Product not found fallback screen
     return (
-      <div className="w-full h-full min-h-screen relative bg-slate-50 dark:bg-slate-950 overflow-y-auto">
-        <CustomerShareOrderView
-          product={customerSharedProduct}
-          onBackToApp={() => {
-            setCustomerSharedProduct(null);
-            const url = new URL(window.location.href);
-            url.searchParams.delete('share');
-            window.history.replaceState({}, '', url.pathname + url.search);
-          }}
-          onShowToast={showToast}
-        />
-        <Toast toast={toast} onDismiss={() => setToast(null)} />
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950 text-center">
+        <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-200 dark:border-slate-800 shadow-xl space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-black text-slate-900 dark:text-white">المنتج غير متوفر أو الرابط منتهي</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            عذراً، لم نتمكن من العثور على المنتج المطلوب. قد يكون قد نفد المخزون أو تم تحديث الرابط.
+          </p>
+          <button
+            onClick={() => navigate('/')}
+            className="w-full py-3 px-4 rounded-xl bg-purple-600 text-white font-black text-xs hover:bg-purple-700 transition flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <ArrowRight className="w-4 h-4" />
+            <span>العودة إلى الصفحة الرئيسية</span>
+          </button>
+        </div>
       </div>
     );
   }
 
-  if (viewMode === 'landing') {
+  // =========================================================================
+  // ROUTE 2: PROTECTED ADMIN HQ (/admin) - RBAC STRICT
+  // =========================================================================
+  if (path === '/admin') {
+    const isAuthorizedAdmin = Boolean(user && (user.role === 'admin' || user.email?.includes('admin')));
+    if (!isAuthorizedAdmin) {
+      return (
+        <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950">
+          <AccessDeniedScreen
+            requiredRoleNameAr="المشرف العام"
+            requiredRoleNameFr="Super Admin"
+            targetPath="/admin"
+          />
+          <Toast toast={toast} onDismiss={() => setToast(null)} />
+        </div>
+      );
+    }
+  }
+
+  // =========================================================================
+  // ROUTE 3: PROTECTED WAREHOUSE & SUPPLIERS (/warehouse) - RBAC STRICT
+  // =========================================================================
+  if (path === '/warehouse') {
+    const isAuthorizedSupplier = Boolean(
+      user && (
+        user.role === 'warehouse' ||
+        user.role === 'platform_warehouse' ||
+        user.role === 'admin' ||
+        impersonatedSupplierName
+      )
+    );
+    if (!isAuthorizedSupplier) {
+      return (
+        <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950">
+          <AccessDeniedScreen
+            requiredRoleNameAr="الموردين والمستودع"
+            requiredRoleNameFr="Suppliers & Warehouse"
+            targetPath="/warehouse"
+          />
+          <Toast toast={toast} onDismiss={() => setToast(null)} />
+        </div>
+      );
+    }
+  }
+
+  // =========================================================================
+  // ROUTE 4: PROTECTED CALL CENTER CONFIRMERS (/confirmer) - RBAC STRICT
+  // =========================================================================
+  if (path === '/confirmer') {
+    const isAuthorizedConfirmer = Boolean(
+      user && (user.role === 'confirmer' || user.role === 'admin' || impersonatedConfirmerName)
+    );
+    if (!isAuthorizedConfirmer) {
+      return (
+        <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950">
+          <AccessDeniedScreen
+            requiredRoleNameAr="فريق التأكيد والاتصال"
+            requiredRoleNameFr="Call Center Confirmers"
+            targetPath="/confirmer"
+          />
+          <Toast toast={toast} onDismiss={() => setToast(null)} />
+        </div>
+      );
+    }
+  }
+
+  // =========================================================================
+  // ROUTE 5: PROTECTED SUPPORT AGENTS (/support) - RBAC STRICT
+  // =========================================================================
+  if (path === '/support') {
+    const isAuthorizedSupport = Boolean(
+      user && (user.role === 'support' || user.role === 'admin' || impersonatedSupportName)
+    );
+    if (!isAuthorizedSupport) {
+      return (
+        <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950">
+          <AccessDeniedScreen
+            requiredRoleNameAr="وكلاء الدعم الفني"
+            requiredRoleNameFr="Customer Support Agents"
+            targetPath="/support"
+          />
+          <Toast toast={toast} onDismiss={() => setToast(null)} />
+        </div>
+      );
+    }
+  }
+
+  // =========================================================================
+  // ROUTE 6: PROTECTED RESELLER DASHBOARD (/dashboard and /dashboard/*)
+  // =========================================================================
+  if (path.startsWith('/dashboard')) {
+    if (!user) {
+      return (
+        <div className="w-full min-h-screen bg-slate-50 dark:bg-slate-950">
+          <AccessDeniedScreen
+            requiredRoleNameAr="المسوقين والتجار"
+            requiredRoleNameFr="Affiliate Resellers"
+            targetPath={path}
+          />
+          <Toast toast={toast} onDismiss={() => setToast(null)} />
+        </div>
+      );
+    }
+  }
+
+  // =========================================================================
+  // ROUTE 7: PUBLIC LANDING PAGE (/)
+  // =========================================================================
+  if (path === '/' || path === '') {
     return (
       <div className="w-full h-full min-h-screen relative">
         <LandingPage
           onEnterApp={(role) => {
-            if (role === 'admin' || role === 'warehouse' || role === 'reseller' || role === 'confirmer' || role === 'support' || role === 'platform_warehouse') {
-              setCurrentRole(role);
+            if (role === 'admin') {
+              navigate('/admin');
+            } else if (role === 'warehouse' || role === 'platform_warehouse') {
+              navigate('/warehouse');
+            } else if (role === 'confirmer') {
+              navigate('/confirmer');
+            } else if (role === 'support') {
+              navigate('/support');
             } else {
-              setCurrentRole('reseller');
+              navigate('/dashboard');
             }
-            setViewMode('app');
           }}
           onShowToast={showToast}
         />
@@ -310,17 +433,25 @@ function AppContent() {
     );
   }
 
+  // =========================================================================
+  // APP DASHBOARDS FRAMEWORK (Admin / Warehouse / Confirmer / Support / Reseller)
+  // =========================================================================
   return (
     <div className="w-full h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 relative">
       {/* Instant Push Sale Celebration Alert Banner */}
       <InstantSaleBanner
-        onGoToOrders={() => setActiveTab('commandes')}
-        onGoToWallet={() => setActiveTab('wallet')}
+        onGoToOrders={() => {
+          setActiveTab('commandes');
+          navigate('/dashboard/commandes');
+        }}
+        onGoToWallet={() => {
+          setActiveTab('wallet');
+          navigate('/dashboard/wallet');
+        }}
       />
 
       {/* Top Offline Network Alert Banner */}
       <OfflineBanner />
-
 
       {/* App Top Header Bar */}
       <header className="px-3 py-2 bg-white/95 dark:bg-slate-900/95 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between sticky top-0 z-30 backdrop-blur-md shadow-2xs gap-2">
@@ -344,7 +475,7 @@ function AppContent() {
           </div>
 
           <button
-            onClick={() => setViewMode('landing')}
+            onClick={() => navigate('/')}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100/90 hover:bg-purple-50 dark:bg-slate-800/90 dark:hover:bg-purple-950/60 text-slate-700 hover:text-purple-700 dark:text-slate-300 dark:hover:text-purple-300 font-extrabold text-[11px] border border-slate-200 dark:border-slate-700 hover:border-purple-200 dark:hover:border-purple-800 transition cursor-pointer shadow-2xs"
             title="الانتقال إلى الصفحة الرئيسية / المتجر"
           >
@@ -353,7 +484,7 @@ function AppContent() {
           </button>
         </div>
 
-        {/* Center Section: Unified 4 Dashboards Switcher */}
+        {/* Center Section: Unified Dashboards Switcher */}
         <div className="flex-1 flex justify-center max-w-2xl px-1">
           <DashboardSwitcher
             currentRole={currentRole}
@@ -418,6 +549,7 @@ function AppContent() {
             onClick={() => {
               setImpersonatedSellerName(null);
               setCurrentRole('admin');
+              navigate('/admin');
             }}
             className="px-3 py-1 rounded-xl bg-white text-purple-950 hover:bg-amber-300 font-black text-[11px] flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
           >
@@ -442,6 +574,7 @@ function AppContent() {
             onClick={() => {
               setImpersonatedSupplierName(null);
               setCurrentRole('admin');
+              navigate('/admin');
             }}
             className="px-3 py-1 rounded-xl bg-white text-amber-950 hover:bg-amber-300 font-black text-[11px] flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
           >
@@ -450,77 +583,74 @@ function AppContent() {
         </div>
       )}
 
-      {currentRole !== 'admin' && impersonatedConfirmerName && (
-        <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-emerald-500/40">
-          <div className="flex items-center gap-2">
-            <span className="bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide flex items-center gap-1">
-              <Headphones className="w-3 h-3 text-emerald-200" />
-              <span>معاينة المؤكد</span>
-            </span>
-            <span>
-              أنت تتصفح الآن واجهة مؤكد الطلبيات:{' '}
-              <strong className="text-emerald-300 font-extrabold">{impersonatedConfirmerName}</strong>
-            </span>
-          </div>
-          <button
-            onClick={() => {
-              setImpersonatedConfirmerName(null);
-              setCurrentRole('admin');
-            }}
-            className="px-3 py-1 rounded-xl bg-white text-emerald-950 hover:bg-emerald-300 font-black text-[11px] flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
-          >
-            <span>العودة للوحة الأدمن</span>
-          </button>
-        </div>
-      )}
-
-      {currentRole !== 'admin' && impersonatedSupportName && (
-        <div className="bg-gradient-to-r from-teal-800 via-cyan-950 to-slate-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-between shadow-md border-b border-teal-500/40">
-          <div className="flex items-center gap-2">
-            <span className="bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide flex items-center gap-1">
-              <LifeBuoy className="w-3 h-3 text-teal-200" />
-              <span>معاينة الدعم</span>
-            </span>
-            <span>
-              أنت تتصفح الآن لوحة الدعم الفني للمسوقين:{' '}
-              <strong className="text-teal-300 font-extrabold">{impersonatedSupportName}</strong>
-            </span>
-          </div>
-          <button
-            onClick={() => {
-              setImpersonatedSupportName(null);
-              setCurrentRole('admin');
-            }}
-            className="px-3 py-1 rounded-xl bg-white text-teal-950 hover:bg-teal-300 font-black text-[11px] flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
-          >
-            <span>العودة للوحة الأدمن</span>
-          </button>
-        </div>
-      )}
-
-      {/* Main View rendering based on currentRole */}
-      <main className="flex-1 overflow-hidden flex flex-col">
+      {/* Main Workspaces Area */}
+      <main className="flex-1 overflow-y-auto pb-20 md:pb-6">
+        {/* VIEW 1: ADMIN HQ */}
         {currentRole === 'admin' && (
           <AdminDashboard
             onShowToast={showToast}
             onSwitchToSellerDashboard={(seller) => {
               setImpersonatedSellerName(`${seller.fullName} (${seller.storeName})`);
               setCurrentRole('reseller');
-              setActiveTab('accueil');
+              navigate('/dashboard');
+              showToast(`تم الدخول لحساب المسوق: ${seller.fullName || seller.storeName}`, 'info');
             }}
-            onImpersonateSupplier={handleImpersonateSupplier}
+            onImpersonateSupplier={(supplier) => {
+              const name = supplier.companyName || supplier.fullName;
+              setImpersonatedSupplierName(name);
+              const supplierData = {
+                id: supplier.id || 'SUP-DEMO',
+                fullName: supplier.fullName || name,
+                companyName: supplier.companyName || name,
+                phone: supplier.phone || '',
+                email: supplier.email || '',
+                wilaya: supplier.wilaya || '16 - الجزائر',
+                activityType: supplier.activityType || 'مصنع / مورد',
+                ccpOrRip: supplier.ccpOrRip || '',
+                status: supplier.status || 'APPROVED',
+              };
+              localStorage.setItem('nouva_supplier_profile', JSON.stringify(supplierData));
+              setCurrentRole('warehouse');
+              navigate('/warehouse');
+              showToast(`تم الدخول لحساب البائع: ${name}`, 'info');
+            }}
             onSwitchToConfirmerDashboard={(confirmer) => {
               setImpersonatedConfirmerName(confirmer?.fullName || 'مؤكد الطلبيات');
               setCurrentRole('confirmer');
+              navigate('/confirmer');
+              showToast(`تم الدخول لحساب المؤكد: ${confirmer?.fullName || 'مؤكد الطلبيات'}`, 'info');
             }}
             onSwitchToSupportDashboard={(agent) => {
               setImpersonatedSupportAgentId(agent?.id || null);
               setImpersonatedSupportName(agent?.fullName || 'سارة مراد (الدعم الفني)');
               setCurrentRole('support');
+              navigate('/support');
+              showToast(`تم الدخول لحساب وكيل الدعم: ${agent?.fullName || 'سارة مراد'}`, 'info');
             }}
           />
         )}
 
+        {/* VIEW 2: WAREHOUSE / SUPPLIER DASHBOARD */}
+        {currentRole === 'platform_warehouse' && (
+          <WarehouseDashboard onShowToast={showToast} isPlatformWarehouse={true} />
+        )}
+        {currentRole === 'warehouse' && (
+          user?.approvalStatus !== 'APPROVED' && !impersonatedSupplierName ? (
+            <PendingSellerScreen
+              onLogout={handleLogout}
+              onGoToLanding={() => navigate('/')}
+            />
+          ) : (
+            <WarehouseDashboard onShowToast={showToast} isPlatformWarehouse={false} />
+          )
+        )}
+
+        {/* VIEW 3: CONFIRMER DASHBOARD */}
+        {currentRole === 'confirmer' && (
+          <ConfirmerDashboard onShowToast={showToast} />
+        )}
+
+        {/* VIEW 4: DIRECT SUPPORT AGENT DASHBOARD */}
         {currentRole === 'support' && (
           <SupportDashboard
             onShowToast={showToast}
@@ -534,134 +664,134 @@ function AppContent() {
           />
         )}
 
-        {currentRole === 'confirmer' && (
-          <ConfirmerDashboard onShowToast={showToast} />
-        )}
-
-        {currentRole === 'platform_warehouse' && (
-          <WarehouseDashboard onShowToast={showToast} isPlatformWarehouse={true} />
-        )}
-
-        {currentRole === 'warehouse' && (
-          user?.approvalStatus !== 'APPROVED' && !impersonatedSupplierName ? (
-            <PendingSellerScreen
-              onLogout={handleLogout}
-              onGoToLanding={() => setViewMode('landing')}
-            />
-          ) : (
-            <WarehouseDashboard onShowToast={showToast} isPlatformWarehouse={false} />
-          )
-        )}
-
+        {/* VIEW 5: RESELLER / MARKETER DASHBOARD */}
         {currentRole === 'reseller' && (
           user?.approvalStatus !== 'APPROVED' && !impersonatedSellerName ? (
             <PendingSellerScreen
               onLogout={handleLogout}
-              onGoToLanding={() => setViewMode('landing')}
+              onGoToLanding={() => navigate('/')}
             />
           ) : (
             <>
               {activeTab === 'accueil' && (
-              <AccueilTab
-                onOpenProduct={(p) => setSelectedProduct(p)}
-                onNavigateToCatalog={() => setActiveTab('produits')}
-                onOpenWallet={() => setActiveTab('wallet')}
-                onOpenGamification={() => setIsGamificationOpen(true)}
-                onGoToOrders={() => setActiveTab('commandes')}
-                onOpenNotifications={() => setIsNotificationsOpen(true)}
-              />
-            )}
-
-            {activeTab === 'produits' && (
-              <ProduitsTab
-                onOpenProduct={(p) => setSelectedProduct(p)}
-                onOpenNewOrderForProduct={(p) => handleOpenNewOrder(p)}
-                onOpenShareModal={(p) => setShareModalProduct(p)}
-                onOpenSyncToStore={(p) => setSyncModalProduct(p)}
-                onOpenStoreManager={() => setIsStoresManagerOpen(true)}
-              />
-            )}
-
-            {activeTab === 'marketed' && (
-              <MarketedProductsTab
-                onOpenProduct={(p) => setSelectedProduct(p)}
-                onOpenNewOrderForProduct={(p) => handleOpenNewOrder(p)}
-                onOpenShareModal={(p) => setShareModalProduct(p)}
-                onShowToast={showToast}
-                onNavigateTab={(tab) => setActiveTab(tab as any)}
-              />
-            )}
-
-            {activeTab === 'commandes' && <CommandesTab />}
-
-            {activeTab === 'wallet' && <WalletTab onShowToast={showToast} />}
-
-            {activeTab === 'analytics' && <AnalyticsTab />}
-
-            {activeTab === 'marketing' && (
-              <MarketingTab
-                initialProduct={prefilledOrderProduct}
-                onShowToast={showToast}
-                onReturnToOrder={(product) => handleOpenNewOrder(product)}
-              />
-            )}
-
-            {activeTab === 'profil' && (
-              <ProfilTab
-                onOpenGamification={() => setIsGamificationOpen(true)}
-                onShowToast={showToast}
-                onLogout={handleLogout}
-              />
-            )}
+                <AccueilTab
+                  onOpenProduct={(p) => setSelectedProduct(p)}
+                  onNavigateToCatalog={() => {
+                    setActiveTab('produits');
+                    navigate('/dashboard/produits');
+                  }}
+                  onOpenWallet={() => {
+                    setActiveTab('wallet');
+                    navigate('/dashboard/wallet');
+                  }}
+                  onOpenGamification={() => setIsGamificationOpen(true)}
+                  onGoToOrders={() => {
+                    setActiveTab('commandes');
+                    navigate('/dashboard/commandes');
+                  }}
+                  onOpenNotifications={() => setIsNotificationsOpen(true)}
+                />
+              )}
+              {activeTab === 'produits' && (
+                <ProduitsTab
+                  onOpenProduct={(p) => setSelectedProduct(p)}
+                  onOpenNewOrderForProduct={(p) => {
+                    setPrefilledOrderProduct(p);
+                    setIsNewOrderModalOpen(true);
+                  }}
+                  onOpenShareModal={(p) => setShareModalProduct(p)}
+                  onOpenSyncToStore={(p) => setSyncModalProduct(p)}
+                  onOpenStoreManager={() => setIsStoresManagerOpen(true)}
+                />
+              )}
+              {activeTab === 'marketed' && (
+                <MarketedProductsTab
+                  onOpenProduct={(p) => setSelectedProduct(p)}
+                  onOpenNewOrderForProduct={(p) => {
+                    setPrefilledOrderProduct(p);
+                    setIsNewOrderModalOpen(true);
+                  }}
+                  onOpenShareModal={(p) => setShareModalProduct(p)}
+                  onShowToast={showToast}
+                  onNavigateTab={(tab) => {
+                    setActiveTab(tab as any);
+                    navigate(`/dashboard/${tab}`);
+                  }}
+                />
+              )}
+              {activeTab === 'commandes' && <CommandesTab />}
+              {activeTab === 'wallet' && <WalletTab onShowToast={showToast} />}
+              {activeTab === 'analytics' && <AnalyticsTab />}
+              {activeTab === 'marketing' && (
+                <MarketingTab
+                  initialProduct={prefilledOrderProduct}
+                  onShowToast={showToast}
+                  onReturnToOrder={(product) => {
+                    setPrefilledOrderProduct(product);
+                    setIsNewOrderModalOpen(true);
+                  }}
+                />
+              )}
+              {activeTab === 'profil' && (
+                <ProfilTab
+                  onOpenGamification={() => setIsGamificationOpen(true)}
+                  onShowToast={showToast}
+                  onLogout={handleLogout}
+                />
+              )}
             </>
           )
         )}
       </main>
 
-      {/* Reseller Mobile Navigation Bar */}
-      {currentRole === 'reseller' && (user?.approvalStatus === 'APPROVED' || impersonatedSellerName) && (
-        <>
-          <nav className="px-2 py-2 bg-white/95 dark:bg-slate-900/95 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-around sticky bottom-0 z-30 backdrop-blur-md shadow-lg">
-            {[
-              { id: 'accueil', label: t('tab.home'), icon: Home },
-              { id: 'produits', label: t('tab.products'), icon: Layers },
-              { id: 'marketed', label: t('tab.links', 'الروابط'), icon: LinkIcon },
-              { id: 'commandes', label: t('tab.orders'), icon: Package, badge: pendingLinkOrdersCount },
-              { id: 'wallet', label: t('tab.wallet'), icon: Wallet },
-              { id: 'profil', label: t('tab.profile'), icon: User },
-            ].map((tab) => {
-              const IconComponent = tab.icon;
-              const isActive = activeTab === tab.id;
-              const badgeCount = tab.badge || 0;
+      {/* Reseller Bottom Navigation Bar */}
+      {currentRole === 'reseller' && user?.approvalStatus !== 'PENDING' && (
+        <nav
+          aria-label="Navigation principale"
+          className="fixed bottom-0 start-0 end-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800 flex justify-around items-center px-2 py-1.5 shadow-lg max-w-lg mx-auto rounded-t-3xl md:hidden"
+        >
+          {[
+            { id: 'accueil', label: t('tab.home'), icon: Home },
+            { id: 'produits', label: t('tab.products'), icon: Layers },
+            { id: 'marketed', label: t('tab.links', 'الروابط'), icon: LinkIcon },
+            { id: 'commandes', label: t('tab.orders'), icon: Package, badge: pendingLinkOrdersCount },
+            { id: 'wallet', label: t('tab.wallet'), icon: Wallet },
+            { id: 'profil', label: t('tab.profile'), icon: User },
+          ].map((tab) => {
+            const IconComponent = tab.icon;
+            const isActive = activeTab === tab.id;
+            const badgeCount = tab.badge || 0;
 
-              return (
-                <button
-                  key={tab.id}
-                  id={`nav-tab-${tab.id}`}
-                  onClick={() => setActiveTab(tab.id as TabType)}
-                  className={`flex flex-col items-center gap-1 py-1 px-3 rounded-2xl transition relative ${
-                    isActive
-                      ? 'text-violet-600 dark:text-violet-400 font-extrabold scale-105'
-                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-medium'
-                  }`}
-                >
-                  <div className="relative flex items-center justify-center">
-                    <IconComponent className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
-                    {badgeCount > 0 && (
-                      <span className="absolute -top-2 -end-2.5 px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[9px] font-black leading-none animate-bounce shadow-md border-2 border-white dark:border-slate-900 flex items-center justify-center min-w-[18px] min-h-[18px]">
-                        {badgeCount > 99 ? '99+' : badgeCount}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[10px] tracking-tight">{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </>
+            return (
+              <button
+                key={tab.id}
+                id={`nav-tab-${tab.id}`}
+                onClick={() => {
+                  setActiveTab(tab.id as TabType);
+                  navigate(`/dashboard/${tab.id}`);
+                }}
+                className={`flex flex-col items-center gap-1 py-1 px-3 rounded-2xl transition relative cursor-pointer ${
+                  isActive
+                    ? 'text-violet-600 dark:text-violet-400 font-extrabold scale-105'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-medium'
+                }`}
+              >
+                <div className="relative flex items-center justify-center">
+                  <IconComponent className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
+                  {badgeCount > 0 && (
+                    <span className="absolute -top-2 -end-2.5 px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[9px] font-black leading-none animate-bounce shadow-md border-2 border-white dark:border-slate-900 flex items-center justify-center min-w-[18px] min-h-[18px]">
+                      {badgeCount > 99 ? '99+' : badgeCount}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] tracking-tight">{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
       )}
 
-      {/* Modals */}
+      {/* Global Modals */}
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}
@@ -699,13 +829,7 @@ function AppContent() {
           onShowToast={showToast}
           onPreviewCustomerView={(product, linkId) => {
             setShareModalProduct(null);
-            setCustomerSharedProduct(product);
-            const url = new URL(window.location.href);
-            url.searchParams.set('share', product.id);
-            if (linkId) {
-              url.searchParams.set('linkId', linkId);
-            }
-            window.history.pushState({}, '', url.toString());
+            navigate(`/p/${product.id}${linkId ? `?linkId=${linkId}` : ''}`);
           }}
         />
       )}
@@ -766,9 +890,11 @@ export default function App() {
       <AuthProvider>
         <OrderProvider>
           <CategoryProvider>
-            <MobileDeviceFrame>
-              <AppContent />
-            </MobileDeviceFrame>
+            <RouterProvider>
+              <MobileDeviceFrame>
+                <AppContent />
+              </MobileDeviceFrame>
+            </RouterProvider>
           </CategoryProvider>
         </OrderProvider>
       </AuthProvider>

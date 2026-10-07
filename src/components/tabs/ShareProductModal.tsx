@@ -308,7 +308,6 @@ export function ShareProductModal({
   // Generate full Share URL for a specific link with seller tracking parameters
   const getShareUrlForLink = (linkId: string) => {
     const origin = window.location.origin;
-    const pathname = window.location.pathname;
     const effectiveSellerId = user?.id || (isSupplierUser ? product.supplierId : '');
     const effectiveSellerName = user?.storeName || user?.fullName || (isSupplierUser ? product.supplierName : '');
     const effectiveSellerEmail = user?.email || (isSupplierUser ? product.supplierEmail : '');
@@ -318,7 +317,7 @@ export function ShareProductModal({
     const pixelParams = activePixelOwner
       ? `${activePixelOwner.metaPixelId ? `&fbPixel=${encodeURIComponent(activePixelOwner.metaPixelId)}` : ''}${activePixelOwner.tiktokPixelId ? `&ttPixel=${encodeURIComponent(activePixelOwner.tiktokPixelId)}` : ''}${activePixelOwner.snapchatPixelId ? `&snapPixel=${encodeURIComponent(activePixelOwner.snapchatPixelId)}` : ''}`
       : '';
-    return `${origin}${pathname}?share=${product.id}&linkId=${linkId}${sellerParams}${pixelParams}`;
+    return `${origin}/p/${product.id}?linkId=${linkId}${sellerParams}${pixelParams}`;
   };
 
   // Handle price update directly from list
