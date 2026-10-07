@@ -330,7 +330,7 @@ function AppContent() {
             <img
               src="/logo.svg"
               alt="Nouva Market Logo"
-              className="w-8 h-8 rounded-xl object-contain drop-shadow-2xs shrink-0"
+              className="w-8 h-8 object-contain drop-shadow-2xs shrink-0"
               referrerPolicy="no-referrer"
             />
             <div className="hidden xl:block">

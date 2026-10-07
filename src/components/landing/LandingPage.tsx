@@ -386,7 +386,7 @@ export function LandingPage({ onEnterApp, onShowToast }: LandingPageProps) {
             <img 
               src="/logo.svg" 
               alt="Nouva Market Logo" 
-              className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl object-contain drop-shadow-md shrink-0 bg-purple-50 p-1 border border-purple-100" 
+              className="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-md shrink-0 transition-transform hover:scale-105" 
               referrerPolicy="no-referrer" 
             />
             <div>
