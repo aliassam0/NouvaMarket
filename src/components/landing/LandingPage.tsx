@@ -40,9 +40,6 @@ import { PrivacyModal } from './PrivacyModal';
 import { EnterprisePendingApprovalModal, PendingApprovalData } from './EnterprisePendingApprovalModal';
 import { WhatsAppIcon } from '../tabs/CustomerShareOrderEnhancements';
 import { GlobalExpansionHeroVisual } from './GlobalExpansionHeroVisual';
-import { SeoHead } from '../seo/SeoHead';
-import { Link, useRouter } from '../../router/RouterContext';
-import { PublicFooter } from '../public/PublicFooter';
 
 interface LandingPageProps {
   onEnterApp: (role?: 'reseller' | 'admin' | 'warehouse' | 'confirmer' | 'support' | 'platform_warehouse') => void;
@@ -54,7 +51,6 @@ const ALGERIA_WILAYAS = FULL_ALGERIA_WILAYAS.map((w) => w.nameAr);
 
 export function LandingPage({ onEnterApp, onShowToast, initialModal }: LandingPageProps) {
   const { user, loginWithPhoneOtp, loginWithEmailPassword, registerWithEmail, updateProfile, authError, logout } = useAuth();
-  const { navigate } = useRouter();
 
   // Modals state
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(initialModal === 'login');
@@ -334,11 +330,6 @@ export function LandingPage({ onEnterApp, onShowToast, initialModal }: LandingPa
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-purple-500 selection:text-white dir-rtl text-right overflow-x-hidden">
-      <SeoHead
-        title="نوفا ماركت | Nouva Market - أول منصة للتسويق بالعمولة والدروبشيبينغ في الجزائر"
-        description="انضم إلى نوفا ماركت (Nouva Market)، المنصة رقم #1 للتسويق بالعمولة والتجارة الإلكترونية في الجزائر. آلاف المنتجات بأسعار الجملة، تأكيد هاتفي احترافي، شحن لـ 58 ولاية، ودفع فوري للأرباح عبر CCP و BaridiMob."
-        canonical="https://nouvamarket.com/"
-      />
       {/* Background Subtle Gradient Blobs */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-40">
         <div className="absolute top-0 -start-40 w-96 h-96 bg-purple-300/40 rounded-full blur-3xl" />
@@ -392,33 +383,28 @@ export function LandingPage({ onEnterApp, onShowToast, initialModal }: LandingPa
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 transition shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3">
           {/* Brand Logo & Name */}
-          <Link to="/" className="flex items-center gap-3 group">
+          <div className="flex items-center gap-3">
             <img 
               src="/logo.svg" 
               alt="Nouva Market Logo" 
-              className="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-md shrink-0 transition-transform group-hover:scale-105" 
+              className="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-md shrink-0 transition-transform hover:scale-105" 
               referrerPolicy="no-referrer" 
             />
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-base sm:text-xl font-black text-slate-900 tracking-tight leading-none group-hover:text-purple-600 transition-colors">
+                <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight leading-none">
                   Nouva Market
-                </span>
+                </h1>
               </div>
             </div>
-          </Link>
+          </div>
 
           {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-4 lg:gap-6 text-xs font-bold text-slate-600">
-            <Link to="/products" className="hover:text-purple-600 transition flex items-center gap-1">
-              <span>المنتجات</span>
-              <span className="px-1 py-0.2 text-[9px] bg-amber-500 text-white rounded font-black">جديد</span>
-            </Link>
-            <Link to="/suppliers" className="hover:text-purple-600 transition">بوابة الموردين</Link>
-            <Link to="/resellers" className="hover:text-purple-600 transition">دليل المسوقين</Link>
-            <Link to="/academy" className="hover:text-purple-600 transition">الأكاديمية</Link>
-            <Link to="/shipping" className="hover:text-purple-600 transition">الشحن لـ 58 ولاية</Link>
-            <Link to="/faq" className="hover:text-purple-600 transition">الأسئلة الشائعة</Link>
+          <nav className="hidden md:flex items-center gap-6 text-xs font-bold text-slate-600">
+            <a href="#features" className="hover:text-purple-600 transition">المميزات</a>
+            <a href="#how-it-works" className="hover:text-purple-600 transition">كيف تبدأ؟</a>
+            <a href="#calculator" className="hover:text-purple-600 transition">حاسبة الأرباح</a>
+            <a href="#faq" className="hover:text-purple-600 transition">الأسئلة الشائعة</a>
           </nav>
 
           {/* Header Action Buttons */}
@@ -954,8 +940,41 @@ export function LandingPage({ onEnterApp, onShowToast, initialModal }: LandingPa
         </div>
       </section>
 
-      {/* Enhanced Public SEO Footer */}
-      <PublicFooter />
+      {/* Footer */}
+      <footer className="py-8 bg-white border-t border-slate-200 text-xs text-slate-500 font-semibold relative z-10">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p>© 2026 Nouva Market. جميع الحقوق محفوظة.</p>
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap justify-center">
+            <button
+              onClick={() => setIsTermsModalOpen(true)}
+              className="hover:text-purple-600 text-slate-700 font-bold transition cursor-pointer flex items-center gap-1"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+              <span>شروط الاستخدام</span>
+            </button>
+            <span>•</span>
+            <button
+              onClick={() => setIsPrivacyModalOpen(true)}
+              className="hover:text-purple-600 text-slate-700 font-bold transition cursor-pointer flex items-center gap-1"
+            >
+              <Lock className="w-3.5 h-3.5 text-purple-600" />
+              <span>سياسة الخصوصية</span>
+            </button>
+            <span>•</span>
+            {user ? (
+              <button onClick={() => onEnterApp(user.role as any)} className="hover:text-purple-600 transition cursor-pointer text-purple-600 font-bold">
+                حسابك: {user.fullName || user.email}
+              </button>
+            ) : (
+              <button onClick={() => setIsLoginModalOpen(true)} className="hover:text-purple-600 transition cursor-pointer">
+                تسجيل الدخول
+              </button>
+            )}
+            <span>•</span>
+            <a href="#faq" className="hover:text-purple-600 transition">الأسئلة الشائعة</a>
+          </div>
+        </div>
+      </footer>
 
       {/* Terms of Use Modal */}
       <TermsModal
