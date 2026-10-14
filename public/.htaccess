@@ -1,0 +1,23 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # 1. Route all /api/* requests to Hostinger PHP API Bridge
+  RewriteCond %{REQUEST_URI} ^/api(/.*)?$ [NC]
+  RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+  # 2. Prevent rewrite for existing files or directories
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+
+  # 3. SPA fallback for frontend routes
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# Security & Compression Headers
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-XSS-Protection "1; mode=block"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

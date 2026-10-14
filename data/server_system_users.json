@@ -1,0 +1,71 @@
+[
+  {
+    "id": "usr-1",
+    "fullName": "مدير النظام (Admin)",
+    "email": "admin@nouvamarket.com",
+    "password": "Aliass@m1989",
+    "role": "ADMIN",
+    "permissions": [
+      "ALL_PERMISSIONS"
+    ],
+    "status": "ACTIVE",
+    "createdAt": "2025-01-01"
+  },
+  {
+    "id": "usr-2",
+    "fullName": "أمين المستودع والمورد (Warehouse)",
+    "email": "warehouse@nouvamarket.com",
+    "password": "Aliass@m1989",
+    "role": "WAREHOUSE",
+    "permissions": [
+      "PACKING",
+      "PICKING",
+      "BARCODE_SCAN",
+      "INVENTORY_READ_WRITE"
+    ],
+    "status": "ACTIVE",
+    "createdAt": "2025-06-12"
+  },
+  {
+    "id": "usr-3",
+    "fullName": "سارة - مؤكدة الطلبيات",
+    "email": "confirmer@nouvamarket.com",
+    "password": "Aliass@m1989",
+    "role": "ORDER_CONFIRMER",
+    "permissions": [
+      "CONFIRM_ORDERS",
+      "ORDERS_MANAGE",
+      "FOLLOW_DELIVERY"
+    ],
+    "status": "ACTIVE",
+    "createdAt": "2025-06-15"
+  },
+  {
+    "id": "usr-4",
+    "fullName": "سارة مراد (الدعم الفني للمسوقين)",
+    "email": "support@nouvamarket.com",
+    "password": "Aliass@m1989",
+    "role": "RESELLER_SUPPORT",
+    "permissions": [
+      "RESELLER_SUPPORT",
+      "ORDERS_MANAGE",
+      "STORE_SYNC_ASSIST"
+    ],
+    "status": "ACTIVE",
+    "createdAt": "2025-06-20"
+  },
+  {
+    "id": "usr-5",
+    "fullName": "كريم بن عمار (الدعم الفني واللوجستي)",
+    "email": "karim.support@nouvamarket.com",
+    "password": "Aliass@m1989",
+    "role": "RESELLER_SUPPORT",
+    "permissions": [
+      "RESELLER_SUPPORT",
+      "ORDERS_MANAGE",
+      "STORE_SYNC_ASSIST"
+    ],
+    "status": "ACTIVE",
+    "createdAt": "2025-07-01"
+  }
+]

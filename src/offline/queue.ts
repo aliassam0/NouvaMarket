@@ -1,0 +1,280 @@
+import { Order } from '../types';
+
+const OFFLINE_QUEUE_KEY = 'nouvamarket_offline_orders_queue_v1';
+const STORED_ORDERS_KEY = 'nouvamarket_local_orders_v1';
+const DELETED_ORDERS_KEY = 'nouva_deleted_orders_ids_v1';
+
+export function getDeletedOrderIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DELETED_ORDERS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return new Set(parsed.map(String));
+      }
+    }
+  } catch (e) {
+    console.error('Failed to get deleted order IDs', e);
+  }
+  return new Set<string>();
+}
+
+export function markOrderDeleted(orderId: string): void {
+  try {
+    const current = getDeletedOrderIds();
+    current.add(String(orderId));
+    localStorage.setItem(DELETED_ORDERS_KEY, JSON.stringify(Array.from(current)));
+  } catch (e) {
+    console.error('Failed to blacklist deleted order ID', e);
+  }
+
+  // Call server DELETE route
+  try {
+    fetch(`/api/reseller/orders/${encodeURIComponent(orderId)}`, {
+      method: 'DELETE',
+    }).catch(() => {});
+  } catch {}
+}
+
+export function unmarkOrderDeleted(orderId: string): void {
+  try {
+    const current = getDeletedOrderIds();
+    current.delete(String(orderId));
+    localStorage.setItem(DELETED_ORDERS_KEY, JSON.stringify(Array.from(current)));
+  } catch (e) {
+    console.error('Failed to unmark deleted order ID', e);
+  }
+}
+
+export interface QueuedOrder {
+  idempotencyKey: string;
+  orderData: Partial<Order>;
+  createdAt: number;
+  attempts: number;
+  status: 'pending' | 'syncing' | 'synced' | 'failed';
+}
+
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'km-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+}
+
+export function getLocalQueue(): QueuedOrder[] {
+  try {
+    const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function saveLocalQueue(queue: QueuedOrder[]) {
+  try {
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+  } catch (e) {
+    console.error('Failed to save offline queue to localStorage', e);
+  }
+}
+
+function normalizeOrderId(id: string): string {
+  const match = String(id).match(/^(ORD-\d+)(?:-\d+-\d+)+$/);
+  return match ? match[1] : String(id);
+}
+
+export function deduplicateOrderList(orderList: Order[]): Order[] {
+  const deletedIds = getDeletedOrderIds();
+  const demoIds = ['ORD-9281', 'ORD-9290', 'ORD-9270', 'ORD-9821', 'ORD-7712', 'ORD-101', 'ORD-102', 'ORD-103', 'ORD-104', 'ORD-105', 'ORD-100'];
+
+  const seenIds = new Set<string>();
+  const seenIdempotency = new Set<string>();
+  const seenTracking = new Set<string>();
+  const result: Order[] = [];
+
+  for (const o of orderList) {
+    if (!o) continue;
+    const rawId = String(o.id || '');
+    const cleanId = rawId ? normalizeOrderId(rawId) : '';
+    if (!cleanId) continue;
+
+    if (deletedIds.has(cleanId) || (o.trackingCode && deletedIds.has(String(o.trackingCode)))) continue;
+    if (demoIds.includes(cleanId) || cleanId.startsWith('ORD-92') || cleanId.startsWith('ORD-98') || cleanId.startsWith('ORD-77')) continue;
+
+    const ord: Order = o.id !== cleanId ? { ...o, id: cleanId } : o;
+    const idem = ord.idempotencyKey;
+    const trk = ord.trackingCode;
+
+    if (seenIds.has(cleanId) || (idem && seenIdempotency.has(idem)) || (trk && seenTracking.has(trk))) {
+      continue;
+    }
+
+    seenIds.add(cleanId);
+    if (idem) seenIdempotency.add(idem);
+    if (trk) seenTracking.add(trk);
+    result.push(ord);
+  }
+
+  return result;
+}
+
+export function getStoredOrders(): Order[] {
+  try {
+    const raw = localStorage.getItem(STORED_ORDERS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const deduplicated = deduplicateOrderList(parsed);
+        if (deduplicated.length !== parsed.length || parsed.some(p => p && normalizeOrderId(p.id) !== p.id)) {
+          try {
+            localStorage.setItem(STORED_ORDERS_KEY, JSON.stringify(deduplicated));
+          } catch {}
+        }
+        return deduplicated;
+      }
+    }
+  } catch (e) {
+    return [];
+  }
+  return [];
+}
+
+export function saveStoredOrders(orders: Order[]) {
+  try {
+    const active = deduplicateOrderList(orders);
+    localStorage.setItem(STORED_ORDERS_KEY, JSON.stringify(active));
+
+    // Background push sync to server
+    if (active.length > 0) {
+      fetch('/api/reseller/orders/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders: active }),
+      }).catch(() => {});
+    }
+  } catch (e) {
+    console.error('Failed to save orders to localStorage', e);
+  }
+}
+
+/**
+ * Enqueue an order locally with a client-generated UUID Idempotency Key
+ * Returns immediately for smooth UI feedback (Rule Section 5.2)
+ */
+export function enqueueOrder(orderInput: Partial<Order>): { idempotencyKey: string; localOrder: Order } {
+  const idempotencyKey = orderInput.idempotencyKey || generateUUID();
+  const uniqueIdSuffix = Date.now().toString().slice(-6) + '-' + Math.floor(1000 + Math.random() * 9000);
+  const orderId = orderInput.id || `ORD-LOCAL-${uniqueIdSuffix}`;
+
+  const localOrder: Order = {
+    ...orderInput,
+    id: orderId,
+    idempotencyKey,
+    customerName: orderInput.customerName || '',
+    phone: orderInput.phone || '',
+    phone2: orderInput.phone2 || '',
+    wilaya: orderInput.wilaya || '16 - Alger',
+    wilayaCode: orderInput.wilayaCode || '16',
+    commune: orderInput.commune || 'Alger',
+    address: orderInput.address || '',
+    deliveryType: orderInput.deliveryType || 'home',
+    stopdesk: orderInput.stopdesk ?? (orderInput.deliveryType === 'office' ? 1 : 0),
+    codeStopdesk: orderInput.codeStopdesk || '',
+    echange: orderInput.echange || 0,
+    refArticle: orderInput.refArticle || `REF-${orderId}`,
+    noteFournisseur: orderInput.noteFournisseur || '',
+    idExterne: orderInput.idExterne || orderId,
+    items: orderInput.items || [],
+    totalAmount: orderInput.totalAmount || 0,
+    shippingFee: orderInput.shippingFee || 500,
+    totalProfit: orderInput.totalProfit || 0,
+    resellerId: orderInput.resellerId || '',
+    resellerName: orderInput.resellerName || '',
+    resellerPhone: orderInput.resellerPhone || '',
+    resellerEmail: orderInput.resellerEmail || '',
+    supplierId: orderInput.supplierId || '',
+    supplierEmail: orderInput.supplierEmail || '',
+    status: orderInput.status || 'PENDING_SYNC',
+    statusAr: orderInput.statusAr || (orderInput.status === 'LINK_ORDER' ? 'طلب من الرابط' : '🔍 قيد المراجعة (في انتظار التأكيد)'),
+    statusFr: orderInput.statusFr || (orderInput.status === 'LINK_ORDER' ? 'Commande par lien' : 'En révision'),
+    situation: orderInput.situation || (orderInput.status === 'LINK_ORDER' ? 'طلب من الرابط' : 'En révision'),
+    source: orderInput.source || (orderInput.status === 'LINK_ORDER' ? 'LINK' : 'LOCAL'),
+    adminConfirmed: orderInput.adminConfirmed || false,
+    isLockedForEdit: orderInput.isLockedForEdit || false,
+    createdAt: orderInput.createdAt || new Date().toISOString(),
+    syncStatus: 'pending_sync',
+    trackingCode: orderInput.trackingCode || ('PENDING-' + idempotencyKey.substring(0, 6).toUpperCase()),
+  };
+
+  // 1. Add to local queue
+  const queue = getLocalQueue();
+  queue.push({
+    idempotencyKey,
+    orderData: localOrder,
+    createdAt: Date.now(),
+    attempts: 0,
+    status: 'pending',
+  });
+  saveLocalQueue(queue);
+
+  // 2. Prepend to local stored orders
+  const existingOrders = getStoredOrders();
+  saveStoredOrders([localOrder, ...existingOrders.filter((o) => o.id !== localOrder.id && o.idempotencyKey !== idempotencyKey)]);
+
+  return { idempotencyKey, localOrder };
+}
+
+/**
+ * Flush pending items in the offline queue to the server
+ */
+export async function flushOfflineQueue(
+  sendOrderApi: (payload: any) => Promise<any>
+): Promise<{ syncedCount: number; failedCount: number }> {
+  const queue = getLocalQueue();
+  if (queue.length === 0) return { syncedCount: 0, failedCount: 0 };
+
+  let syncedCount = 0;
+  let failedCount = 0;
+  const remainingQueue: QueuedOrder[] = [];
+
+  for (const item of queue) {
+    try {
+      item.status = 'syncing';
+      item.attempts += 1;
+
+      // Send to server with exact Idempotency-Key
+      const response = await sendOrderApi({
+        ...item.orderData,
+        idempotencyKey: item.idempotencyKey,
+      });
+
+      if (response && response.success && response.order) {
+        syncedCount++;
+
+        // Update local stored order with real server details
+        const stored = getStoredOrders();
+        const updated = stored.map((ord) => {
+          if (ord.idempotencyKey === item.idempotencyKey) {
+            return {
+              ...response.order,
+              syncStatus: 'synced' as const,
+            };
+          }
+          return ord;
+        });
+        saveStoredOrders(updated);
+      } else {
+        throw new Error('Server response invalid');
+      }
+    } catch (err) {
+      console.warn(`[Offline Queue] Sync failed for ${item.idempotencyKey}, attempt ${item.attempts}`, err);
+      failedCount++;
+      if (item.attempts < 5) {
+        remainingQueue.push({ ...item, status: 'pending' });
+      }
+    }
+  }
+
+  saveLocalQueue(remainingQueue);
+  return { syncedCount, failedCount };
+}

@@ -1,0 +1,443 @@
+import fs from 'fs';
+import path from 'path';
+import sharp from 'sharp';
+
+async function generateFaviconAndLogo() {
+  const size = 1024;
+
+  // Exact 3D clay-render vector graphic matching the user's uploaded reference:
+  // 9A97B94C-2A46-4A6C-BB69-9D4B64AC7601.png
+  // Key characteristics:
+  // - Isometric three-quarter perspective purple shopping bag on pure white background
+  // - Vibrant saturated electric violet / royal purple (#6628E2 to #7339F3)
+  // - Right accordion gusset with realistic 3D folding crease and dark purple depth
+  // - Dual glossy white arched tubular handles:
+  //   * Back handle rising from behind the bag opening in parallax
+  //   * Front handle attached via two prominent white 3D ring grommets / eyelets
+  // - Signature chunky 3D white clay letter "N" with:
+  //   * Rounded vertical pill stem on left
+  //   * Bold diagonal stroke
+  //   * Distinctive organic curved wing/flick crest at top-right
+  //   * Realistic 3D extrusion and soft ambient shadow cast onto bag surface
+  // - Subtle contact ground shadow
+
+  const svg = `
+<svg width="${size}" height="${size}" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Soft Contact Shadow on Ground -->
+    <radialGradient id="groundShadow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1e045b" stop-opacity="0.32"/>
+      <stop offset="55%" stop-color="#3b0f98" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#5521b5" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Front Face Primary Vibrant Purple Gradient -->
+    <linearGradient id="frontFaceGrad" x1="15%" y1="0%" x2="85%" y2="100%">
+      <stop offset="0%" stop-color="#7B42FA"/>
+      <stop offset="35%" stop-color="#692BF0"/>
+      <stop offset="75%" stop-color="#581CDA"/>
+      <stop offset="100%" stop-color="#4B12C8"/>
+    </linearGradient>
+
+    <!-- Front Face Soft Surface Gloss Highlight -->
+    <radialGradient id="frontGloss" cx="35%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="50%" stop-color="#9C6BFC" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#692BF0" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Top Rim Specular Highlight -->
+    <linearGradient id="topRimSheen" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#A579FC" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#8E57F8" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#6C32EE" stop-opacity="0.1"/>
+    </linearGradient>
+
+    <!-- Left Edge Contour Highlight -->
+    <linearGradient id="leftEdgeSheen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9E6DFB" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#551CDA" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Side Gusset - Rear Fold Facet (Deep rich 3D shadow) -->
+    <linearGradient id="sideRearGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#370CA0"/>
+      <stop offset="50%" stop-color="#28067C"/>
+      <stop offset="100%" stop-color="#1C035C"/>
+    </linearGradient>
+
+    <!-- Side Gusset - Front Fold Facet (Medium purple shadow) -->
+    <linearGradient id="sideFrontGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4812BC"/>
+      <stop offset="60%" stop-color="#370CA0"/>
+      <stop offset="100%" stop-color="#260676"/>
+    </linearGradient>
+
+    <!-- Side Gusset - Bottom Inward Fold Triangle Shadow -->
+    <linearGradient id="bottomFoldShadow" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#140248"/>
+      <stop offset="100%" stop-color="#24056E"/>
+    </linearGradient>
+
+    <!-- Handles 3D Cylinder Gradient (Glossy Porcelain White) -->
+    <linearGradient id="handleTubeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="30%" stop-color="#FFFFFF"/>
+      <stop offset="70%" stop-color="#F2EEFC"/>
+      <stop offset="100%" stop-color="#D7D0F2"/>
+    </linearGradient>
+
+    <!-- Back Handle Gradient (Slightly cooler & dimmer for depth) -->
+    <linearGradient id="backHandleTubeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FAF8FF"/>
+      <stop offset="40%" stop-color="#EDE8FA"/>
+      <stop offset="100%" stop-color="#C8C0E8"/>
+    </linearGradient>
+
+    <!-- Handle Grommet (Raised 3D White Torus Ring) -->
+    <linearGradient id="grommetGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="50%" stop-color="#F3EFFC"/>
+      <stop offset="100%" stop-color="#CEC6F0"/>
+    </linearGradient>
+
+    <!-- 3D Letter 'N' Extrusion Bevel Gradient -->
+    <linearGradient id="nBevelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F0EDFB"/>
+      <stop offset="50%" stop-color="#DDD8F5"/>
+      <stop offset="100%" stop-color="#C6BEEA"/>
+    </linearGradient>
+
+    <!-- 3D Letter 'N' Front Face Gradient -->
+    <linearGradient id="nFrontFaceGrad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="60%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#FAF9FF"/>
+    </linearGradient>
+
+    <!-- Realistic Drop Shadow for Letter 'N' onto the bag face -->
+    <filter id="nDropShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="12" dy="18" stdDeviation="14" flood-color="#1c0356" flood-opacity="0.48"/>
+    </filter>
+
+    <!-- Soft Drop Shadow for Grommets -->
+    <filter id="grommetShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="3" dy="6" stdDeviation="5" flood-color="#24056a" flood-opacity="0.38"/>
+    </filter>
+
+    <!-- Whole Bag Ambient Occlusion Shadow -->
+    <filter id="bagAmbientShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#280775" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <!-- ================= GROUND CONTACT SHADOW ================= -->
+  <ellipse cx="510" cy="920" rx="410" ry="42" fill="url(#groundShadow)"/>
+
+  <!-- ================= MAIN BAG COMPOSITION ================= -->
+  <g filter="url(#bagAmbientShadow)">
+
+    <!-- 1. BACK HANDLE (Reaches high in 3D parallax behind the bag) -->
+    <g>
+      <!-- Base Tubular Path -->
+      <path d="M 370,270 C 370, 40 680, 30 680, 250"
+            fill="none"
+            stroke="url(#backHandleTubeGrad)"
+            stroke-width="50"
+            stroke-linecap="round"/>
+      <!-- Soft Inner Shading for Back Handle -->
+      <path d="M 370,270 C 370, 40 680, 30 680, 250"
+            fill="none"
+            stroke="#B9AFDF"
+            stroke-width="12"
+            stroke-linecap="round"
+            opacity="0.45"
+            transform="translate(6, 4)"/>
+      <!-- Top Specular Highlight on Back Handle -->
+      <path d="M 382,260 C 382, 50 670, 40 670, 240"
+            fill="none"
+            stroke="#FFFFFF"
+            stroke-width="16"
+            stroke-linecap="round"
+            opacity="0.8"/>
+    </g>
+
+    <!-- 2. SIDE GUSSET / 3D ACCORDION PANEL (Right side of the bag) -->
+    <g>
+      <!-- Rear Facet of the accordion fold -->
+      <polygon points="800,253 836,264 908,870 782,835" fill="url(#sideRearGrad)"/>
+
+      <!-- Front Facet of the accordion fold -->
+      <polygon points="764,242 800,253 782,835 748,930" fill="url(#sideFrontGrad)"/>
+
+      <!-- Bottom inward folding triangle (gives authentic paper-bag gusset fold) -->
+      <polygon points="748,930 782,835 908,870" fill="url(#bottomFoldShadow)"/>
+
+      <!-- Subtle edge highlight where side meets back -->
+      <line x1="836" y1="264" x2="908" y2="870" stroke="#4812BC" stroke-width="2" opacity="0.6"/>
+    </g>
+
+    <!-- 3. MAIN FRONT FACE (Smooth vibrant purple 3D body) -->
+    <g>
+      <!-- Main Front Surface with rounded corners -->
+      <path d="M 198,284
+               C 186,285 178,295 180,307
+               L 136,878
+               C 134,892 144,904 158,905
+               L 728,935
+               C 742,936 754,926 755,912
+               L 775,258
+               C 776,246 767,236 755,236
+               L 198,284 Z"
+            fill="url(#frontFaceGrad)"/>
+
+      <!-- Front Surface Soft Radial Gloss -->
+      <path d="M 198,284
+               C 186,285 178,295 180,307
+               L 136,878
+               C 134,892 144,904 158,905
+               L 728,935
+               C 742,936 754,926 755,912
+               L 775,258
+               C 776,246 767,236 755,236
+               L 198,284 Z"
+            fill="url(#frontGloss)"/>
+
+      <!-- Top Rim Specular Sheen (Curved molded 3D rim highlight) -->
+      <path d="M 182,302 L 773,242 L 773,256 L 180,314 Z"
+            fill="url(#topRimSheen)"/>
+
+      <!-- Left Edge Specular Contour Highlight -->
+      <path d="M 180,307 L 136,878 L 148,880 L 192,306 Z"
+            fill="url(#leftEdgeSheen)"/>
+    </g>
+
+    <!-- 4. FRONT HANDLE & GROMMETS (Lies directly on foreground front face) -->
+    <g>
+      <!-- Handle Drop Shadow onto bag face -->
+      <path d="M 318,342 C 318, 48 588, 40 588, 324"
+            fill="none"
+            stroke="#200466"
+            stroke-width="58"
+            stroke-linecap="round"
+            opacity="0.32"
+            transform="translate(10, 16)"/>
+
+      <!-- Main Front Handle Arch (Thick glossy porcelain white tube) -->
+      <path d="M 318,342 C 318, 48 588, 40 588, 324"
+            fill="none"
+            stroke="url(#handleTubeGrad)"
+            stroke-width="56"
+            stroke-linecap="round"/>
+
+      <!-- Soft Underside Shading on Front Handle Tube -->
+      <path d="M 318,342 C 318, 48 588, 40 588, 324"
+            fill="none"
+            stroke="#CCC4EB"
+            stroke-width="14"
+            stroke-linecap="round"
+            opacity="0.6"
+            transform="translate(3, 4)"/>
+
+      <!-- Bright Specular Highlight along Tube Spine -->
+      <path d="M 324,332 C 324, 58 582, 50 582, 314"
+            fill="none"
+            stroke="#FFFFFF"
+            stroke-width="18"
+            stroke-linecap="round"
+            opacity="0.95"/>
+
+      <!-- LEFT GROMMET (Raised White 3D Donut Ring) -->
+      <g transform="translate(318, 342)" filter="url(#grommetShadow)">
+        <!-- Outer White Torus Ring -->
+        <circle cx="0" cy="0" r="32" fill="url(#grommetGrad)"/>
+        <!-- Top-Left Gloss Highlight Rim -->
+        <circle cx="0" cy="0" r="28" fill="none" stroke="#FFFFFF" stroke-width="5"/>
+        <!-- Inner Hole (Shows deep purple bag interior) -->
+        <circle cx="0" cy="0" r="16" fill="#320888"/>
+        <!-- Hole Inner Drop Shadow -->
+        <circle cx="0" cy="0" r="16" fill="none" stroke="#1c0356" stroke-width="3" opacity="0.7"/>
+      </g>
+
+      <!-- RIGHT GROMMET (Raised White 3D Donut Ring) -->
+      <g transform="translate(588, 324)" filter="url(#grommetShadow)">
+        <!-- Outer White Torus Ring -->
+        <circle cx="0" cy="0" r="32" fill="url(#grommetGrad)"/>
+        <!-- Top-Left Gloss Highlight Rim -->
+        <circle cx="0" cy="0" r="28" fill="none" stroke="#FFFFFF" stroke-width="5"/>
+        <!-- Inner Hole (Shows deep purple bag interior) -->
+        <circle cx="0" cy="0" r="16" fill="#320888"/>
+        <!-- Hole Inner Drop Shadow -->
+        <circle cx="0" cy="0" r="16" fill="none" stroke="#1c0356" stroke-width="3" opacity="0.7"/>
+      </g>
+    </g>
+
+    <!-- 5. SIGNATURE 3D EMBOSSED WHITE LETTER 'N' -->
+    <!-- Meticulously traced from uploaded image 9A97B94C-2A46-4A6C-BB69-9D4B64AC7601.png -->
+    <!-- Features:
+         * Left vertical pill stem (smooth rounded top & bottom caps)
+         * Deep diagonal connecting across
+         * Right vertical stroke with signature outward-curving wing/crest flick at top-right
+         * 3D bevel extrusion and soft realistic drop shadow
+    -->
+    <g>
+      <!-- A. Realistic Drop Shadow Cast onto Bag Face -->
+      <g filter="url(#nDropShadow)">
+        <path d="M 334,440
+                 C 305,440 282,463 282,492
+                 L 282,752
+                 C 282,781 305,804 334,804
+                 C 363,804 386,781 386,752
+                 L 386,608
+                 L 514,756
+                 C 530,774 554,784 578,784
+                 C 604,784 624,764 624,738
+                 L 624,534
+                 C 638,510 650,478 648,446
+                 C 646,424 634,410 616,412
+                 C 602,414 590,430 578,458
+                 C 572,472 568,492 566,516
+                 L 386,478
+                 C 378,456 358,440 334,440 Z"
+              fill="#220468"
+              opacity="0.85"/>
+      </g>
+
+      <!-- B. 3D Bevel Extrusion / Thickness (Offset down-right for physical volume) -->
+      <g transform="translate(8, 12)">
+        <path d="M 334,440
+                 C 305,440 282,463 282,492
+                 L 282,752
+                 C 282,781 305,804 334,804
+                 C 363,804 386,781 386,752
+                 L 386,608
+                 L 514,756
+                 C 530,774 554,784 578,784
+                 C 604,784 624,764 624,738
+                 L 624,534
+                 C 638,510 650,478 648,446
+                 C 646,424 634,410 616,412
+                 C 602,414 590,430 578,458
+                 C 572,472 568,492 566,516
+                 L 386,478
+                 C 378,456 358,440 334,440 Z"
+              fill="url(#nBevelGrad)"/>
+      </g>
+
+      <!-- C. Main Front White Face of Letter 'N' -->
+      <!-- Smooth, rounded, organic 3D typography -->
+      <path d="M 330,436
+               C 301,436 278,459 278,488
+               L 278,748
+               C 278,777 301,800 330,800
+               C 359,800 382,777 382,748
+               L 382,604
+               L 510,752
+               C 526,770 550,780 574,780
+               C 600,780 620,760 620,734
+               L 620,530
+               C 634,506 646,474 644,442
+               C 642,420 630,406 612,408
+               C 598,410 586,426 574,454
+               C 568,468 564,488 562,512
+               L 382,474
+               C 374,452 354,436 330,436 Z"
+            fill="url(#nFrontFaceGrad)"/>
+
+      <!-- D. Top Soft Specular Highlight on 'N' -->
+      <path d="M 330,442
+               C 310,442 292,458 290,478
+               L 290,560
+               L 340,560
+               L 340,460
+               C 340,448 350,444 360,444
+               L 380,448
+               C 368,444 348,442 330,442 Z"
+            fill="#FFFFFF"
+            opacity="0.9"/>
+
+      <!-- E. Highlight along Top Crest Flick of 'N' -->
+      <path d="M 612,412
+               C 624,414 636,426 638,444
+               C 638,466 630,490 618,514
+               L 608,514
+               C 620,488 626,464 624,444
+               C 622,430 616,420 608,418 Z"
+            fill="#FFFFFF"
+            opacity="0.95"/>
+
+      <!-- F. Subtle Inner Bevel Shading at junction -->
+      <path d="M 382,604 L 510,752 L 498,752 L 382,618 Z"
+            fill="#E2DEF5"
+            opacity="0.7"/>
+    </g>
+  </g>
+</svg>
+`;
+
+  // 1. Write vector favicon.svg (used directly by modern web browsers)
+  const faviconSvgPath = path.join(process.cwd(), 'public', 'favicon.svg');
+  fs.writeFileSync(faviconSvgPath, svg.trim(), 'utf-8');
+  console.log(`Updated vector favicon.svg at ${faviconSvgPath}`);
+
+  // 2. Write vector logo.svg (used in app headers, landing pages, sidebar)
+  const logoSvgPath = path.join(process.cwd(), 'public', 'logo.svg');
+  fs.writeFileSync(logoSvgPath, svg.trim(), 'utf-8');
+  console.log(`Updated vector logo.svg at ${logoSvgPath}`);
+
+  // Generate multi-resolution raster PNG assets via Sharp:
+  // 1. favicon-32x32.png
+  await sharp(Buffer.from(svg))
+    .resize(32, 32)
+    .png()
+    .toFile(path.join(process.cwd(), 'public', 'favicon-32x32.png'));
+
+  // 2. favicon-192x192.png (PWA standard)
+  await sharp(Buffer.from(svg))
+    .resize(192, 192)
+    .png()
+    .toFile(path.join(process.cwd(), 'public', 'favicon-192x192.png'));
+
+  // 3. apple-touch-icon.png (180x180 for iOS Safari)
+  await sharp(Buffer.from(svg))
+    .resize(180, 180)
+    .png()
+    .toFile(path.join(process.cwd(), 'public', 'apple-touch-icon.png'));
+
+  // 4. favicon-512x512.png (High-definition)
+  await sharp(Buffer.from(svg))
+    .resize(512, 512)
+    .png()
+    .toFile(path.join(process.cwd(), 'public', 'favicon-512x512.png'));
+
+  // 5. logo.png (512x512 PNG copy)
+  await sharp(Buffer.from(svg))
+    .resize(512, 512)
+    .png()
+    .toFile(path.join(process.cwd(), 'public', 'logo.png'));
+
+  // 6. pwa-192x192.png
+  await sharp(Buffer.from(svg))
+    .resize(192, 192)
+    .png()
+    .toFile(path.join(process.cwd(), 'public', 'pwa-192x192.png'));
+
+  // 7. pwa-512x512.png
+  await sharp(Buffer.from(svg))
+    .resize(512, 512)
+    .png()
+    .toFile(path.join(process.cwd(), 'public', 'pwa-512x512.png'));
+
+  // 8. pwa-maskable-512x512.png
+  await sharp(Buffer.from(svg))
+    .resize(512, 512)
+    .png()
+    .toFile(path.join(process.cwd(), 'public', 'pwa-maskable-512x512.png'));
+
+  console.log('Successfully regenerated all favicon and logo PNGs!');
+}
+
+generateFaviconAndLogo().catch((err) => {
+  console.error('Error generating favicon:', err);
+  process.exit(1);
+});
