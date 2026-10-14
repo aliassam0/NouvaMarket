@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, X, CheckCircle2, Clock, Wallet, Award, Package, RefreshCw, Trash2, CheckCheck, Volume2, VolumeX, Music, ShieldCheck, Box } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   getStoredNotifications,
   markNotificationAsRead,
@@ -29,12 +30,15 @@ interface NotificationsModalProps {
 
 export function NotificationsModal({ onClose, role = 'seller' }: NotificationsModalProps) {
   const { language } = useLanguage();
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => getStoredNotifications(role));
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState<AppNotification[]>(() =>
+    getStoredNotifications(role, role === 'seller' ? user?.id : undefined)
+  );
   const [soundEnabled, setSoundEnabled] = useState<boolean>(isNotificationSoundEnabled);
 
   useEffect(() => {
     const handleUpdate = () => {
-      setNotifications(getStoredNotifications(role));
+      setNotifications(getStoredNotifications(role, role === 'seller' ? user?.id : undefined));
     };
     let eventName = 'seller_notifications_updated';
     if (role === 'admin') {
@@ -44,7 +48,7 @@ export function NotificationsModal({ onClose, role = 'seller' }: NotificationsMo
     }
     window.addEventListener(eventName, handleUpdate);
     return () => window.removeEventListener(eventName, handleUpdate);
-  }, [role]);
+  }, [role, user?.id]);
 
   const toggleSound = () => {
     const next = !soundEnabled;

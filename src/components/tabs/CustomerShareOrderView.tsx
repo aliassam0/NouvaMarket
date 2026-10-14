@@ -897,87 +897,13 @@ export function CustomerShareOrderView({ product: initialProduct, onBackToApp, o
       {/* Top Header - Hidden on Thank You page to protect seller dashboard privacy */}
       {!isSubmitted && (
         <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-2xs">
-          {/* Top Header Content: For Official Platform Store, clean minimal header matching marketer customer page */}
-          {pageMode === 'official' ? (
-            <div className="max-w-lg mx-auto px-4 py-2.5 flex items-center justify-center">
-              <span className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <Truck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>توصيل سريع لجميع الولايات 🚚</span>
-              </span>
-            </div>
-          ) : (
-            <>
-              {/* Top Announcement Bar based on pageMode (المسوق / المورد) */}
-              {pageMode === 'seller' ? (
-                <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white text-xs py-1.5 px-3 shadow-xs">
-                  <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 font-black text-[10px] sm:text-[11px] truncate">
-                      <span className="bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
-                        🏭 مستودع المورد
-                      </span>
-                      <span className="truncate">📦 شحن مباشر من مستودع المصنع/المورد بسعر الجملة</span>
-                    </div>
-                    <span className="shrink-0 text-[10px] bg-amber-900/40 text-amber-100 font-bold px-2 py-0.5 rounded-full">
-                      سعر المصنع
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white text-xs py-1.5 px-3 shadow-xs">
-                  <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 font-black text-[10px] sm:text-[11px] truncate">
-                      <span className="bg-white/20 text-white px-2 py-0.5 rounded-full shrink-0">
-                        ✨ متجر {customization?.storeBadgeTitle || effectiveSellerName || 'مسوق معتمد'}
-                      </span>
-                      <span className="truncate">{customization?.customBadge || '🔥 عروض حصرية وتخفيضات كبرى • الدفع عند الاستلام'}</span>
-                    </div>
-                    <span className="shrink-0 text-[10px] bg-amber-400 text-slate-900 font-black px-2 py-0.5 rounded-full">
-                      مسوق معتمد
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Sub Header / Brand Bar + Quick Page Customizer Button */}
-              <div className="max-w-lg mx-auto px-3.5 py-2.5 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white font-black text-xs shrink-0 ${
-                    pageMode === 'seller' ? 'bg-amber-600' : 'bg-purple-600'
-                  }`}>
-                    {pageMode === 'seller' ? '🏭' : '✨'}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
-                      {pageMode === 'seller'
-                        ? (product.supplierName || effectiveSellerName || 'مستودع المورد المعتمد')
-                        : (customization?.storeBadgeTitle || effectiveSellerName || 'متجر المسوق المعتمد')}
-                    </p>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
-                      <span>توصيل سريع لجميع الولايات • الدفع عند الاستلام بعد المعاينة 🚚</span>
-                    </p>
-                  </div>
-                </div>
-
-                {/* In-page customize button for differentiating this page (Only visible to owner/previewer/admin) */}
-                {Boolean(
-                  (user?.role === 'reseller' && (!effectiveSellerId || user.id === effectiveSellerId)) ||
-                  user?.role === 'admin' ||
-                  searchParams.get('preview') === 'true'
-                ) && (
-                  <button
-                    type="button"
-                    onClick={() => setShowCustomizerModal(true)}
-                    className="px-2.5 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-[11px] font-black flex items-center gap-1 transition cursor-pointer shrink-0"
-                    title="تخصيص وتمييز هذه الصفحة (الصور، الهوية، الألوان)"
-                  >
-                    <Palette className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">تخصيص الصفحة</span>
-                    <span className="sm:hidden">تخصيص</span>
-                  </button>
-                )}
-              </div>
-            </>
-          )}
+          {/* Clean minimal header: توصيل سريع لجميع الولايات like platform store */}
+          <div className="max-w-lg mx-auto px-4 py-2.5 flex items-center justify-center">
+            <span className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <Truck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>توصيل سريع لجميع الولايات 🚚</span>
+            </span>
+          </div>
         </header>
       )}
 

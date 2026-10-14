@@ -282,11 +282,16 @@ export function approveWithdrawalRequest(id: string, proofReference?: string): b
     });
     saveStoredWalletTransactions(updatedSellerTxs, targetReq.sellerId);
 
-    addSellerNotification({
-      type: 'wallet',
-      titleAr: '✔ تم صرف طلب السحب وتحويل الأرباح!',
-      bodyAr: `تمت الموافقة على طلب السحب رقم #${targetReq.id} بمبلغ ${targetReq.amountDzd.toLocaleString()} دج وتحويل الأرباح إلى حسابك (${targetReq.accountDetails}). رقم الإثبات: ${targetReq.proofReference}`,
-    });
+    addSellerNotification(
+      {
+        type: 'wallet',
+        titleAr: '✔ تم صرف طلب السحب وتحويل الأرباح!',
+        bodyAr: `تمت الموافقة على طلب السحب رقم #${targetReq.id} بمبلغ ${targetReq.amountDzd.toLocaleString()} دج وتحويل الأرباح إلى حسابك (${targetReq.accountDetails}). رقم الإثبات: ${targetReq.proofReference}`,
+        sellerId: targetReq.sellerId,
+        recipientUserId: targetReq.sellerId,
+      },
+      targetReq.sellerId
+    );
   } else if (targetReq.userType === 'CONFIRMER') {
     addConfirmerNotification({
       type: 'wallet',
@@ -341,11 +346,16 @@ export function rejectWithdrawalRequest(id: string, reason: string): boolean {
     };
     saveStoredWalletTransactions([refundTx, ...sellerTxs], targetReq.sellerId);
 
-    addSellerNotification({
-      type: 'wallet',
-      titleAr: '✖ تم رفض طلب السحب وإعادة الرصيد لمحفظتك',
-      bodyAr: `تم رفض طلب السحب #${targetReq.id} بمبلغ ${targetReq.amountDzd.toLocaleString()} دج. السبب: (${reason}). تم إرجاع المبلغ كاملاً إلى محفظتك المتاحة.`,
-    });
+    addSellerNotification(
+      {
+        type: 'wallet',
+        titleAr: '✖ تم رفض طلب السحب وإعادة الرصيد لمحفظتك',
+        bodyAr: `تم رفض طلب السحب #${targetReq.id} بمبلغ ${targetReq.amountDzd.toLocaleString()} دج. السبب: (${reason}). تم إرجاع المبلغ كاملاً إلى محفظتك المتاحة.`,
+        sellerId: targetReq.sellerId,
+        recipientUserId: targetReq.sellerId,
+      },
+      targetReq.sellerId
+    );
   } else if (targetReq.userType === 'CONFIRMER') {
     addConfirmerNotification({
       type: 'wallet',

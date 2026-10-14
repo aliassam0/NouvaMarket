@@ -942,6 +942,10 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             note: note || '',
             agentName: agent.fullName,
           };
+          const isCancelled = result.includes('ألغى الطلب');
+          const isWrongData = result.includes('بيانات خاطئة');
+          const shouldCancel = isCancelled || isWrongData;
+
           updatedOrder = {
             ...o,
             assignedConfirmerId: o.assignedConfirmerId || agent.id,
@@ -951,7 +955,16 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             lastCallDate: new Date().toISOString(),
             lastCallResult: result,
             callHistory: [newCallEntry, ...currentHistory],
-            confirmationNote: note ? `${o.confirmationNote ? o.confirmationNote + ' | ' : ''}${result}: ${note}` : o.confirmationNote,
+            confirmationNote: note ? `${o.confirmationNote ? o.confirmationNote + ' | ' : ''}${result}: ${note}` : `${o.confirmationNote ? o.confirmationNote + ' | ' : ''}${result}`,
+            ...(shouldCancel ? {
+              status: 'CANCELLED' as OrderStatus,
+              statusAr: isWrongData ? 'بيانات خاطئة (ملغاة)' : 'ألغى الزبون الطلب (ملغاة)',
+              statusFr: isWrongData ? 'Données erronées' : 'Annulé par le client',
+              situation: 'Annulé',
+              avancement: 'Annulé',
+              cancellationReason: note || (isWrongData ? 'بيانات أو رقم هاتف غير صحيح' : 'الزبون صرح بإلغاء الطلب أثناء المكالمة'),
+              adminConfirmed: false,
+            } : {}),
           };
           return updatedOrder;
         }
@@ -1027,10 +1040,15 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             statusAr = 'قيد التوصيل والشحن';
             statusFr = 'En cours de livraison';
             situation = 'EnTransit';
-          } else if (targetStatus === 'FAILED' || targetStatus === 'CANCELLED') {
-            statusAr = 'فشل التسليم / مرتجع';
+          } else if (targetStatus === 'FAILED') {
+            statusAr = 'فشل التسليم / مرتجع (Retour)';
             statusFr = 'Échec de livraison';
             situation = 'Retour';
+          } else if (targetStatus === 'CANCELLED') {
+            const isWrongData = note?.includes('بيانات خاطئة') || note?.includes('رقم خاطئ') || note?.includes('عنوان خاطئ');
+            statusAr = isWrongData ? 'بيانات خاطئة (ملغاة)' : 'ألغى الزبون الطلب (ملغاة)';
+            statusFr = isWrongData ? 'Données erronées' : 'Annulé par le client';
+            situation = 'Annulé';
           }
 
           updatedOrder = {
@@ -1137,10 +1155,15 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
             statusAr = 'خارج للتوصيل (Sorti en livraison)';
             statusFr = 'Sorti en livraison';
             situation = 'SortiEnLivraison';
-          } else if (targetStatus === 'FAILED' || targetStatus === 'CANCELLED') {
+          } else if (targetStatus === 'FAILED') {
             statusAr = 'فشل التسليم / مرتجع (Retour)';
             statusFr = 'Retour';
             situation = 'Retour';
+          } else if (targetStatus === 'CANCELLED') {
+            const isWrongData = data.coordinationNotes?.includes('بيانات خاطئة') || data.coordinationNotes?.includes('رقم خاطئ');
+            statusAr = isWrongData ? 'بيانات خاطئة (ملغاة)' : 'ألغى الزبون الطلب (ملغاة)';
+            statusFr = isWrongData ? 'Données erronées' : 'Annulé par le client';
+            situation = 'Annulé';
           }
 
           updatedOrder = {

@@ -46,15 +46,17 @@ export function AccueilTab({
   const { orders, pendingLinkOrdersCount } = useOrders();
   const { t, language } = useLanguage();
 
-  const [unreadNotifCount, setUnreadNotifCount] = useState<number>(() => getUnreadNotificationsCount('seller'));
+  const [unreadNotifCount, setUnreadNotifCount] = useState<number>(() =>
+    getUnreadNotificationsCount('seller', user?.id)
+  );
 
   useEffect(() => {
     const handleUpdate = () => {
-      setUnreadNotifCount(getUnreadNotificationsCount('seller'));
+      setUnreadNotifCount(getUnreadNotificationsCount('seller', user?.id));
     };
     window.addEventListener('seller_notifications_updated', handleUpdate);
     return () => window.removeEventListener('seller_notifications_updated', handleUpdate);
-  }, []);
+  }, [user?.id]);
 
   const storedBalance = getStoredWalletBalance(user?.id, 0);
 

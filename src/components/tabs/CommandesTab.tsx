@@ -1581,7 +1581,7 @@ GET /Api_v1/Colis/Date_last_status/2025-01-01`}
               </button>
             </div>
 
-            <OrderAuditTimeline order={selectedTimelineOrder} />
+            <OrderAuditTimeline order={orders.find((o) => o.id === selectedTimelineOrder.id) || selectedTimelineOrder} />
 
             <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
               <button

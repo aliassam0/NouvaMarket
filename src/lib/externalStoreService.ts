@@ -3,43 +3,30 @@ import { ExternalStoreConnection, SyncedProductMapping, ProductExportOptions, Ex
 const STORES_STORAGE_KEY = 'nouva_external_stores';
 const SYNCED_PRODUCTS_STORAGE_KEY = 'nouva_synced_products';
 
-// Default initial demo connected store (can be edited/removed by user anytime)
-export const DEFAULT_DEMO_STORE: ExternalStoreConnection = {
-  id: 'store-demo-youcan',
-  resellerId: 'seller-101',
-  resellerName: 'كريم بوزيد',
-  platform: 'youcan',
-  storeName: 'متجري على يوكان (YouCan)',
-  storeUrl: 'https://karim-boutique.youcan.shop',
-  apiKey: 'yc_live_tok_8492048194',
-  currency: 'DZD',
-  status: 'connected',
-  statusMessage: 'المتجر متصل وجاهز للمزامنة الفورية',
-  lastSyncAt: new Date().toISOString(),
-  lastOrdersSyncAt: new Date().toISOString(),
-  autoSyncInventory: true,
-  autoPullOrders: true,
-  priceMarkupType: 'fixed',
-  priceMarkupValue: 600,
-  defaultOrderStatus: 'CONFIRMED',
-  syncedProductsCount: 3,
-  totalOrdersPulled: 12,
-  createdAt: '2026-03-01T10:00:00.000Z',
-};
-
-export function getLocalStoredStores(): ExternalStoreConnection[] {
+// Connected stores are strictly managed by users without dummy phantom stores
+export function getLocalStoredStores(resellerId?: string): ExternalStoreConnection[] {
   try {
     const raw = localStorage.getItem(STORES_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (Array.isArray(parsed)) {
+        // Filter out any legacy test/demo stores
+        const clean = parsed.filter(
+          (s) => s && s.id && !s.id.startsWith('store-demo-') && s.id !== 'store-demo-youcan'
+        );
+        if (clean.length !== parsed.length) {
+          saveLocalStoredStores(clean);
+        }
+        if (resellerId) {
+          return clean.filter((s) => s.resellerId === resellerId);
+        }
+        return clean;
       }
     }
   } catch (e) {
     console.error('Error reading external stores from localStorage:', e);
   }
-  return [DEFAULT_DEMO_STORE];
+  return [];
 }
 
 export function saveLocalStoredStores(stores: ExternalStoreConnection[]): void {
@@ -86,7 +73,7 @@ export async function fetchConnectedStores(resellerId?: string): Promise<Externa
   } catch (err) {
     console.warn('Could not fetch external stores from server, using local cache:', err);
   }
-  return getLocalStoredStores();
+  return getLocalStoredStores(resellerId);
 }
 
 // Save or add store connection

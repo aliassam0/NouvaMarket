@@ -251,7 +251,7 @@ function AppContent() {
   useEffect(() => {
     const handleNotifUpdate = () => {
       const targetRole = currentRole === 'admin' ? 'admin' : 'seller';
-      setUnreadNotifCount(getUnreadNotificationsCount(targetRole));
+      setUnreadNotifCount(getUnreadNotificationsCount(targetRole, targetRole === 'seller' ? user?.id : undefined));
     };
     handleNotifUpdate();
     window.addEventListener('seller_notifications_updated', handleNotifUpdate);
@@ -260,7 +260,7 @@ function AppContent() {
       window.removeEventListener('seller_notifications_updated', handleNotifUpdate);
       window.removeEventListener('admin_notifications_updated', handleNotifUpdate);
     };
-  }, [currentRole]);
+  }, [currentRole, user?.id]);
 
   useEffect(() => {
     const handleAppToast = (e: Event) => {

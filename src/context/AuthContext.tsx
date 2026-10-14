@@ -708,6 +708,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('nouvamarket_session_v2', JSON.stringify(newSeller));
     localStorage.setItem('reseller_wallet_balance_v1', '0');
     localStorage.setItem('reseller_wallet_transactions_v1', JSON.stringify([]));
+    localStorage.setItem('seller_notifications_v1', JSON.stringify([]));
+    try {
+      window.dispatchEvent(new CustomEvent('seller_notifications_updated'));
+    } catch {}
     return true;
   };
 

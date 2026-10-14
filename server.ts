@@ -647,34 +647,13 @@ let serverSuppliers: any[] = Array.from(supplierMap.values());
 saveJsonFile(SELLERS_FILE, serverSellers);
 saveJsonFile(SUPPLIERS_FILE, serverSuppliers);
 
-const SEED_EXTERNAL_STORES = [
-  {
-    id: "store-demo-youcan",
-    resellerId: "seller-101",
-    resellerName: "كريم بوزيد",
-    platform: "youcan",
-    storeName: "متجري على يوكان (YouCan)",
-    storeUrl: "https://karim-boutique.youcan.shop",
-    apiKey: "yc_live_tok_8492048194",
-    currency: "DZD",
-    status: "connected",
-    statusMessage: "المتجر متصل وجاهز للمزامنة الفورية",
-    lastSyncAt: new Date().toISOString(),
-    lastOrdersSyncAt: new Date().toISOString(),
-    autoSyncInventory: true,
-    autoPullOrders: true,
-    priceMarkupType: "fixed",
-    priceMarkupValue: 600,
-    defaultOrderStatus: "CONFIRMED",
-    syncedProductsCount: 3,
-    totalOrdersPulled: 12,
-    createdAt: "2026-03-01T10:00:00.000Z",
-  },
-];
+const SEED_EXTERNAL_STORES: any[] = [];
 
-const initialLoadedStores: any[] = loadJsonFile(EXTERNAL_STORES_FILE, []);
-let serverExternalStores: any[] = initialLoadedStores.length > 0 ? initialLoadedStores : SEED_EXTERNAL_STORES;
-if (initialLoadedStores.length === 0) saveJsonFile(EXTERNAL_STORES_FILE, serverExternalStores);
+const initialLoadedStores: any[] = loadJsonFile(EXTERNAL_STORES_FILE, []).filter(
+  (s: any) => s && s.id && !s.id.startsWith("store-demo-") && s.id !== "store-demo-youcan"
+);
+let serverExternalStores: any[] = initialLoadedStores;
+saveJsonFile(EXTERNAL_STORES_FILE, serverExternalStores);
 
 const initialLoadedSyncedProducts: any[] = loadJsonFile(SYNCED_PRODUCTS_FILE, []);
 let serverSyncedProducts: any[] = initialLoadedSyncedProducts;
@@ -1846,7 +1825,7 @@ app.get("/api/external-stores", (req, res) => {
   const resellerId = req.query.resellerId as string;
   let stores = serverExternalStores;
   if (resellerId) {
-    stores = serverExternalStores.filter((s) => !s.resellerId || s.resellerId === resellerId);
+    stores = serverExternalStores.filter((s) => s.resellerId === resellerId);
   }
   res.json({ success: true, stores, count: stores.length });
 });

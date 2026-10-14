@@ -11,6 +11,8 @@ export interface AppNotification {
   productId?: string;
   productNameAr?: string;
   recipientRole?: 'seller' | 'admin' | 'warehouse' | 'confirmer' | 'all';
+  recipientUserId?: string;
+  sellerId?: string;
 }
 
 export type SellerNotification = AppNotification;
@@ -25,7 +27,10 @@ const INITIAL_ADMIN_NOTIFICATIONS: AppNotification[] = [];
 const INITIAL_WAREHOUSE_NOTIFICATIONS: AppNotification[] = [];
 const INITIAL_CONFIRMER_NOTIFICATIONS: AppNotification[] = [];
 
-export function getStoredNotifications(role: 'seller' | 'admin' | 'warehouse' | 'confirmer' = 'seller'): AppNotification[] {
+export function getStoredNotifications(
+  role: 'seller' | 'admin' | 'warehouse' | 'confirmer' = 'seller',
+  targetUserId?: string
+): AppNotification[] {
   let key = STORAGE_KEY_SELLER;
   let initial = INITIAL_SELLER_NOTIFICATIONS;
 
@@ -48,10 +53,24 @@ export function getStoredNotifications(role: 'seller' | 'admin' | 'warehouse' | 
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      const filtered = parsed.filter(
+      // Filter out any invalid or legacy dummy notifications
+      let filtered = parsed.filter(
         (n) => n && !n.id?.startsWith('n-default-') && !n.id?.startsWith('n-admin-') && !n.id?.startsWith('n-wh-')
       );
-      if (filtered.length !== parsed.length) {
+
+      // If viewing as a seller and a targetUserId is provided, isolate notifications
+      if (role === 'seller' && targetUserId) {
+        filtered = filtered.filter((n) => {
+          // If notification is tied to a specific recipient, check match
+          if (n.recipientUserId) return n.recipientUserId === targetUserId;
+          if (n.sellerId) return n.sellerId === targetUserId;
+          // Wallet/withdrawal notifications MUST belong to the user; never bleed to other users
+          if (n.type === 'wallet') return false;
+          return true;
+        });
+      }
+
+      if (filtered.length !== parsed.length && !targetUserId) {
         saveStoredNotifications(filtered, role);
       }
       return filtered;
@@ -188,9 +207,15 @@ export function addNotification(
 }
 
 export function addSellerNotification(
-  item: Omit<AppNotification, 'id' | 'createdAt' | 'timestamp' | 'isRead' | 'recipientRole'>
+  item: Omit<AppNotification, 'id' | 'createdAt' | 'timestamp' | 'isRead' | 'recipientRole'>,
+  sellerId?: string
 ): void {
-  addNotification({ ...item, recipientRole: 'seller' });
+  addNotification({
+    ...item,
+    recipientRole: 'seller',
+    sellerId: sellerId || item.sellerId,
+    recipientUserId: sellerId || item.recipientUserId,
+  });
 }
 
 export function addAdminNotification(
@@ -227,8 +252,11 @@ export function clearAllNotifications(role: 'seller' | 'admin' | 'warehouse' | '
   saveStoredNotifications([], role);
 }
 
-export function getUnreadNotificationsCount(role: 'seller' | 'admin' | 'warehouse' | 'confirmer' = 'seller'): number {
-  const notifs = getStoredNotifications(role);
+export function getUnreadNotificationsCount(
+  role: 'seller' | 'admin' | 'warehouse' | 'confirmer' = 'seller',
+  targetUserId?: string
+): number {
+  const notifs = getStoredNotifications(role, targetUserId);
   return notifs.filter((n) => !n.isRead).length;
 }
 
