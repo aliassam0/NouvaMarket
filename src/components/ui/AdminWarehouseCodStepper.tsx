@@ -118,7 +118,7 @@ export function AdminWarehouseCodStepper({
     {
       id: 7,
       key: 'FAILED',
-      label: 'فشل التسليم / مرتجع',
+      label: isShipped ? 'فشل التسليم / مرتجع' : 'إلغاء قبل الشحن',
       active: isFailed,
       completed: isFailed,
       icon: XCircle,
@@ -152,7 +152,9 @@ export function AdminWarehouseCodStepper({
           }`}
         >
           {isFailed
-            ? '✖ فشل التسليم / مرتجع'
+            ? isShipped
+              ? '✖ فشل التسليم / مرتجع (Retour)'
+              : '✖ ملغية قبل الشحن'
             : isDelivered
             ? '✔ تم التسليم'
             : isShipped

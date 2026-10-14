@@ -3,14 +3,27 @@ import { getStoredProducts, saveStoredProducts } from '../data/mockProducts';
 
 const INBOUND_STOCK_KEY = 'nouva_inbound_stock_requests_v1';
 
-export function getStoredInboundRequests(): InboundStockRequest[] {
+export function getStoredInboundRequests(supplierId?: string, supplierEmail?: string): InboundStockRequest[] {
   try {
     const raw = localStorage.getItem(INBOUND_STOCK_KEY);
-    if (!raw) return getDefaultInboundRequests();
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : getDefaultInboundRequests();
+    if (!Array.isArray(parsed)) return [];
+    // Filter out dummy demo shipments
+    const cleanList: InboundStockRequest[] = parsed.filter(
+      (r) => r && r.id !== 'INB-883412' && r.supplierId !== 'sup-demo'
+    );
+    if (supplierId || supplierEmail) {
+      const cleanEmail = (supplierEmail || '').trim().toLowerCase();
+      return cleanList.filter((r) => {
+        const idMatches = supplierId && r.supplierId === supplierId;
+        const emailMatches = cleanEmail && r.supplierEmail?.trim().toLowerCase() === cleanEmail;
+        return Boolean(idMatches || emailMatches);
+      });
+    }
+    return cleanList;
   } catch {
-    return getDefaultInboundRequests();
+    return [];
   }
 }
 
@@ -131,39 +144,5 @@ export function receiveAndInspectInboundStock(
 }
 
 function getDefaultInboundRequests(): InboundStockRequest[] {
-  return [
-    {
-      id: 'INB-883412',
-      supplierId: 'sup-demo',
-      supplierName: 'مؤسسة الأناقة للألبسة',
-      supplierPhone: '0550123456',
-      supplierEmail: 'warehouse@nouvamarket.com',
-      trackingNumber: 'TRK-INB-992104',
-      carrierName: 'شاحنة نقل بضائع خاصة',
-      status: 'IN_TRANSIT',
-      totalUnits: 150,
-      totalWholesaleValueDzd: 375000,
-      items: [
-        {
-          productId: 'p-1',
-          productName: 'حذاء كاجوال خفيف أصلي',
-          variantSize: '42',
-          variantColor: 'أسود',
-          quantitySent: 100,
-          wholesalePrice: 2500,
-        },
-        {
-          productId: 'p-1',
-          productName: 'حذاء كاجوال خفيف أصلي',
-          variantSize: '43',
-          variantColor: 'بني',
-          quantitySent: 50,
-          wholesalePrice: 2500,
-        },
-      ],
-      notes: 'شحنة كراتين مغلفة جاهزة لفحص الاستقبال في مستودع العاصمة',
-      createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-      warehouseLocation: 'مستودع المنصة المركزي (الجزائر العاصمة) - رصيف 2',
-    },
-  ];
+  return [];
 }

@@ -25,14 +25,19 @@ export interface ProductSourcingRequest {
 
 const SOURCING_REQUESTS_KEY = 'nouva_sourcing_requests_v1';
 
-export function getStoredSourcingRequests(): ProductSourcingRequest[] {
+export function getStoredSourcingRequests(sellerId?: string): ProductSourcingRequest[] {
   try {
     const raw = localStorage.getItem(SOURCING_REQUESTS_KEY);
-    if (!raw) return getDefaultSourcingRequests();
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : getDefaultSourcingRequests();
+    if (!Array.isArray(parsed)) return [];
+    const cleanList = parsed.filter((r) => r && r.id !== 'SRC-98124' && r.sellerId !== 'sup-demo');
+    if (sellerId) {
+      return cleanList.filter((r) => r.sellerId === sellerId);
+    }
+    return cleanList;
   } catch {
-    return getDefaultSourcingRequests();
+    return [];
   }
 }
 
@@ -139,26 +144,5 @@ export function deleteSourcingRequest(id: string): void {
 }
 
 function getDefaultSourcingRequests(): ProductSourcingRequest[] {
-  return [
-    {
-      id: 'SRC-98124',
-      sellerId: 'sup-demo',
-      sellerName: 'مستودع الأناقة والتجارة',
-      sellerPhone: '0555123456',
-      sellerEmail: 'warehouse@nouvamarket.com',
-      productName: 'ساعة يد ذكية مقاومة للماء مع شاشة AMOLED',
-      productUrl: 'https://1688.com/item/demo-smart-watch',
-      targetQuantity: 300,
-      targetBudgetDzd: 450000,
-      notes: 'توفير التغليف المخصص مع شهادة الفحص قبل الشحن والتخليص بالجزائر.',
-      status: 'SOURCING',
-      createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-      quotedUnitPriceDzd: 1250,
-      quotedShippingCostDzd: 45000,
-      quotedCustomsEstimateDzd: 32000,
-      totalEstimatedCostDzd: 452000,
-      adminFeedback: 'تم التواصل مع مصنع معتمد في شنتشن، المواصفات مطابقة وسيتم شحن عينة أولية للفحص.',
-      estimatedArrivalDate: '2026-10-25',
-    },
-  ];
+  return [];
 }

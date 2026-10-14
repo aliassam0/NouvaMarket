@@ -1578,7 +1578,15 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       return baseOrders.filter((o) => o.status === 'CONFIRMED' || o.adminConfirmed);
     }
     if (filterStatus === 'FAILED') {
-      return baseOrders.filter((o) => o.status === 'FAILED' || o.status === 'CANCELLED' || o.situation === 'Retour' || o.situation === 'Annulé');
+      return baseOrders.filter(
+        (o) =>
+          (o.status === 'FAILED' || o.situation === 'Retour') &&
+          o.status !== 'CANCELLED' &&
+          o.situation !== 'Annulé'
+      );
+    }
+    if (filterStatus === 'CANCELLED') {
+      return baseOrders.filter((o) => o.status === 'CANCELLED' || o.situation === 'Annulé');
     }
     return baseOrders.filter((o) => o.status === filterStatus);
   };

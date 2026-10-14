@@ -581,7 +581,8 @@ export function CommandesTab() {
           { id: 'PROCESSING', labelAr: 'قيد التحضير', labelFr: 'En préparation' },
           { id: 'SHIPPED', labelAr: 'قيد التوصيل', labelFr: 'En transit' },
           { id: 'DELIVERED', labelAr: 'تم التسليم', labelFr: 'Livrées' },
-          { id: 'FAILED', labelAr: 'فشل التسليم', labelFr: 'Échecs' },
+          { id: 'FAILED', labelAr: 'مرتجع التوصيل (Retour)', labelFr: 'Retours' },
+          { id: 'CANCELLED', labelAr: 'ملغاة قبل الشحن', labelFr: 'Annulées' },
         ].map((tab) => {
           const badgeVal = tab.badge || 0;
           return (
@@ -616,8 +617,10 @@ export function CommandesTab() {
             let cardBorderStyle = 'border-2 border-slate-200 dark:border-slate-700/80 border-s-4 border-s-amber-500';
             if (order.status === 'DELIVERED' || order.situation === 'Livre') {
               cardBorderStyle = 'border-2 border-purple-200 dark:border-purple-900/80 border-s-4 border-s-purple-500';
-            } else if (order.status === 'FAILED' || order.status === 'CANCELLED' || order.situation === 'Retour') {
+            } else if (order.status === 'FAILED' || order.situation === 'Retour') {
               cardBorderStyle = 'border-2 border-rose-200 dark:border-rose-900/80 border-s-4 border-s-rose-500';
+            } else if (order.status === 'CANCELLED' || order.situation === 'Annulé') {
+              cardBorderStyle = 'border-2 border-slate-200 dark:border-slate-800 border-s-4 border-s-slate-400';
             } else if (order.status === 'SHIPPED' || order.situation === 'EnTransit' || order.situation === 'EnTraitement') {
               cardBorderStyle = 'border-2 border-violet-200 dark:border-violet-900/80 border-s-4 border-s-violet-500';
             } else if (order.status === 'PROCESSING' || order.adminConfirmed) {

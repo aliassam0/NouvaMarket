@@ -66,9 +66,9 @@ export const CourierAnalyticsModal: React.FC<CourierAnalyticsModalProps> = ({
         stats[w].delivered += 1;
         stats[w].codTotal += cod;
       } else if (
-        o.status === 'FAILED' ||
-        o.status === 'CANCELLED' ||
-        o.situation === 'Retour'
+        (o.status === 'FAILED' || o.situation === 'Retour') &&
+        o.status !== 'CANCELLED' &&
+        o.situation !== 'Annulé'
       ) {
         stats[w].returned += 1;
       } else if (o.status === 'SHIPPED') {
@@ -83,7 +83,10 @@ export const CourierAnalyticsModal: React.FC<CourierAnalyticsModalProps> = ({
   const totalOrders = orders.length;
   const deliveredOrders = orders.filter((o) => o.status === 'DELIVERED').length;
   const returnedOrders = orders.filter(
-    (o) => o.status === 'FAILED' || o.status === 'CANCELLED' || o.situation === 'Retour'
+    (o) =>
+      (o.status === 'FAILED' || o.situation === 'Retour') &&
+      o.status !== 'CANCELLED' &&
+      o.situation !== 'Annulé'
   ).length;
   const inTransitOrders = orders.filter((o) => o.status === 'SHIPPED').length;
 

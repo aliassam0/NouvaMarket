@@ -313,7 +313,17 @@ export function AdminDashboard({
   const adminShippedCount = useMemo(() => orders.filter((o) => o.status === 'SHIPPED').length, [orders]);
   const adminDeliveredCount = useMemo(() => orders.filter((o) => o.status === 'DELIVERED').length, [orders]);
   const adminFailedCount = useMemo(
-    () => orders.filter((o) => o.status === 'FAILED' || o.status === 'CANCELLED' || o.situation === 'Retour').length,
+    () =>
+      orders.filter(
+        (o) =>
+          (o.status === 'FAILED' || o.situation === 'Retour') &&
+          o.status !== 'CANCELLED' &&
+          o.situation !== 'Annulé'
+      ).length,
+    [orders]
+  );
+  const adminCancelledCount = useMemo(
+    () => orders.filter((o) => o.status === 'CANCELLED' || o.situation === 'Annulé').length,
     [orders]
   );
 
@@ -373,8 +383,16 @@ export function AdminDashboard({
         );
       }
       if (adminOrderFilterStatus === 'SHIPPED') return o.status === 'SHIPPED';
-      if (adminOrderFilterStatus === 'DELIVERED') return o.status === 'DELIVERED';
-      if (adminOrderFilterStatus === 'FAILED') return o.status === 'FAILED' || o.status === 'CANCELLED' || o.situation === 'Retour';
+      if (adminOrderFilterStatus === 'FAILED') {
+        return (
+          (o.status === 'FAILED' || o.situation === 'Retour') &&
+          o.status !== 'CANCELLED' &&
+          o.situation !== 'Annulé'
+        );
+      }
+      if (adminOrderFilterStatus === 'CANCELLED') {
+        return o.status === 'CANCELLED' || o.situation === 'Annulé';
+      }
       return true;
     });
   }, [orders, adminOrderSearchTerm, adminOrderFilterStatus, adminOrderWilayaFilter]);
@@ -2136,7 +2154,8 @@ export function AdminDashboard({
               { id: 'PROCESSING', labelAr: 'قيد التحضير', count: adminProcessingCount, color: 'bg-purple-100 text-purple-800' },
               { id: 'SHIPPED', labelAr: 'قيد التوصيل', count: adminShippedCount, color: 'bg-indigo-100 text-indigo-800' },
               { id: 'DELIVERED', labelAr: 'تم التسليم', count: adminDeliveredCount, color: 'bg-emerald-100 text-emerald-800' },
-              { id: 'FAILED', labelAr: 'فشل / مرتجع', count: adminFailedCount, color: 'bg-rose-100 text-rose-800' },
+              { id: 'FAILED', labelAr: 'مرتجع التوصيل (Retour)', count: adminFailedCount, color: 'bg-rose-100 text-rose-800' },
+              { id: 'CANCELLED', labelAr: 'ملغاة قبل الشحن', count: adminCancelledCount, color: 'bg-slate-100 text-slate-800' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -7368,7 +7387,9 @@ export function AdminDashboard({
             (o) =>
               !o.returnedToWarehouse &&
               o.situation !== 'RetourReçu' &&
-              (o.status === 'FAILED' || o.status === 'CANCELLED' || o.situation === 'Retour')
+              (o.status === 'FAILED' || o.situation === 'Retour') &&
+              o.status !== 'CANCELLED' &&
+              o.situation !== 'Annulé'
           )}
           products={products}
           onClose={() => setIsAdminReturnsQCModalOpen(false)}

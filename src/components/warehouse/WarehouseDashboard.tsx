@@ -286,8 +286,19 @@ export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: Warehou
   const [isUrlImportModalOpen, setIsUrlImportModalOpen] = useState(false);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
 
+  // Supplier Profile & Financials State
+  const { user } = useAuth();
+  const isDemoSupplier =
+    (user?.email && user.email.toLowerCase() === 'warehouse@nouvamarket.com') ||
+    user?.id === 'u-wh-1' ||
+    user?.id === 'sup-demo';
+
   // Inbound Stock Shipments to Platform Warehouse State
-  const [inboundRequests, setInboundRequests] = useState<InboundStockRequest[]>(() => getStoredInboundRequests());
+  const [inboundRequests, setInboundRequests] = useState<InboundStockRequest[]>(() =>
+    isPlatformWarehouse
+      ? getStoredInboundRequests()
+      : getStoredInboundRequests(user?.id, user?.email)
+  );
   const [isInboundModalOpen, setIsInboundModalOpen] = useState(false);
   const [inboundSelectedProductId, setInboundSelectedProductId] = useState<string>('');
   const [inboundQuantitySent, setInboundQuantitySent] = useState<number>(50);
@@ -295,6 +306,18 @@ export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: Warehou
   const [inboundCarrier, setInboundCarrier] = useState<string>('شاحنة خاصة بالبائع');
   const [inspectingInboundRequest, setInspectingInboundRequest] = useState<InboundStockRequest | null>(null);
   const [inboundTabFilter, setInboundTabFilter] = useState<'pending' | 'received' | 'all'>('pending');
+
+  useEffect(() => {
+    const handleInboundSync = () => {
+      setInboundRequests(
+        isPlatformWarehouse
+          ? getStoredInboundRequests()
+          : getStoredInboundRequests(user?.id, user?.email)
+      );
+    };
+    window.addEventListener('nouva_inbound_stock_updated', handleInboundSync);
+    return () => window.removeEventListener('nouva_inbound_stock_updated', handleInboundSync);
+  }, [isPlatformWarehouse, user?.id, user?.email]);
 
   // Phase 2: Picking Sheet & Courier Handover Manifest State
   const [isPickingModalOpen, setIsPickingModalOpen] = useState(false);
@@ -306,13 +329,6 @@ export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: Warehou
   const [isReturnsQCModalOpen, setIsReturnsQCModalOpen] = useState(false);
   const [isCourierAnalyticsModalOpen, setIsCourierAnalyticsModalOpen] = useState(false);
   const [selectedTimelineOrder, setSelectedTimelineOrder] = useState<Order | null>(null);
-
-  // Supplier Profile & Financials State
-  const { user } = useAuth();
-  const isDemoSupplier =
-    (user?.email && user.email.toLowerCase() === 'warehouse@nouvamarket.com') ||
-    user?.id === 'u-wh-1' ||
-    user?.id === 'sup-demo';
 
   const [supplierProfile, setSupplierProfile] = useState<SupplierProfile>(() => {
     const suppliers = getStoredSuppliers();
@@ -1089,9 +1105,13 @@ export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: Warehou
     (o) =>
       !o.returnedToWarehouse &&
       o.situation !== 'RetourReçu' &&
-      (o.status === 'FAILED' ||
-        o.status === 'CANCELLED' ||
-        o.situation === 'Retour')
+      (o.status === 'FAILED' || o.situation === 'Retour') &&
+      o.status !== 'CANCELLED' &&
+      o.situation !== 'Annulé'
+  );
+
+  const cancelledOrders = dateFilteredOrders.filter(
+    (o) => o.status === 'CANCELLED' || o.situation === 'Annulé'
   );
 
   // DIRECT SELLER ORDERS: Orders sold directly by this seller themselves or through their share links / external store
@@ -1185,7 +1205,17 @@ export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: Warehou
   const myDirectFailedOrders = useMemo(
     () =>
       supplierMyDirectOrders.filter(
-        (o) => o.status === 'FAILED' || o.status === 'CANCELLED' || o.situation === 'Retour'
+        (o) =>
+          (o.status === 'FAILED' || o.situation === 'Retour') &&
+          o.status !== 'CANCELLED' &&
+          o.situation !== 'Annulé'
+      ),
+    [supplierMyDirectOrders]
+  );
+  const myDirectCancelledOrders = useMemo(
+    () =>
+      supplierMyDirectOrders.filter(
+        (o) => o.status === 'CANCELLED' || o.situation === 'Annulé'
       ),
     [supplierMyDirectOrders]
   );
@@ -1236,9 +1266,16 @@ export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: Warehou
       if (myOrdersFilter === 'DELIVERED' && order.status !== 'DELIVERED' && order.situation !== 'Livré') return false;
       if (
         myOrdersFilter === 'FAILED' &&
-        order.status !== 'FAILED' &&
+        ((order.status !== 'FAILED' && order.situation !== 'Retour') ||
+          order.status === 'CANCELLED' ||
+          order.situation === 'Annulé')
+      ) {
+        return false;
+      }
+      if (
+        myOrdersFilter === 'CANCELLED' &&
         order.status !== 'CANCELLED' &&
-        order.situation !== 'Retour'
+        order.situation !== 'Annulé'
       ) {
         return false;
       }
@@ -1358,7 +1395,17 @@ export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: Warehou
   const supplierFailedCount = useMemo(
     () =>
       supplierOrders.filter(
-        (o) => o.status === 'FAILED' || o.status === 'CANCELLED' || o.situation === 'Retour'
+        (o) =>
+          (o.status === 'FAILED' || o.situation === 'Retour') &&
+          o.status !== 'CANCELLED' &&
+          o.situation !== 'Annulé'
+      ).length,
+    [supplierOrders]
+  );
+  const supplierCancelledCount = useMemo(
+    () =>
+      supplierOrders.filter(
+        (o) => o.status === 'CANCELLED' || o.situation === 'Annulé'
       ).length,
     [supplierOrders]
   );
@@ -1409,7 +1456,14 @@ export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: Warehou
       if (supplierPipelineFilter === 'SHIPPED') return o.status === 'SHIPPED';
       if (supplierPipelineFilter === 'DELIVERED') return o.status === 'DELIVERED';
       if (supplierPipelineFilter === 'FAILED') {
-        return o.status === 'FAILED' || o.status === 'CANCELLED' || o.situation === 'Retour';
+        return (
+          (o.status === 'FAILED' || o.situation === 'Retour') &&
+          o.status !== 'CANCELLED' &&
+          o.situation !== 'Annulé'
+        );
+      }
+      if (supplierPipelineFilter === 'CANCELLED') {
+        return o.status === 'CANCELLED' || o.situation === 'Annulé';
       }
       return true;
     });
@@ -2012,7 +2066,8 @@ export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: Warehou
               { id: 'PROCESSING', labelAr: 'قيد التحضير', count: myDirectProcessingOrders.length },
               { id: 'SHIPPED', labelAr: 'قيد التوصيل', count: myDirectShippedOrders.length },
               { id: 'DELIVERED', labelAr: 'تم التسليم', count: myDirectDeliveredOrders.length },
-              { id: 'FAILED', labelAr: 'فشل / مرتجع', count: myDirectFailedOrders.length },
+              { id: 'FAILED', labelAr: 'مرتجع التوصيل (Retour)', count: myDirectFailedOrders.length },
+              { id: 'CANCELLED', labelAr: 'ملغاة قبل الشحن', count: myDirectCancelledOrders.length },
             ].map((tab) => {
               const isActive = myOrdersFilter === tab.id;
               return (
@@ -2484,7 +2539,8 @@ export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: Warehou
               { id: 'PROCESSING', labelAr: '📦 قيد التحضير', count: supplierProcessingCount, color: 'bg-purple-100 text-purple-800' },
               { id: 'SHIPPED', labelAr: '🚚 قيد التوصيل', count: supplierShippedCount, color: 'bg-indigo-100 text-indigo-800' },
               { id: 'DELIVERED', labelAr: '🎉 تم التسليم', count: supplierDeliveredCount, color: 'bg-emerald-100 text-emerald-800' },
-              { id: 'FAILED', labelAr: '❌ فشل التسليم', count: supplierFailedCount, color: 'bg-rose-100 text-rose-800' },
+              { id: 'FAILED', labelAr: '❌ مرتجع التوصيل (Retour)', count: supplierFailedCount, color: 'bg-rose-100 text-rose-800' },
+              { id: 'CANCELLED', labelAr: '⚠️ ملغاة قبل الشحن', count: supplierCancelledCount, color: 'bg-slate-100 text-slate-800' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -5220,7 +5276,10 @@ export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: Warehou
 
           const deliveredCount = pOrders.filter((o) => o.status === 'DELIVERED').length;
           const returnedCount = pOrders.filter(
-            (o) => o.status === 'CANCELLED' || o.status === 'FAILED' || o.situation === 'RetourReçu'
+            (o) =>
+              (o.status === 'FAILED' || o.situation === 'Retour' || o.situation === 'RetourReçu') &&
+              o.status !== 'CANCELLED' &&
+              o.situation !== 'Annulé'
           ).length;
 
           const pDeliveryRate = ordersCount > 0 ? Math.round((deliveredCount / ordersCount) * 100) : 90;

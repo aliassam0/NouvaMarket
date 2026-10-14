@@ -709,8 +709,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('reseller_wallet_balance_v1', '0');
     localStorage.setItem('reseller_wallet_transactions_v1', JSON.stringify([]));
     localStorage.setItem('seller_notifications_v1', JSON.stringify([]));
+    localStorage.setItem('nouva_external_stores_v1', JSON.stringify([]));
     try {
       window.dispatchEvent(new CustomEvent('seller_notifications_updated'));
+      window.dispatchEvent(new CustomEvent('nouva_inbound_stock_updated'));
+      window.dispatchEvent(new CustomEvent('nouva_sourcing_requests_updated'));
     } catch {}
     return true;
   };
