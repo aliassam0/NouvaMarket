@@ -451,118 +451,125 @@ export const CustomerOrderReviewModal: React.FC<CustomerOrderReviewModalProps> =
 
           {/* ============================================================ */}
           {/* 3. THIRD SECTION: ONE-CLICK CONFIRMATION & CALL OUTCOME LOG */}
+          {/* Only shown if user has intervention permissions (Admin/Confirmer) */}
           {/* ============================================================ */}
-          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border-2 border-emerald-500/40 shadow-md space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-xl bg-emerald-600 text-white shadow-xs">
-                  <PhoneCall className="w-4 h-4" />
-                </span>
-                <div>
-                  <h4 className="text-xs font-black text-slate-900 dark:text-white">
-                    تسجيل نتيجة الاتصال وتأكيد الطلبية 📞
-                  </h4>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    اختر نتيجة المكالمة وانقر على الحفظ مباشرة
-                  </p>
+          {Boolean(onConfirmOrder || onLogCallResult) && (
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border-2 border-emerald-500/40 shadow-md space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-xl bg-emerald-600 text-white shadow-xs">
+                    <PhoneCall className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900 dark:text-white">
+                      تسجيل نتيجة الاتصال وتأكيد الطلبية 📞
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      اختر نتيجة المكالمة وانقر على الحفظ مباشرة
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Big Primary One-Click Confirmation Button */}
-            {!order.adminConfirmed && (
-              <button
-                type="button"
-                onClick={handleQuickConfirm}
-                disabled={isSubmitting}
-                className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition transform active:scale-[0.99] cursor-pointer disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="w-5 h-5" />
-                )}
-                <span>✅ تم الرد وتأكيد الطلبية ونقلها للمستودع فوراً</span>
-              </button>
-            )}
+              {/* Big Primary One-Click Confirmation Button */}
+              {!order.adminConfirmed && onConfirmOrder && (
+                <button
+                  type="button"
+                  onClick={handleQuickConfirm}
+                  disabled={isSubmitting}
+                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition transform active:scale-[0.99] cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-5 h-5" />
+                  )}
+                  <span>✅ تم الرد وتأكيد الطلبية ونقلها للمستودع فوراً</span>
+                </button>
+              )}
 
-            {/* Other Call Outcomes (Clean Grid Selector) */}
-            <div className="space-y-1.5 pt-1">
-              <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block">
-                أو اختر نتيجة أخرى للاتصال:
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                {CALL_OUTCOMES.filter((o) => o.id !== 'answered_confirmed').map((outcome) => {
-                  const isSelected = selectedOutcome === outcome.id;
-                  return (
+              {/* Other Call Outcomes (Clean Grid Selector) */}
+              {onLogCallResult && (
+                <>
+                  <div className="space-y-1.5 pt-1">
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block">
+                      أو اختر نتيجة أخرى للاتصال:
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      {CALL_OUTCOMES.filter((o) => o.id !== 'answered_confirmed').map((outcome) => {
+                        const isSelected = selectedOutcome === outcome.id;
+                        return (
+                          <button
+                            key={outcome.id}
+                            type="button"
+                            onClick={() => setSelectedOutcome(outcome.id)}
+                            className={`p-2 rounded-xl border text-xs font-bold text-center transition cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                              isSelected
+                                ? 'bg-purple-600 text-white border-purple-500 shadow-sm ring-2 ring-purple-500/40'
+                                : 'bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                            }`}
+                            title={outcome.description}
+                          >
+                            <span>{outcome.shortLabel}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Optional Call Note */}
+                  <div className="space-y-1 pt-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <label className="font-bold text-slate-500 dark:text-slate-400">
+                        ملاحظات المكالمة (اختياري):
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setCallNote('أكد الزبون الاستلام بعد العصر')}
+                          className="text-[10px] text-purple-600 hover:underline"
+                        >
+                          + بعد العصر
+                        </button>
+                        <span className="text-slate-300">•</span>
+                        <button
+                          type="button"
+                          onClick={() => setCallNote('الزبون طلب إرسال الموقع عبر واتساب')}
+                          className="text-[10px] text-purple-600 hover:underline"
+                        >
+                          + موقع واتساب
+                        </button>
+                      </div>
+                    </div>
+                    <textarea
+                      value={callNote}
+                      onChange={(e) => setCallNote(e.target.value)}
+                      placeholder="اكتب ملاحظة للمكالمة، مثل: وقت التوصيل المفضل أو تأكيد بالواتساب..."
+                      rows={2}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:border-purple-500 resize-none"
+                    />
+                  </div>
+
+                  {/* Submit Non-Confirmed Outcome Button if Selected */}
+                  {selectedOutcome !== 'answered_confirmed' && (
                     <button
-                      key={outcome.id}
                       type="button"
-                      onClick={() => setSelectedOutcome(outcome.id)}
-                      className={`p-2 rounded-xl border text-xs font-bold text-center transition cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
-                        isSelected
-                          ? 'bg-purple-600 text-white border-purple-500 shadow-sm ring-2 ring-purple-500/40'
-                          : 'bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                      }`}
-                      title={outcome.description}
+                      onClick={handleSubmitCallOutcome}
+                      disabled={isSubmitting}
+                      className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer disabled:opacity-50"
                     >
-                      <span>{outcome.shortLabel}</span>
+                      {isSubmitting ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4" />
+                      )}
+                      <span>حفظ وتسجيل نتيجة: {CALL_OUTCOMES.find((o) => o.id === selectedOutcome)?.shortLabel}</span>
                     </button>
-                  );
-                })}
-              </div>
+                  )}
+                </>
+              )}
             </div>
-
-            {/* Optional Call Note */}
-            <div className="space-y-1 pt-1">
-              <div className="flex items-center justify-between text-[11px]">
-                <label className="font-bold text-slate-500 dark:text-slate-400">
-                  ملاحظات المكالمة (اختياري):
-                </label>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setCallNote('أكد الزبون الاستلام بعد العصر')}
-                    className="text-[10px] text-purple-600 hover:underline"
-                  >
-                    + بعد العصر
-                  </button>
-                  <span className="text-slate-300">•</span>
-                  <button
-                    type="button"
-                    onClick={() => setCallNote('الزبون طلب إرسال الموقع عبر واتساب')}
-                    className="text-[10px] text-purple-600 hover:underline"
-                  >
-                    + موقع واتساب
-                  </button>
-                </div>
-              </div>
-              <textarea
-                value={callNote}
-                onChange={(e) => setCallNote(e.target.value)}
-                placeholder="اكتب ملاحظة للمكالمة، مثل: وقت التوصيل المفضل أو تأكيد بالواتساب..."
-                rows={2}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:border-purple-500 resize-none"
-              />
-            </div>
-
-            {/* Submit Non-Confirmed Outcome Button if Selected */}
-            {selectedOutcome !== 'answered_confirmed' && (
-              <button
-                type="button"
-                onClick={handleSubmitCallOutcome}
-                disabled={isSubmitting}
-                className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Check className="w-4 h-4" />
-                )}
-                <span>حفظ وتسجيل نتيجة: {CALL_OUTCOMES.find((o) => o.id === selectedOutcome)?.shortLabel}</span>
-              </button>
-            )}
-          </div>
+          )}
         </div>
 
         {/* MODAL FOOTER */}

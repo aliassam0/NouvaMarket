@@ -88,19 +88,15 @@ export function OrderAuditTimeline({ order, compact = false }: OrderAuditTimelin
   const isDelivered = order.status === 'DELIVERED';
   const isCancelled = order.status === 'CANCELLED' || order.status === 'FAILED';
 
-  // Permission check for intervention
+  // Permission check for intervention: STRICTLY restricted to Admin and Confirmer.
+  // Completely hidden for Marketers (المسوق) and Sellers (البائع) so they only see real-time synchronized status.
   const canIntervene = Boolean(
-    user?.role === 'admin' ||
-    user?.role === 'confirmer' ||
-    (user?.role === 'reseller' && (order.resellerId === user.id || !order.resellerId || order.resellerEmail === user.email)) ||
-    (user?.role === 'warehouse' && (order.supplierId === user.id || order.items?.some((it) => it.supplierId === user.id || !it.supplierId)))
+    user?.role === 'admin' || user?.role === 'confirmer'
   );
 
   const getActorLabel = () => {
     if (user?.role === 'admin') return 'مدير النظام (Admin)';
-    if (user?.role === 'reseller') return `المسوق (${user?.fullName || user?.storeName || 'صاحب الطلبية'})`;
-    if (user?.role === 'warehouse') return `البائع (${user?.fullName || user?.storeName || 'صاحب المنتج'})`;
-    return user?.fullName || 'مدير النظام (Admin)';
+    return user?.fullName || 'فريق التأكيد المركزي';
   };
 
   const handleInstantConfirm = async () => {
@@ -406,7 +402,7 @@ export function OrderAuditTimeline({ order, compact = false }: OrderAuditTimelin
 
                   {/* ======================================================== */}
                   {/* DIRECT CALL OUTCOME & CONFIRMATION INTERVENTION PANEL    */}
-                  {/* For Admin, Reseller (if owner), and Supplier (if owner) */}
+                  {/* Strictly for Admin and Confirmer - Completely hidden from Marketers and Sellers */}
                   {/* ======================================================== */}
                   {st.id === 'confirmation' && !isConfirmed && canIntervene && (
                     <div className="mt-3 p-3.5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-purple-300 dark:border-purple-800 space-y-3 shadow-xs">
@@ -416,10 +412,6 @@ export function OrderAuditTimeline({ order, compact = false }: OrderAuditTimelin
                           <span>
                             {user?.role === 'admin'
                               ? '⚡ تدخل الإدارة للتأكيد الهاتفي الفوري أو تسجيل محاولة الاتصال:'
-                              : user?.role === 'reseller'
-                              ? '⚡ بصفتك صاحب الطلبية: يمكنك التدخل لتأكيد الطلب مباشرة أو تسجيل نتيجة الاتصال:'
-                              : user?.role === 'warehouse'
-                              ? '⚡ بصفتك صاحب السلعة: يمكنك التدخل لتأكيد الطلب مباشرة أو تسجيل نتيجة الاتصال:'
                               : '⚡ تسجيل نتيجة الاتصال والتأكيد الهاتفي:'}
                           </span>
                         </div>
