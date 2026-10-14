@@ -191,12 +191,15 @@ export function getStoredDirectConversations(): Record<string, DirectChatConvers
 
     const raw = localStorage.getItem(STORAGE_KEY_DIRECT_CONVERSATIONS);
     if (!raw) {
-      const initial = getSampleInitialConversations();
-      localStorage.setItem(STORAGE_KEY_DIRECT_CONVERSATIONS, JSON.stringify(initial));
-      return initial;
+      localStorage.setItem(STORAGE_KEY_DIRECT_CONVERSATIONS, JSON.stringify({}));
+      return {};
     }
     const parsed = JSON.parse(raw);
     if (typeof parsed === 'object' && parsed !== null) {
+      // Strip legacy dummy test conversations
+      delete parsed['conv_sel_101'];
+      delete parsed['conv_sup_1'];
+      delete (parsed as any)['0'];
       return parsed;
     }
     return {};
@@ -684,75 +687,7 @@ export function getTotalUnreadForAgent(agentId?: string): number {
  * Initial sample seed conversations so support dashboard has realistic data immediately
  */
 function getSampleInitialConversations(): Record<string, DirectChatConversation> {
-  const now = Date.now();
-  return {
-    conv_sel_101: {
-      id: 'conv_sel_101',
-      partyId: 'sel-101',
-      partyType: 'RESELLER',
-      partyName: 'أحمد بن علي',
-      partyStoreName: 'متجر الأناقة ديزاد',
-      partyPhone: '0555123456',
-      partyWilaya: 'الجزائر العاصمة',
-      agentId: 'sys-usr-support-1',
-      agentName: 'سارة مراد',
-      agentPhone: '0555000111',
-      lastMessage: 'تمام أختي سارة، شكراً جزيلاً تم تحويل أرباح الـ BaridiMob بنجاح!',
-      lastMessageAt: new Date(now - 1000 * 60 * 12).toISOString(),
-      unreadByAgentCount: 1,
-      unreadByPartyCount: 0,
-      messages: [
-        {
-          id: 'msg_init_1',
-          conversationId: 'conv_sel_101',
-          senderId: 'sys-usr-support-1',
-          senderName: 'سارة مراد',
-          senderRole: 'SUPPORT',
-          text: 'مرحباً بك أخي أحمد! معك سارة مراد من الدعم الفني. تمت مراجعة طلب السحب الخاص بك وجارٍ إرسال الحوالة.',
-          timestamp: new Date(now - 1000 * 60 * 45).toISOString(),
-          readByRecipient: true,
-        },
-        {
-          id: 'msg_init_2',
-          conversationId: 'conv_sel_101',
-          senderId: 'sel-101',
-          senderName: 'أحمد بن علي',
-          senderRole: 'RESELLER',
-          text: 'تمام أختي سارة، شكراً جزيلاً تم تحويل أرباح الـ BaridiMob بنجاح!',
-          timestamp: new Date(now - 1000 * 60 * 12).toISOString(),
-          readByRecipient: false,
-        },
-      ],
-    },
-    conv_sup_1: {
-      id: 'conv_sup_1',
-      partyId: 'sup-1',
-      partyType: 'SUPPLIER',
-      partyName: 'كمال بلقاسم',
-      partyStoreName: 'مؤسسة النور للاستيراد والتصنيع',
-      partyPhone: '0661223344',
-      partyWilaya: 'البليدة',
-      agentId: 'sys-usr-support-1',
-      agentName: 'سارة مراد',
-      agentPhone: '0555000111',
-      lastMessage: 'السلام عليكم، أرسلنا اليوم شحنة 200 قطعة من الحقائب الجلدية إلى مستودع الوسط 1.',
-      lastMessageAt: new Date(now - 1000 * 60 * 5).toISOString(),
-      unreadByAgentCount: 1,
-      unreadByPartyCount: 0,
-      messages: [
-        {
-          id: 'msg_init_3',
-          conversationId: 'conv_sup_1',
-          senderId: 'sup-1',
-          senderName: 'كمال بلقاسم',
-          senderRole: 'SUPPLIER',
-          text: 'السلام عليكم، أرسلنا اليوم شحنة 200 قطعة من الحقائب الجلدية إلى مستودع الوسط 1.',
-          timestamp: new Date(now - 1000 * 60 * 5).toISOString(),
-          readByRecipient: false,
-        },
-      ],
-    },
-  };
+  return {};
 }
 
 /**

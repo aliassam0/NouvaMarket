@@ -112,136 +112,7 @@ const STORAGE_KEY_ASSIGNMENTS = 'nouva_reseller_support_assignments_v1';
 const STORAGE_KEY_SUPPLIER_ASSIGNMENTS = 'nouva_supplier_support_assignments_v1';
 const STORAGE_KEY_AUTO_DISTRIBUTION_CONFIG = 'nouva_auto_distribution_config_v1';
 
-export const INITIAL_SUPPORT_TICKETS: SupportTicket[] = [
-  {
-    id: 'TCK-9401',
-    resellerId: 'sel-101',
-    resellerName: 'أحمد بن علي',
-    resellerPhone: '0555123456',
-    resellerStoreName: 'متجر الأناقة ديزاد',
-    assignedAgentId: 'sys-usr-support-1',
-    assignedAgentName: 'سارة مراد (الدعم الفني للمسوقين)',
-    category: 'ORDERS',
-    categoryLabelAr: 'متابعة وتعديل طلبيات',
-    subject: 'الزبون يطلب تغيير ولاية التوصيل من وهران إلى مستغانم',
-    status: 'IN_PROGRESS',
-    priority: 'HIGH',
-    relatedOrderId: 'ORD-8941',
-    lastMessage: 'تم التواصل مع مندوب الشحن وتحديث وجهة الطرد رقم #ORD-8941 بنجاح.',
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-    createdAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-    unreadBySupport: false,
-    messages: [
-      {
-        id: 'msg-1',
-        sender: 'RESELLER',
-        senderName: 'أحمد بن علي',
-        text: 'السلام عليكم، الزبون في الطلب #ORD-8941 اتصل بي وأخبرني أنه انتقل إلى ولاية مستغانم (دائرة سيدي علي) ويريد استلام الطرد هناك بدلاً من وهران. هل يمكن تعديلها قبل خروج السائق؟',
-        timestamp: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-      },
-      {
-        id: 'msg-2',
-        sender: 'SUPPORT',
-        senderName: 'سارة مراد',
-        text: 'وعليكم السلام ورحمة الله أخي أحمد، بالتأكيد! قمنا الآن بالتنسيق مع مركز فرز شركة التوصيل وتعديل بوليصة الشحن نحو مستغانم - سيدي علي، ورقم هاتف الزبون مؤكد.',
-        timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-      },
-    ],
-  },
-  {
-    id: 'TCK-9402',
-    resellerId: 'sel-102',
-    resellerName: 'ياسين بلعباس',
-    resellerPhone: '0661987654',
-    resellerStoreName: 'ProTech Algérie',
-    assignedAgentId: 'sys-usr-support-1',
-    assignedAgentName: 'سارة مراد (الدعم الفني للمسوقين)',
-    category: 'STORE_SYNC',
-    categoryLabelAr: 'ربط المتاجر (Shopify / YouCan)',
-    subject: 'مساعدة في استيراد المنتجات والربط التلقائي للمخزون بمتجر YouCan',
-    status: 'WAITING_RESELLER',
-    priority: 'MEDIUM',
-    lastMessage: 'يرجى تزويدنا بـ API Token الخاص بمتجرك في YouCan لضبط المزامنة الفورية.',
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 95).toISOString(),
-    createdAt: new Date(Date.now() - 1000 * 60 * 300).toISOString(),
-    unreadBySupport: false,
-    messages: [
-      {
-        id: 'msg-3',
-        sender: 'RESELLER',
-        senderName: 'ياسين بلعباس',
-        text: 'أريد ربط متجري في يوكان مع Nouva Market لمزامنة كميات المخزون وسحب الطلبيات أوتوماتيكياً.',
-        timestamp: new Date(Date.now() - 1000 * 60 * 300).toISOString(),
-      },
-      {
-        id: 'msg-4',
-        sender: 'SUPPORT',
-        senderName: 'سارة مراد',
-        text: 'أهلاً بك ياسين! تم إعداد وتفعيل قناة الربط الخاصة بمتجرك. يرجى تزويدنا بـ API Token الخاص بمتجرك في YouCan أو نسخه في تبويب "ربط المتاجر" لتبدأ المزامنة الفورية.',
-        timestamp: new Date(Date.now() - 1000 * 60 * 95).toISOString(),
-      },
-    ],
-  },
-  {
-    id: 'TCK-9403',
-    resellerId: 'sel-103',
-    resellerName: 'فاطمة الزهراء عيساني',
-    resellerPhone: '0770554433',
-    resellerStoreName: 'بيوتي كوين ستور',
-    assignedAgentId: 'sys-usr-support-1',
-    assignedAgentName: 'سارة مراد (الدعم الفني للمسوقين)',
-    category: 'WITHDRAWAL',
-    categoryLabelAr: 'سحب الأرباح والمالية',
-    subject: 'استفسار حول مدة وصول حوالة BaridiMob بعد قبول طلب السحب',
-    status: 'RESOLVED',
-    priority: 'LOW',
-    lastMessage: 'تم تحويل مستحقاتك بمبلغ 35,000 دج وإرفاق وصل التحويل بنجاح.',
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-    createdAt: new Date(Date.now() - 1000 * 60 * 600).toISOString(),
-    unreadBySupport: false,
-    messages: [
-      {
-        id: 'msg-5',
-        sender: 'RESELLER',
-        senderName: 'فاطمة الزهراء عيساني',
-        text: 'مرحباً، قمت بطلب سحب أرباحي بقيمة 35,000 دج عبر بريدي موب أمس، كم تستغرق المعالجة عادة؟',
-        timestamp: new Date(Date.now() - 1000 * 60 * 600).toISOString(),
-      },
-      {
-        id: 'msg-6',
-        sender: 'SUPPORT',
-        senderName: 'سارة مراد',
-        text: 'مرحباً أختي فاطمة. تم فحص الطلب والموافقة عليه وتحويل المبلغ كاملاً إلى حساب BaridiMob الخاص بك مع إشعار رسمي ورمز العملية.',
-        timestamp: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-      },
-    ],
-  },
-  {
-    id: 'TCK-9404',
-    resellerId: 'sel-104',
-    resellerName: 'خالد دراجي',
-    resellerPhone: '0558112233',
-    resellerStoreName: 'السوق الجزائري الذكي',
-    category: 'PIXEL_TRACKING',
-    categoryLabelAr: 'تتبع وبيكسل الحملات',
-    subject: 'تثبيت بيكسل TikTok وتتبع صفحة الشكر للطلبيات المباشرة',
-    status: 'NEW',
-    priority: 'HIGH',
-    lastMessage: 'طلبية جديدة من إعلانات تيك توك ولم تسجل في Events Manager',
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-    createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-    unreadBySupport: true,
-    messages: [
-      {
-        id: 'msg-7',
-        sender: 'RESELLER',
-        senderName: 'خالد دراجي',
-        text: 'السلام عليكم فريق الدعم، أطلقت حملة على TikTok ووضعت البيكسل في رابط التخصيص، هل يمكنكم التأكد من إطلاق حدث Purchase بنجاح عند تسجيل الطلب؟',
-        timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-      },
-    ],
-  },
-];
+export const INITIAL_SUPPORT_TICKETS: SupportTicket[] = [];
 
 export const CANNED_QUICK_REPLIES: QuickCannedReply[] = [
   {
@@ -288,14 +159,21 @@ export function getStoredSupportTickets(): SupportTicket[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_TICKETS);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY_TICKETS, JSON.stringify(INITIAL_SUPPORT_TICKETS));
-      return INITIAL_SUPPORT_TICKETS;
+      localStorage.setItem(STORAGE_KEY_TICKETS, JSON.stringify([]));
+      return [];
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    return INITIAL_SUPPORT_TICKETS;
+    if (Array.isArray(parsed)) {
+      // Strip any old legacy dummy tickets (e.g. TCK-940*)
+      const clean = parsed.filter((t) => t && t.id && !t.id.startsWith('TCK-940'));
+      if (clean.length !== parsed.length) {
+        localStorage.setItem(STORAGE_KEY_TICKETS, JSON.stringify(clean));
+      }
+      return clean;
+    }
+    return [];
   } catch {
-    return INITIAL_SUPPORT_TICKETS;
+    return [];
   }
 }
 
@@ -318,43 +196,17 @@ export function getStoredSupportAssignments(): Record<string, SupportAssignment>
   try {
     const raw = localStorage.getItem(STORAGE_KEY_ASSIGNMENTS);
     if (!raw) {
-      // Default sample assignments
-      const defaultAssignments: Record<string, SupportAssignment> = {
-        'sel-101': {
-          resellerId: 'sel-101',
-          resellerName: 'أحمد بن علي',
-          resellerPhone: '0555123456',
-          resellerStoreName: 'متجر الأناقة ديزاد',
-          agentId: 'sys-usr-support-1',
-          agentName: 'سارة مراد',
-          assignedAt: '2025-02-01',
-          notes: 'مسوق متميز - يركز على الملابس والأحذية الرياضية',
-        },
-        'sel-102': {
-          resellerId: 'sel-102',
-          resellerName: 'ياسين بلعباس',
-          resellerPhone: '0661987654',
-          resellerStoreName: 'ProTech Algérie',
-          agentId: 'sys-usr-support-1',
-          agentName: 'سارة مراد',
-          assignedAt: '2025-02-15',
-          notes: 'متجر إلكتروني نشط في مستلزمات الهواتف والأجهزة الذكية',
-        },
-        'sel-103': {
-          resellerId: 'sel-103',
-          resellerName: 'فاطمة الزهراء عيساني',
-          resellerPhone: '0770554433',
-          resellerStoreName: 'بيوتي كوين ستور',
-          agentId: 'sys-usr-support-1',
-          agentName: 'سارة مراد',
-          assignedAt: '2025-03-01',
-          notes: 'مسوقة محترفة على تيك توك وإنستغرام في مجال التجميل',
-        },
-      };
-      localStorage.setItem(STORAGE_KEY_ASSIGNMENTS, JSON.stringify(defaultAssignments));
-      return defaultAssignments;
+      return {};
     }
-    return JSON.parse(raw) || {};
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      // Clean legacy dummy test reseller assignments if present
+      delete parsed['sel-101'];
+      delete parsed['sel-102'];
+      delete parsed['sel-103'];
+      return parsed;
+    }
+    return {};
   } catch {
     return {};
   }
@@ -498,24 +350,14 @@ export function getStoredSupplierSupportAssignments(): Record<string, SupplierSu
   try {
     const raw = localStorage.getItem(STORAGE_KEY_SUPPLIER_ASSIGNMENTS);
     if (!raw) {
-      const defaultAssignments: Record<string, SupplierSupportAssignment> = {
-        'sup-201': {
-          supplierId: 'sup-201',
-          supplierName: 'أحمد بن قاسم',
-          companyName: 'مصنع الأقمشة والملابس الجاهزة',
-          supplierPhone: '0770987654',
-          supplierWilaya: '19 - سطيف',
-          activityType: 'ألبسة ونسيج وتصنيع',
-          agentId: 'sys-usr-support-1',
-          agentName: 'سارة مراد',
-          assignedAt: '2025-02-15',
-          notes: 'مورد معتمد للألبسة الجاهزة، يحتاج مرافقة في توريد الشحنات لمستودع المنصة',
-        },
-      };
-      localStorage.setItem(STORAGE_KEY_SUPPLIER_ASSIGNMENTS, JSON.stringify(defaultAssignments));
-      return defaultAssignments;
+      return {};
     }
-    return JSON.parse(raw) || {};
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      delete parsed['sup-201'];
+      return parsed;
+    }
+    return {};
   } catch {
     return {};
   }

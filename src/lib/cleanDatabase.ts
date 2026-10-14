@@ -24,6 +24,17 @@ export function cleanDatabaseSystem(): {
     localStorage.setItem('reseller_wallet_balance_v1', '0');
     localStorage.setItem('reseller_wallet_transactions_v1', JSON.stringify([]));
     localStorage.setItem('nouva_offline_orders_queue', JSON.stringify([]));
+
+    // Reset support tickets and direct chat conversations to zero for production launch
+    localStorage.setItem('nouva_support_tickets_v1', JSON.stringify([]));
+    localStorage.setItem('nouva_reseller_support_assignments_v1', JSON.stringify({}));
+    localStorage.setItem('nouva_supplier_support_assignments_v1', JSON.stringify({}));
+    localStorage.setItem('nouva_direct_conversations_v1', JSON.stringify({}));
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('nouva_support_tickets_updated', { detail: [] }));
+      window.dispatchEvent(new CustomEvent('nouva_direct_conversations_updated', { detail: {} }));
+    }
   } catch (err) {
     console.error('Error executing database cleanup:', err);
   }

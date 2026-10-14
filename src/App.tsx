@@ -129,6 +129,31 @@ function AppContent() {
 
   useEffect(() => {
     syncProductsWithServer();
+    // One-time automatic clean of any legacy dummy support tickets & test conversations
+    try {
+      const ticketsRaw = localStorage.getItem('nouva_support_tickets_v1');
+      if (ticketsRaw) {
+        const parsed = JSON.parse(ticketsRaw);
+        if (Array.isArray(parsed) && parsed.some((t: any) => t?.id?.startsWith('TCK-940'))) {
+          const clean = parsed.filter((t: any) => t && t.id && !t.id.startsWith('TCK-940'));
+          localStorage.setItem('nouva_support_tickets_v1', JSON.stringify(clean));
+          window.dispatchEvent(new CustomEvent('nouva_support_tickets_updated', { detail: clean }));
+        }
+      }
+      const chatRaw = localStorage.getItem('nouva_direct_conversations_v1');
+      if (chatRaw) {
+        const parsedChat = JSON.parse(chatRaw);
+        if (parsedChat && typeof parsedChat === 'object' && (parsedChat['conv_sel_101'] || parsedChat['conv_sup_1'] || (parsedChat as any)['0'])) {
+          delete parsedChat['conv_sel_101'];
+          delete parsedChat['conv_sup_1'];
+          delete (parsedChat as any)['0'];
+          localStorage.setItem('nouva_direct_conversations_v1', JSON.stringify(parsedChat));
+          window.dispatchEvent(new CustomEvent('nouva_direct_conversations_updated', { detail: parsedChat }));
+        }
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   const handleLogout = () => {
