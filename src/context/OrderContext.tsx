@@ -309,14 +309,23 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
               });
 
               if (msg.type === 'order_created' && (newOrUpdated.status === 'LINK_ORDER' || newOrUpdated.source === 'LINK')) {
-                window.dispatchEvent(
-                  new CustomEvent('app-toast', {
-                    detail: {
-                      message: `🔥 طلب جديد وارد من الرابط: ${newOrUpdated.customerName || 'زبون'} (${newOrUpdated.totalAmount} دج)`,
-                      type: 'success',
-                    },
-                  })
-                );
+                const isMine =
+                  !user ||
+                  user.role === 'admin' ||
+                  user.role === 'confirmer' ||
+                  (newOrUpdated.resellerId && newOrUpdated.resellerId === user.id) ||
+                  (user.email && newOrUpdated.resellerEmail?.toLowerCase() === user.email.toLowerCase());
+
+                if (isMine) {
+                  window.dispatchEvent(
+                    new CustomEvent('app_toast', {
+                      detail: {
+                        message: `🔥 طلب جديد وارد من الرابط: ${newOrUpdated.customerName || 'زبون'} (${newOrUpdated.totalAmount} دج)`,
+                        type: 'success',
+                      },
+                    })
+                  );
+                }
               }
             }
           } else if (msg.type === 'order_deleted') {
@@ -491,13 +500,17 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     // Send seller notification for new order (link or manual)
     const firstItem = localOrder.items?.[0];
     if (orderInput.source === 'LINK' || orderInput.status === ('LINK_ORDER' as any)) {
-      addSellerNotification({
-        type: 'order',
-        titleAr: '🔗 طلبية جديدة واردة من رابط المشاركة! 🔥',
-        bodyAr: `قام زبون جديد (${localOrder.customerName || 'مجهول'}) بطلب منتج "${firstItem?.productName || ''}" عبر رابط المتجر الشخصي. بقيمة ${localOrder.totalAmount || 0} دج (ربح متوقع: +${localOrder.totalProfit || 0} دج).`,
-        productId: firstItem?.productId,
-        productNameAr: firstItem?.productName,
-      });
+      if (enrichedInput.resellerId) {
+        addSellerNotification({
+          type: 'order',
+          titleAr: '🔗 طلبية جديدة واردة من رابط المشاركة! 🔥',
+          bodyAr: `قام زبون جديد (${localOrder.customerName || 'مجهول'}) بطلب منتج "${firstItem?.productName || ''}" عبر رابط المتجر الشخصي. بقيمة ${localOrder.totalAmount || 0} دج (ربح متوقع: +${localOrder.totalProfit || 0} دج).`,
+          productId: firstItem?.productId,
+          productNameAr: firstItem?.productName,
+          sellerId: enrichedInput.resellerId,
+          recipientUserId: enrichedInput.resellerId,
+        });
+      }
 
       addAdminNotification({
         type: 'order',
@@ -507,13 +520,17 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         productNameAr: firstItem?.productName,
       });
     } else {
-      addSellerNotification({
-        type: 'order',
-        titleAr: '📝 تم تسجيل طلبية جديدة بنجاح',
-        bodyAr: `تم إنشاء طلبية جديدة للزبون (${localOrder.customerName || ''}) بقيمة ${localOrder.totalAmount || 0} دج.`,
-        productId: firstItem?.productId,
-        productNameAr: firstItem?.productName,
-      });
+      if (enrichedInput.resellerId) {
+        addSellerNotification({
+          type: 'order',
+          titleAr: '📝 تم تسجيل طلبية جديدة بنجاح',
+          bodyAr: `تم إنشاء طلبية جديدة للزبون (${localOrder.customerName || ''}) بقيمة ${localOrder.totalAmount || 0} دج.`,
+          productId: firstItem?.productId,
+          productNameAr: firstItem?.productName,
+          sellerId: enrichedInput.resellerId,
+          recipientUserId: enrichedInput.resellerId,
+        });
+      }
 
       addAdminNotification({
         type: 'order',
@@ -1531,13 +1548,25 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     let baseOrders = orders;
     if (user) {
       if (user.role === 'reseller') {
+        const cleanEmail = user.email?.trim().toLowerCase();
+        const cleanPhone = user.phone?.trim();
         const isDemoSeller =
-          user.email === 'seller@nouvachat.com' ||
-          user.phone === '0550123456' ||
+          cleanEmail === 'seller@nouvachat.com' ||
+          cleanPhone === '0550123456' ||
           user.id === 'u-reseller-12';
-        if (!isDemoSeller) {
+        if (isDemoSeller) {
           baseOrders = orders.filter(
-            (o) => !o.resellerId || o.resellerId === user.id || o.resellerEmail === user.email || o.resellerPhone === user.phone
+            (o) =>
+              o.resellerId === 'u-reseller-12' ||
+              o.resellerEmail?.toLowerCase() === 'seller@nouvachat.com' ||
+              o.resellerPhone === '0550123456'
+          );
+        } else {
+          baseOrders = orders.filter(
+            (o) =>
+              (o.resellerId && o.resellerId === user.id) ||
+              (cleanEmail && o.resellerEmail && o.resellerEmail.trim().toLowerCase() === cleanEmail) ||
+              (cleanPhone && o.resellerPhone && o.resellerPhone.trim() === cleanPhone)
           );
         }
       } else if (user.role === 'warehouse') {
@@ -1976,15 +2005,26 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     if (!user) return orders;
     if (user.role === 'admin' || user.role === 'confirmer') return orders;
     if (user.role === 'reseller') {
+      const cleanEmail = user.email?.trim().toLowerCase();
+      const cleanPhone = user.phone?.trim();
       const isDemoSeller =
-        user.email === 'seller@nouvachat.com' ||
-        user.phone === '0550123456' ||
+        cleanEmail === 'seller@nouvachat.com' ||
+        cleanPhone === '0550123456' ||
         user.id === 'u-reseller-12';
-      if (!isDemoSeller) {
+      if (isDemoSeller) {
         return orders.filter(
-          (o) => !o.resellerId || o.resellerId === user.id || o.resellerEmail === user.email || o.resellerPhone === user.phone
+          (o) =>
+            o.resellerId === 'u-reseller-12' ||
+            o.resellerEmail?.toLowerCase() === 'seller@nouvachat.com' ||
+            o.resellerPhone === '0550123456'
         );
       }
+      return orders.filter(
+        (o) =>
+          (o.resellerId && o.resellerId === user.id) ||
+          (cleanEmail && o.resellerEmail && o.resellerEmail.trim().toLowerCase() === cleanEmail) ||
+          (cleanPhone && o.resellerPhone && o.resellerPhone.trim() === cleanPhone)
+      );
     } else if (user.role === 'warehouse') {
       const cleanUserEmail = user.email?.trim().toLowerCase();
       return orders.filter(

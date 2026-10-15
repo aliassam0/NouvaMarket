@@ -568,48 +568,60 @@ export async function syncOrderStatus(
     const firstItem = updatedOrder.items?.[0];
 
     // Notification for Reseller / Seller
-    if (newStatus === 'CONFIRMED') {
-      addSellerNotification({
-        type: 'order',
-        titleAr: '✅ تم تأكيد طلبيتك',
-        bodyAr: `تم تأكيد طلبيتك #${orderRef} للزبون (${customer}) بنجاح وهي الآن جاهزة للتحضير بالمستودع.`,
-        productId: firstItem?.productId,
-        productNameAr: firstItem?.productName,
-      });
-    } else if (newStatus === 'PROCESSING') {
-      addSellerNotification({
-        type: 'order',
-        titleAr: '📦 طلبيتك قيد التجهيز بالمستودع',
-        bodyAr: `بدأ المستودع بتجهيز وتحضير الطرد للطلبية #${orderRef}.`,
-        productId: firstItem?.productId,
-        productNameAr: firstItem?.productName,
-      });
-    } else if (newStatus === 'SHIPPED') {
-      const courierStr = updatedOrder.deliveryCompanyName || 'شركة التوصيل';
-      const driverStr = updatedOrder.driverName ? `السائق: ${updatedOrder.driverName} (${updatedOrder.driverPhone || ''})` : '';
-      addSellerNotification({
-        type: 'order',
-        titleAr: '🚚 طلبيتك قيد التوصيل الآن',
-        bodyAr: `أصبحت طلبيتك #${orderRef} قيد التوصيل في ولاية ${wilaya} مع ${courierStr}. ${driverStr}`,
-        productId: firstItem?.productId,
-        productNameAr: firstItem?.productName,
-      });
-    } else if (newStatus === 'DELIVERED') {
-      addSellerNotification({
-        type: 'wallet',
-        titleAr: '🎉 تم تسليم الطلبية وإضافة الأرباح!',
-        bodyAr: `تم تسليم طلبيتك #${orderRef} للزبون (${customer}) بنجاح وإضافة عمولتك (+${(updatedOrder.totalProfit || 1000).toLocaleString()} دج) إلى رصيد محفظتك.`,
-        productId: firstItem?.productId,
-        productNameAr: firstItem?.productName,
-      });
-    } else if (newStatus === 'FAILED' || newStatus === 'CANCELLED') {
-      addSellerNotification({
-        type: 'order',
-        titleAr: '⚠️ تحديث بخصوص طلبيتك (غير مستلمة / ملغاة)',
-        bodyAr: `الطلبية #${orderRef} للزبون (${customer}) تم تسجيلها كـ (${meta.statusAr}). السبب: ${options.reason || options.note || 'تعذر التسليم'}`,
-        productId: firstItem?.productId,
-        productNameAr: firstItem?.productName,
-      });
+    if (updatedOrder.resellerId) {
+      if (newStatus === 'CONFIRMED') {
+        addSellerNotification({
+          type: 'order',
+          titleAr: '✅ تم تأكيد طلبيتك',
+          bodyAr: `تم تأكيد طلبيتك #${orderRef} للزبون (${customer}) بنجاح وهي الآن جاهزة للتحضير بالمستودع.`,
+          productId: firstItem?.productId,
+          productNameAr: firstItem?.productName,
+          sellerId: updatedOrder.resellerId,
+          recipientUserId: updatedOrder.resellerId,
+        });
+      } else if (newStatus === 'PROCESSING') {
+        addSellerNotification({
+          type: 'order',
+          titleAr: '📦 طلبيتك قيد التجهيز بالمستودع',
+          bodyAr: `بدأ المستودع بتجهيز وتحضير الطرد للطلبية #${orderRef}.`,
+          productId: firstItem?.productId,
+          productNameAr: firstItem?.productName,
+          sellerId: updatedOrder.resellerId,
+          recipientUserId: updatedOrder.resellerId,
+        });
+      } else if (newStatus === 'SHIPPED') {
+        const courierStr = updatedOrder.deliveryCompanyName || 'شركة التوصيل';
+        const driverStr = updatedOrder.driverName ? `السائق: ${updatedOrder.driverName} (${updatedOrder.driverPhone || ''})` : '';
+        addSellerNotification({
+          type: 'order',
+          titleAr: '🚚 طلبيتك قيد التوصيل الآن',
+          bodyAr: `أصبحت طلبيتك #${orderRef} قيد التوصيل في ولاية ${wilaya} مع ${courierStr}. ${driverStr}`,
+          productId: firstItem?.productId,
+          productNameAr: firstItem?.productName,
+          sellerId: updatedOrder.resellerId,
+          recipientUserId: updatedOrder.resellerId,
+        });
+      } else if (newStatus === 'DELIVERED') {
+        addSellerNotification({
+          type: 'wallet',
+          titleAr: '🎉 تم تسليم الطلبية وإضافة الأرباح!',
+          bodyAr: `تم تسليم طلبيتك #${orderRef} للزبون (${customer}) بنجاح وإضافة عمولتك (+${(updatedOrder.totalProfit || 1000).toLocaleString()} دج) إلى رصيد محفظتك.`,
+          productId: firstItem?.productId,
+          productNameAr: firstItem?.productName,
+          sellerId: updatedOrder.resellerId,
+          recipientUserId: updatedOrder.resellerId,
+        });
+      } else if (newStatus === 'FAILED' || newStatus === 'CANCELLED') {
+        addSellerNotification({
+          type: 'order',
+          titleAr: '⚠️ تحديث بخصوص طلبيتك (غير مستلمة / ملغاة)',
+          bodyAr: `الطلبية #${orderRef} للزبون (${customer}) تم تسجيلها كـ (${meta.statusAr}). السبب: ${options.reason || options.note || 'تعذر التسليم'}`,
+          productId: firstItem?.productId,
+          productNameAr: firstItem?.productName,
+          sellerId: updatedOrder.resellerId,
+          recipientUserId: updatedOrder.resellerId,
+        });
+      }
     }
 
     // Notification for Warehouse / Supplier

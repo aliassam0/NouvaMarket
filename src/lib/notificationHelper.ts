@@ -58,15 +58,18 @@ export function getStoredNotifications(
         (n) => n && !n.id?.startsWith('n-default-') && !n.id?.startsWith('n-admin-') && !n.id?.startsWith('n-wh-')
       );
 
-      // If viewing as a seller and a targetUserId is provided, isolate notifications
-      if (role === 'seller' && targetUserId) {
+      // If viewing as a seller, isolate private notifications (orders, wallet, rewards)
+      if (role === 'seller') {
         filtered = filtered.filter((n) => {
           // If notification is tied to a specific recipient, check match
-          if (n.recipientUserId) return n.recipientUserId === targetUserId;
-          if (n.sellerId) return n.sellerId === targetUserId;
-          // Wallet/withdrawal notifications MUST belong to the user; never bleed to other users
-          if (n.type === 'wallet') return false;
-          return true;
+          if (targetUserId) {
+            if (n.recipientUserId) return n.recipientUserId === targetUserId;
+            if (n.sellerId) return n.sellerId === targetUserId;
+          }
+          // Order, wallet, and reward notifications MUST strictly belong to the user; never bleed to other users
+          if (n.type === 'order' || n.type === 'wallet' || n.type === 'reward') return false;
+          // General broadcast notifications (product additions, stock updates, system announcements)
+          return n.recipientRole === 'all' || n.type === 'product_add' || n.type === 'stock_update' || n.type === 'system';
         });
       }
 

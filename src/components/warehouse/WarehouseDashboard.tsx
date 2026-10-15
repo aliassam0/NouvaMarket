@@ -2062,12 +2062,12 @@ export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: Warehou
                 highlight: supplierLinkOrdersCount > 0,
               },
               { id: 'REVIEW', labelAr: 'قيد المراجعة', count: myDirectReviewOrders.length },
+              { id: 'CANCELLED', labelAr: 'ملغاة قبل الشحن', count: myDirectCancelledOrders.length },
               { id: 'CONFIRMED', labelAr: 'تم التأكيد', count: myDirectConfirmedOrders.length },
               { id: 'PROCESSING', labelAr: 'قيد التحضير', count: myDirectProcessingOrders.length },
               { id: 'SHIPPED', labelAr: 'قيد التوصيل', count: myDirectShippedOrders.length },
               { id: 'DELIVERED', labelAr: 'تم التسليم', count: myDirectDeliveredOrders.length },
               { id: 'FAILED', labelAr: 'مرتجع التوصيل (Retour)', count: myDirectFailedOrders.length },
-              { id: 'CANCELLED', labelAr: 'ملغاة قبل الشحن', count: myDirectCancelledOrders.length },
             ].map((tab) => {
               const isActive = myOrdersFilter === tab.id;
               return (
@@ -2535,12 +2535,12 @@ export function WarehouseDashboard({ onShowToast, isPlatformWarehouse }: Warehou
             {[
               { id: 'ALL', labelAr: 'الكل', count: supplierOrders.length, color: 'bg-slate-100 text-slate-800' },
               { id: 'REVIEW', labelAr: '🔍 قيد المراجعة', count: supplierReviewCount, color: 'bg-amber-100 text-amber-800' },
+              { id: 'CANCELLED', labelAr: '⚠️ ملغاة قبل الشحن', count: supplierCancelledCount, color: 'bg-slate-100 text-slate-800' },
               { id: 'CONFIRMED', labelAr: '✅ تم التأكيد', count: supplierConfirmedCount, color: 'bg-blue-100 text-blue-800' },
               { id: 'PROCESSING', labelAr: '📦 قيد التحضير', count: supplierProcessingCount, color: 'bg-purple-100 text-purple-800' },
               { id: 'SHIPPED', labelAr: '🚚 قيد التوصيل', count: supplierShippedCount, color: 'bg-indigo-100 text-indigo-800' },
               { id: 'DELIVERED', labelAr: '🎉 تم التسليم', count: supplierDeliveredCount, color: 'bg-emerald-100 text-emerald-800' },
               { id: 'FAILED', labelAr: '❌ مرتجع التوصيل (Retour)', count: supplierFailedCount, color: 'bg-rose-100 text-rose-800' },
-              { id: 'CANCELLED', labelAr: '⚠️ ملغاة قبل الشحن', count: supplierCancelledCount, color: 'bg-slate-100 text-slate-800' },
             ].map((tab) => (
               <button
                 key={tab.id}

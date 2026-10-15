@@ -2150,12 +2150,12 @@ export function AdminDashboard({
               { id: 'OFFICIAL_STORE', labelAr: '🛒 المتجر الرسمي', count: adminOfficialStoreCount, color: 'bg-emerald-100 text-emerald-900 font-black' },
               { id: 'LINK_ORDER', labelAr: 'طلبات الروابط', count: adminLinkCount, color: 'bg-amber-100 text-amber-900 font-black' },
               { id: 'REVIEW', labelAr: 'قيد المراجعة', count: adminReviewCount, color: 'bg-amber-100 text-amber-800' },
+              { id: 'CANCELLED', labelAr: 'ملغاة قبل الشحن', count: adminCancelledCount, color: 'bg-slate-100 text-slate-800' },
               { id: 'CONFIRMED', labelAr: 'تم التأكيد', count: adminConfirmedCount, color: 'bg-blue-100 text-blue-800' },
               { id: 'PROCESSING', labelAr: 'قيد التحضير', count: adminProcessingCount, color: 'bg-purple-100 text-purple-800' },
               { id: 'SHIPPED', labelAr: 'قيد التوصيل', count: adminShippedCount, color: 'bg-indigo-100 text-indigo-800' },
               { id: 'DELIVERED', labelAr: 'تم التسليم', count: adminDeliveredCount, color: 'bg-emerald-100 text-emerald-800' },
               { id: 'FAILED', labelAr: 'مرتجع التوصيل (Retour)', count: adminFailedCount, color: 'bg-rose-100 text-rose-800' },
-              { id: 'CANCELLED', labelAr: 'ملغاة قبل الشحن', count: adminCancelledCount, color: 'bg-slate-100 text-slate-800' },
             ].map((tab) => (
               <button
                 key={tab.id}

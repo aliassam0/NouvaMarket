@@ -577,12 +577,12 @@ export function CommandesTab() {
               ]
             : []),
           { id: 'REVIEW', labelAr: 'قيد المراجعة', labelFr: 'En révision' },
+          { id: 'CANCELLED', labelAr: 'ملغاة قبل الشحن', labelFr: 'Annulées' },
           { id: 'CONFIRMED', labelAr: 'تم التأكيد', labelFr: 'Confirmée' },
           { id: 'PROCESSING', labelAr: 'قيد التحضير', labelFr: 'En préparation' },
           { id: 'SHIPPED', labelAr: 'قيد التوصيل', labelFr: 'En transit' },
           { id: 'DELIVERED', labelAr: 'تم التسليم', labelFr: 'Livrées' },
           { id: 'FAILED', labelAr: 'مرتجع التوصيل (Retour)', labelFr: 'Retours' },
-          { id: 'CANCELLED', labelAr: 'ملغاة قبل الشحن', labelFr: 'Annulées' },
         ].map((tab) => {
           const badgeVal = tab.badge || 0;
           return (
