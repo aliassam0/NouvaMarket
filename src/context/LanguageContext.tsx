@@ -22,7 +22,7 @@ const TRANSLATIONS: Record<Language, Record<string, string>> = {
 
     // App header & welcome
     'app.title': 'Nouva Market',
-    'app.subtitle': 'منصة التجارة بالعمولة والدروبشيبينغ الشاملة بالجزائر',
+    'app.subtitle': 'منصة التسويق بالعمولة والتجارة الإلكترونية بالجزائر',
     'app.offline': 'أنت تعمل بدون إنترنت (Offline) — يتم حفظ الطلبات محلياً',
 
     // Home / Dashboard
@@ -153,7 +153,7 @@ const TRANSLATIONS: Record<Language, Record<string, string>> = {
 
     // App header & welcome
     'app.title': 'Nouva Market',
-    'app.subtitle': 'Reseller Operating System — Commerce & Dropshipping',
+    'app.subtitle': 'Reseller Operating System — E-Commerce & Affiliate',
     'app.offline': 'Mode Hors-ligne — Commandes sauvegardées en local',
 
     // Home / Dashboard

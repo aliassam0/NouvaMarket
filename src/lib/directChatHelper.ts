@@ -253,7 +253,7 @@ export function getDefaultSupportAgent(): { id: string; fullName: string; phone:
   }
   return {
     id: 'sys-usr-support-1',
-    fullName: 'سارة مراد (الدعم الفني المباشر)',
+    fullName: 'فريق الدعم الفني المباشر',
     phone: '0555000111',
   };
 }
@@ -567,7 +567,7 @@ export function triggerAutoSupportReply(params: {
         senderId: params.agentId || 'sys-usr-support-1',
         senderName:
           params.agentName ||
-          (params.partyType === 'RESELLER' ? 'سارة مراد (الدعم الفني للمسوقين)' : 'كول سنتر دعم الموردين والبائعين'),
+          (params.partyType === 'RESELLER' ? 'فريق الدعم الفني للمسوقين' : 'كول سنتر دعم الموردين والبائعين'),
         senderRole: 'SUPPORT',
         text: replyText,
       });

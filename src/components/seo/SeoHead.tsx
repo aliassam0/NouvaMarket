@@ -12,9 +12,9 @@ export interface SeoProps {
   jsonLd?: Record<string, any> | Array<Record<string, any>>;
 }
 
-const DEFAULT_TITLE = 'نوفا ماركت | Nouva Market - أول منصة للتسويق بالعمولة والدروبشيبينغ في الجزائر';
+const DEFAULT_TITLE = 'نوفا ماركت | Nouva Market - أول منصة للتسويق بالعمولة والتجارة الإلكترونية في الجزائر';
 const DEFAULT_DESCRIPTION = 'انضم إلى نوفا ماركت (Nouva Market)، المنصة رقم #1 للتسويق بالعمولة والتجارة الإلكترونية في الجزائر. آلاف المنتجات بأسعار الجملة، تأكيد هاتفي احترافي، شحن لـ 58 ولاية، ودفع فوري للأرباح عبر CCP و BaridiMob.';
-const DEFAULT_KEYWORDS = 'نوفا ماركت, Nouva Market, التسويق بالعمولة في الجزائر, دروبشيبينغ الجزائر, الربح من الانترنت بالجزائر, التجارة الالكترونية الجزائر, منتجات الجملة الجزائر, الدفع عند الاستلام COD الجزائر, بريدي موب BaridiMob, ccp الجزائر, موردين الجزائر';
+const DEFAULT_KEYWORDS = 'نوفا ماركت, Nouva Market, التسويق بالعمولة في الجزائر, التجارة الالكترونية الجزائر, الربح من الانترنت بالجزائر, منتجات الجملة الجزائر, الدفع عند الاستلام COD الجزائر, بريدي موب BaridiMob, ccp الجزائر, موردين الجزائر';
 const DEFAULT_OG_IMAGE = 'https://nouvamarket.com/og-image.png';
 const SITE_URL = 'https://nouvamarket.com';
 

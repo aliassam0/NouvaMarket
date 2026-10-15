@@ -84,8 +84,8 @@ export function PublicProductsPage({
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col">
       <SeoHead
         title="كتالوج المنتجات وسوق الجملة | نوفا ماركت الجزائر"
-        description="تصفح آلاف المنتجات الرابحة بأسعار الجملة في الجزائر. ابدأ التسويق بالعمولة والدروبشيبينغ بدون رأس مال مع هوامش ربح تصل إلى 2500 دج للقطعة الواحدة وشحن لـ 58 ولاية."
-        keywords="منتجات دروبشيبينغ الجزائر, منتجات الجملة بالجزائر, منتجات مربحة للتسويق بالعمولة, سوق الجملة الجزائر, بضاعة جملة وهران قسنطينة سطيف الجزائر, منتجات تريند الجزائر"
+        description="تصفح آلاف المنتجات الرابحة بأسعار الجملة في الجزائر. ابدأ التسويق بالعمولة بدون رأس مال مع هوامش ربح تصل إلى 2500 دج للقطعة الواحدة وشحن لـ 58 ولاية."
+        keywords="منتجات التجارة الإلكترونية بالجزائر, منتجات الجملة بالجزائر, منتجات مربحة للتسويق بالعمولة, سوق الجملة الجزائر, بضاعة جملة وهران قسنطينة سطيف الجزائر, منتجات تريند الجزائر"
         canonical="https://nouvamarket.com/products"
         jsonLd={productsJsonLd}
       />
@@ -99,7 +99,7 @@ export function PublicProductsPage({
           <div className="max-w-6xl mx-auto relative z-10 text-center space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/20 border border-purple-400/30 text-purple-200 text-xs font-bold">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>كتالوج منتجات دروبشيبينغ والجملة 2026 في الجزائر</span>
+              <span>كتالوج منتجات التسويق بالعمولة والجملة 2026 في الجزائر</span>
             </div>
             <h1 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight">
               سوق المنتجات الرابحة <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-purple-300">بأسعار الجملة المباشرة</span>
@@ -210,7 +210,7 @@ export function PublicProductsPage({
                     <div className="relative aspect-square bg-slate-100 dark:bg-slate-800 overflow-hidden">
                       <img
                         src={product.image}
-                        alt={`${product.name} - منتج دروبشيبينغ في الجزائر`}
+                        alt={`${product.name} - منتج للتسويق بالعمولة في الجزائر`}
                         loading="lazy"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />

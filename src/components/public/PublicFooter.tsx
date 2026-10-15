@@ -30,7 +30,7 @@ export function PublicFooter() {
               </span>
             </Link>
             <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
-              أكبر منصة للتسويق بالعمولة والدروبشيبينغ في الجزائر. نربط المسوقين وأصحاب المتاجر الإلكترونية بأفضل الموردين والمصانع المحلية مع ضمان التأكيد الهاتفي السريع والشحن لـ 58 ولاية وتسوية الأرباح عبر بريدي موب و CCP.
+              أكبر منصة للتسويق بالعمولة والتجارة الإلكترونية في الجزائر. نربط المسوقين وأصحاب المتاجر الإلكترونية بأفضل الموردين والمصانع المحلية مع ضمان التأكيد الهاتفي السريع والشحن لـ 58 ولاية وتسوية الأرباح عبر بريدي موب و CCP.
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <span className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-[11px] font-bold text-slate-300 flex items-center gap-1.5">

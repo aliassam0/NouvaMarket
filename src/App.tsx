@@ -894,10 +894,10 @@ function AppContent() {
             }}
             onSwitchToSupportDashboard={(agent) => {
               setImpersonatedSupportAgentId(agent?.id || null);
-              setImpersonatedSupportName(agent?.fullName || 'سارة مراد (الدعم الفني)');
+              setImpersonatedSupportName(agent?.fullName || 'فريق الدعم الفني');
               setCurrentRole('support');
               navigate('/support');
-              showToast(`تم الدخول لحساب وكيل الدعم: ${agent?.fullName || 'سارة مراد'}`, 'info');
+              showToast(`تم الدخول لحساب وكيل الدعم: ${agent?.fullName || 'فريق الدعم الفني'}`, 'info');
             }}
           />
         )}

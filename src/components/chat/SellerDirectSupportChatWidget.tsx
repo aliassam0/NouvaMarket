@@ -298,7 +298,7 @@ export function SellerDirectSupportChatWidget({
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-200" />
                 </div>
                 <h3 className="font-black text-xs sm:text-sm leading-tight mt-0.5">
-                  {conversation?.agentName || (partyType === 'RESELLER' ? 'سارة مراد (وكيلة الدعم)' : 'كول سنتر دعم الموردين')}
+                  {conversation?.agentName || (partyType === 'RESELLER' ? 'فريق الدعم الفني للمسوقين' : 'كول سنتر دعم الموردين')}
                 </h3>
                 <div className="flex items-center gap-1.5 text-[10.5px] text-teal-100 mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-300"></span>

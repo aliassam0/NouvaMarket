@@ -681,7 +681,7 @@ const DEFAULT_SYSTEM_USERS: any[] = [
   },
   {
     id: "usr-3",
-    fullName: "سارة - مؤكدة الطلبيات",
+    fullName: "مؤكد الطلبيات (فريق التأكيد)",
     email: "confirmer@nouvamarket.com",
     password: "Aliass@m1989",
     role: "ORDER_CONFIRMER",
@@ -691,7 +691,7 @@ const DEFAULT_SYSTEM_USERS: any[] = [
   },
   {
     id: "usr-4",
-    fullName: "سارة مراد (الدعم الفني للمسوقين)",
+    fullName: "فريق الدعم الفني للمسوقين",
     email: "support@nouvamarket.com",
     password: "Aliass@m1989",
     role: "RESELLER_SUPPORT",
@@ -701,7 +701,7 @@ const DEFAULT_SYSTEM_USERS: any[] = [
   },
   {
     id: "usr-5",
-    fullName: "كريم بن عمار (الدعم الفني واللوجستي)",
+    fullName: "فريق الدعم الفني واللوجستي",
     email: "karim.support@nouvamarket.com",
     password: "Aliass@m1989",
     role: "RESELLER_SUPPORT",

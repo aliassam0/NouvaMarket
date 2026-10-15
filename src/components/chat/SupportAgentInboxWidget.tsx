@@ -52,7 +52,7 @@ export function SupportAgentInboxWidget() {
 
   const isSuperAdmin = user?.role === 'admin';
   const agentId = isSuperAdmin ? 'ALL' : (user?.id || 'sys-usr-support-1');
-  const agentName = user?.fullName || (isSuperAdmin ? 'إدارة المنصة والدعم' : 'سارة مراد (الدعم الفني)');
+  const agentName = user?.fullName || (isSuperAdmin ? 'إدارة المنصة والدعم' : 'فريق الدعم الفني');
 
   // Load conversations for this agent
   const reloadData = () => {

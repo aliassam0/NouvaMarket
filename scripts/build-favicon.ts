@@ -273,103 +273,119 @@ async function generateFaviconAndLogo() {
     </g>
 
     <!-- 5. SIGNATURE 3D EMBOSSED WHITE LETTER 'N' -->
-    <!-- Meticulously traced from uploaded image 9A97B94C-2A46-4A6C-BB69-9D4B64AC7601.png -->
-    <!-- Features:
-         * Left vertical pill stem (smooth rounded top & bottom caps)
-         * Deep diagonal connecting across
-         * Right vertical stroke with signature outward-curving wing/crest flick at top-right
-         * 3D bevel extrusion and soft realistic drop shadow
-    -->
-    <g>
+    <g transform="rotate(-2.2 475 590)">
       <!-- A. Realistic Drop Shadow Cast onto Bag Face -->
       <g filter="url(#nDropShadow)">
-        <path d="M 334,440
-                 C 305,440 282,463 282,492
-                 L 282,752
-                 C 282,781 305,804 334,804
-                 C 363,804 386,781 386,752
-                 L 386,608
-                 L 514,756
-                 C 530,774 554,784 578,784
-                 C 604,784 624,764 624,738
-                 L 624,534
-                 C 638,510 650,478 648,446
-                 C 646,424 634,410 616,412
-                 C 602,414 590,430 578,458
-                 C 572,472 568,492 566,516
-                 L 386,478
-                 C 378,456 358,440 334,440 Z"
-              fill="#220468"
-              opacity="0.85"/>
+        <path d="M 359, 435
+                 L 405, 435
+                 L 541, 645
+                 C 543, 648 545, 646 545, 642
+                 L 545, 449
+                 C 545, 441 552, 435 561, 435
+                 L 589, 435
+                 C 598, 435 605, 441 605, 449
+                 L 605, 721
+                 C 605, 729 598, 735 589, 735
+                 L 545, 735
+                 L 409, 525
+                 C 407, 522 405, 524 405, 528
+                 L 405, 721
+                 C 405, 729 398, 735 389, 735
+                 L 361, 735
+                 C 352, 735 345, 729 345, 721
+                 L 345, 449
+                 C 345, 441 352, 435 359, 435 Z"
+              fill="#1e0356"
+              opacity="0.75"
+              transform="translate(10, 16)"/>
       </g>
 
       <!-- B. 3D Bevel Extrusion / Thickness (Offset down-right for physical volume) -->
-      <g transform="translate(8, 12)">
-        <path d="M 334,440
-                 C 305,440 282,463 282,492
-                 L 282,752
-                 C 282,781 305,804 334,804
-                 C 363,804 386,781 386,752
-                 L 386,608
-                 L 514,756
-                 C 530,774 554,784 578,784
-                 C 604,784 624,764 624,738
-                 L 624,534
-                 C 638,510 650,478 648,446
-                 C 646,424 634,410 616,412
-                 C 602,414 590,430 578,458
-                 C 572,472 568,492 566,516
-                 L 386,478
-                 C 378,456 358,440 334,440 Z"
+      <g transform="translate(6, 10)">
+        <path d="M 359, 435
+                 L 405, 435
+                 L 541, 645
+                 C 543, 648 545, 646 545, 642
+                 L 545, 449
+                 C 545, 441 552, 435 561, 435
+                 L 589, 435
+                 C 598, 435 605, 441 605, 449
+                 L 605, 721
+                 C 605, 729 598, 735 589, 735
+                 L 545, 735
+                 L 409, 525
+                 C 407, 522 405, 524 405, 528
+                 L 405, 721
+                 C 405, 729 398, 735 389, 735
+                 L 361, 735
+                 C 352, 735 345, 729 345, 721
+                 L 345, 449
+                 C 345, 441 352, 435 359, 435 Z"
               fill="url(#nBevelGrad)"/>
       </g>
 
       <!-- C. Main Front White Face of Letter 'N' -->
-      <!-- Smooth, rounded, organic 3D typography -->
-      <path d="M 330,436
-               C 301,436 278,459 278,488
-               L 278,748
-               C 278,777 301,800 330,800
-               C 359,800 382,777 382,748
-               L 382,604
-               L 510,752
-               C 526,770 550,780 574,780
-               C 600,780 620,760 620,734
-               L 620,530
-               C 634,506 646,474 644,442
-               C 642,420 630,406 612,408
-               C 598,410 586,426 574,454
-               C 568,468 564,488 562,512
-               L 382,474
-               C 374,452 354,436 330,436 Z"
+      <path d="M 359, 435
+               L 405, 435
+               L 541, 645
+               C 543, 648 545, 646 545, 642
+               L 545, 449
+               C 545, 441 552, 435 561, 435
+               L 589, 435
+               C 598, 435 605, 441 605, 449
+               L 605, 721
+               C 605, 729 598, 735 589, 735
+               L 545, 735
+               L 409, 525
+               C 407, 522 405, 524 405, 528
+               L 405, 721
+               C 405, 729 398, 735 389, 735
+               L 361, 735
+               C 352, 735 345, 729 345, 721
+               L 345, 449
+               C 345, 441 352, 435 359, 435 Z"
             fill="url(#nFrontFaceGrad)"/>
 
-      <!-- D. Top Soft Specular Highlight on 'N' -->
-      <path d="M 330,442
-               C 310,442 292,458 290,478
-               L 290,560
-               L 340,560
-               L 340,460
-               C 340,448 350,444 360,444
-               L 380,448
-               C 368,444 348,442 330,442 Z"
-            fill="#FFFFFF"
+      <!-- D. Glossy Highlights -->
+      <!-- Left stem gloss highlight -->
+      <path d="M 365, 460 L 365, 710"
+            fill="none"
+            stroke="#FFFFFF"
+            stroke-width="7"
+            stroke-linecap="round"
+            opacity="0.75"/>
+
+      <!-- Right stem gloss highlight -->
+      <path d="M 585, 460 L 585, 710"
+            fill="none"
+            stroke="#FFFFFF"
+            stroke-width="6"
+            stroke-linecap="round"
+            opacity="0.5"/>
+
+      <!-- Diagonal stroke gloss highlight -->
+      <path d="M 425, 470 L 530, 635"
+            fill="none"
+            stroke="#FFFFFF"
+            stroke-width="8"
+            stroke-linecap="round"
+            opacity="0.8"/>
+
+      <!-- Top-left cap gloss rim -->
+      <path d="M 355, 440 L 400, 440"
+            fill="none"
+            stroke="#FFFFFF"
+            stroke-width="5"
+            stroke-linecap="round"
             opacity="0.9"/>
 
-      <!-- E. Highlight along Top Crest Flick of 'N' -->
-      <path d="M 612,412
-               C 624,414 636,426 638,444
-               C 638,466 630,490 618,514
-               L 608,514
-               C 620,488 626,464 624,444
-               C 622,430 616,420 608,418 Z"
-            fill="#FFFFFF"
-            opacity="0.95"/>
-
-      <!-- F. Subtle Inner Bevel Shading at junction -->
-      <path d="M 382,604 L 510,752 L 498,752 L 382,618 Z"
-            fill="#E2DEF5"
-            opacity="0.7"/>
+      <!-- Top-right cap gloss rim -->
+      <path d="M 555, 440 L 595, 440"
+            fill="none"
+            stroke="#FFFFFF"
+            stroke-width="5"
+            stroke-linecap="round"
+            opacity="0.9"/>
     </g>
   </g>
 </svg>
