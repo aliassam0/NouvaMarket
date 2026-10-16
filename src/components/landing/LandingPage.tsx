@@ -344,7 +344,7 @@ export function LandingPage({ onEnterApp, onShowToast, initialModal }: LandingPa
           <div className="flex items-center gap-2 font-bold">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping inline-block shrink-0" />
             <span>
-              مرحباً <strong>{user.storeName || user.fullName}</strong> • أنت متصل داخل المنصة وحسابك {user.role === 'warehouse' ? 'كبائع' : 'كمسوق'} قيد مراجعة الإدارة. ستبقى متصلاً بالمنصة وسيتم نقلك مباشرة إلى لوحة التحكم فور موافقة الأدمن دون الحاجة لتسجيل الدخول مجدداً!
+              مرحباً <strong>{user.storeName || user.fullName}</strong> • أنت مسجل في <strong>قائمة الانتظار (حتى التوسع)</strong>. قبول الحسابات يتم <strong>يدوياً من طرف الإدارة</strong> بعد مراجعة البيانات. ستبقى متصلاً وسيتم نقلك مباشرة إلى لوحة التحكم فور موافقة وتفعيل الأدمن لحسابك!
             </span>
           </div>
           <div className="flex items-center gap-2">

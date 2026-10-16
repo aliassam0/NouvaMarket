@@ -218,13 +218,13 @@ export const EnterprisePendingApprovalModal: React.FC<EnterprisePendingApprovalM
                       : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                   }`}
                 >
-                  {isApprovedNow ? 'حساب معتمد ومفعل ✅' : 'بانتظار موافقة الإدارة ⏳'}
+                  {isApprovedNow ? 'حساب معتمد ومفعل ✅' : 'قائمة الانتظار (حتى التوسع) ⏳'}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
                 {isApprovedNow
-                  ? 'تم قبول واعتماد ملفك من قِبل إدارة المنصة'
-                  : 'طلب انضمامك مسجل بأمان وهو الآن قيد التدقيق'}
+                  ? 'تم قبول واعتماد ملفك يدوياً من قِبل إدارة المنصة'
+                  : 'طلبك مسجل في قائمة الانتظار للمراجعة اليدوية من الإدارة حتى التوسع'}
               </p>
             </div>
           </div>

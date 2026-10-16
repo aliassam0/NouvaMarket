@@ -310,11 +310,13 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
               if (msg.type === 'order_created' && (newOrUpdated.status === 'LINK_ORDER' || newOrUpdated.source === 'LINK')) {
                 const isMine =
-                  !user ||
-                  user.role === 'admin' ||
-                  user.role === 'confirmer' ||
-                  (newOrUpdated.resellerId && newOrUpdated.resellerId === user.id) ||
-                  (user.email && newOrUpdated.resellerEmail?.toLowerCase() === user.email.toLowerCase());
+                  Boolean(user) &&
+                  (user?.role === 'admin' ||
+                    user?.role === 'confirmer' ||
+                    (user?.role === 'reseller' &&
+                      user?.approvalStatus === 'APPROVED' &&
+                      ((newOrUpdated.resellerId && newOrUpdated.resellerId === user.id) ||
+                        (user.email && newOrUpdated.resellerEmail?.toLowerCase() === user.email.toLowerCase()))));
 
                 if (isMine) {
                   window.dispatchEvent(
@@ -1545,42 +1547,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   };
 
   const getFilteredOrders = () => {
-    let baseOrders = orders;
-    if (user) {
-      if (user.role === 'reseller') {
-        const cleanEmail = user.email?.trim().toLowerCase();
-        const cleanPhone = user.phone?.trim();
-        const isDemoSeller =
-          cleanEmail === 'seller@nouvachat.com' ||
-          cleanPhone === '0550123456' ||
-          user.id === 'u-reseller-12';
-        if (isDemoSeller) {
-          baseOrders = orders.filter(
-            (o) =>
-              o.resellerId === 'u-reseller-12' ||
-              o.resellerEmail?.toLowerCase() === 'seller@nouvachat.com' ||
-              o.resellerPhone === '0550123456'
-          );
-        } else {
-          baseOrders = orders.filter(
-            (o) =>
-              (o.resellerId && o.resellerId === user.id) ||
-              (cleanEmail && o.resellerEmail && o.resellerEmail.trim().toLowerCase() === cleanEmail) ||
-              (cleanPhone && o.resellerPhone && o.resellerPhone.trim() === cleanPhone)
-          );
-        }
-      } else if (user.role === 'warehouse') {
-        const cleanUserEmail = user.email?.trim().toLowerCase();
-        baseOrders = orders.filter(
-          (o) =>
-            o.supplierId === user.id ||
-            o.items?.some(
-              (i) => i.supplierId === user.id || (cleanUserEmail && i.supplierEmail?.toLowerCase() === cleanUserEmail)
-            ) ||
-            cleanUserEmail === 'warehouse@nouvamarket.com'
-        );
-      }
-    }
+    const baseOrders = userFilteredOrders;
 
     if (filterStatus === 'ALL') return baseOrders;
     if (filterStatus === 'LINK_ORDER') {
@@ -2002,30 +1969,33 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   };
 
   const userFilteredOrders = React.useMemo(() => {
-    if (!user) return orders;
+    if (!user) return [];
     if (user.role === 'admin' || user.role === 'confirmer') return orders;
     if (user.role === 'reseller') {
+      // Pending or waiting list sellers have 0 orders
+      if (user.approvalStatus !== 'APPROVED') {
+        return [];
+      }
       const cleanEmail = user.email?.trim().toLowerCase();
-      const cleanPhone = user.phone?.trim();
       const isDemoSeller =
-        cleanEmail === 'seller@nouvachat.com' ||
-        cleanPhone === '0550123456' ||
-        user.id === 'u-reseller-12';
+        user.id === 'u-reseller-12' &&
+        cleanEmail === 'seller@nouvachat.com';
       if (isDemoSeller) {
         return orders.filter(
           (o) =>
             o.resellerId === 'u-reseller-12' ||
-            o.resellerEmail?.toLowerCase() === 'seller@nouvachat.com' ||
-            o.resellerPhone === '0550123456'
+            o.resellerEmail?.toLowerCase() === 'seller@nouvachat.com'
         );
       }
       return orders.filter(
         (o) =>
           (o.resellerId && o.resellerId === user.id) ||
-          (cleanEmail && o.resellerEmail && o.resellerEmail.trim().toLowerCase() === cleanEmail) ||
-          (cleanPhone && o.resellerPhone && o.resellerPhone.trim() === cleanPhone)
+          (cleanEmail && o.resellerEmail && o.resellerEmail.trim().toLowerCase() === cleanEmail)
       );
     } else if (user.role === 'warehouse') {
+      if (user.approvalStatus !== 'APPROVED' && user.email !== 'warehouse@nouvamarket.com') {
+        return [];
+      }
       const cleanUserEmail = user.email?.trim().toLowerCase();
       return orders.filter(
         (o) =>
@@ -2036,7 +2006,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
           cleanUserEmail === 'warehouse@nouvamarket.com'
       );
     }
-    return orders;
+    return [];
   }, [orders, user]);
 
   const pendingLinkOrdersCount = React.useMemo(() => {

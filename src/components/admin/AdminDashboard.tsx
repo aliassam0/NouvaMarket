@@ -2449,22 +2449,22 @@ export function AdminDashboard({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm font-black text-slate-900 dark:text-white">
-                  طلبات الانضمام
+                  قائمة الانتظار وطلبات الانضمام (المراجعة والقبول اليدوي)
                 </h3>
                 {totalPendingApprovals > 0 ? (
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 animate-pulse">
-                    {totalPendingApprovals} معلق
+                    {totalPendingApprovals} في قائمة الانتظار
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    لا توجد طلبات معلقة
+                    لا توجد طلبات في قائمة الانتظار
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 {totalPendingApprovals > 0
-                  ? 'طلبات انضمام جديدة بانتظار المراجعة والاعتماد.'
-                  : 'تم اعتماد وتفعيل جميع الحسابات المسجلة.'}
+                  ? 'بائعون ومسوقون في قائمة الانتظار (حتى التوسع). القبول يدوي حصرياً من قِبل الإدارة بعد مراجعة بياناتهم.'
+                  : 'تمت مراجعة واعتماد جميع الحسابات المسجلة.'}
               </p>
             </div>
           </div>
@@ -2539,7 +2539,7 @@ export function AdminDashboard({
                           </span>
                         </div>
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                          ⏳ قيد المراجعة
+                          ⏳ في قائمة الانتظار (حتى التوسع)
                         </span>
                       </div>
 
@@ -2570,10 +2570,10 @@ export function AdminDashboard({
                     <div className="flex items-center gap-2 pt-2 border-t border-amber-500/20 flex-wrap">
                       <button
                         onClick={() => handleApproveSeller(seller.id)}
-                        className="flex-1 min-w-[100px] py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                        className="flex-1 min-w-[130px] py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
                       >
                         <Check className="w-3.5 h-3.5" />
-                        <span>قبول</span>
+                        <span>قبول وتفعيل الحساب</span>
                       </button>
 
                       <a
@@ -2620,7 +2620,7 @@ export function AdminDashboard({
                           </span>
                         </div>
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                          معلق
+                          ⏳ في قائمة الانتظار (حتى التوسع)
                         </span>
                       </div>
 
@@ -2649,10 +2649,10 @@ export function AdminDashboard({
                     <div className="flex items-center gap-2 pt-2 border-t border-purple-500/20 flex-wrap">
                       <button
                         onClick={() => handleUpdateSupplierStatus(supplier.id, 'APPROVED')}
-                        className="flex-1 min-w-[100px] py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                        className="flex-1 min-w-[130px] py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
                       >
                         <Check className="w-3.5 h-3.5" />
-                        <span>قبول</span>
+                        <span>قبول وتفعيل الحساب</span>
                       </button>
 
                       <a
